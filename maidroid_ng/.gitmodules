@@ -1,0 +1,3 @@
+[submodule "maidroid"]
+	path = maidroid
+	url = https://gitlab.com/mazes_80/maidroid

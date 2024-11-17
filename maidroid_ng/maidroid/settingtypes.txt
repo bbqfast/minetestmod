@@ -1,0 +1,33 @@
+[Common]
+maidroid.compat	        		(Auto-magically migrate tagicar maidroids) bool false
+maidroid.skip_steps			(Skip some steps: decrease cpu usage) int 0 0 10
+maidroid.speed				(Maidroid speed) float 0.7 0.4 1
+maidroid.path.timeout			(Do not follow path over) float 10 5 20
+maidroid.wander.walk_timeout		(Time to wander) float 4 2 12
+maidroid.wander.direction_timeout	(Time to wander in same direction) float 2.5 2 5
+maidroid.hat				(Enable maidroid hats) bool true
+
+[Cores]
+maidroid.farming			(Enable farmers) bool true
+maidroid.ocr				(Enable programmable maidroids) bool true
+maidroid.stockbreeder			(Enable stockbreeders) bool true
+maidroid.torcher			(Enable torchers) bool true
+maidroid.waffler			(Enable waffle cookers) bool true
+
+[Farming]
+maidroid.farming.job_time		(Delay to rest after after a job) float 3 0.5 5
+maidroid.farming.offline		(Work even owner offline) bool true
+maidroid.farming.sound			(Play sounds when digging nodes) bool true
+
+[Stockbreeder]
+maidroid.stockbreeder.pause		(Delay to rest after jobs) float 4 2 20
+maidroid.stockbreeder.max_poultries	(Max poultries near maidroid) int 12 8 20
+
+[Torcher]
+maidroid.torcher.delay			(Time between torch placement) float 0.75 0.25 5
+
+[Tools]
+maidroid.tools.capture_rod.wears	(Does capture rod wears) bool true
+maidroid.tools.capture_rod		(Load maidroid tools) bool true
+maidroid.tools.capture_rod.uses		(Capture rod be used) int 100 20 200
+maidroid.tools.robbery_stick		(Enable robbery stick) bool true
