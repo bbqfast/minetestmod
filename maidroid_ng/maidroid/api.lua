@@ -596,6 +596,9 @@ end
 
 -- generate_texture return a string with the maidroid texture
 maidroid.generate_texture = function(index)
+	minetest.log("******************************************   generate_texture")
+	-- error("This is an error message", 2)
+
 	local texture_name = "[combine:40x40:0,0=maidroid_base.png"
 	local color = index
 	if type(index) ~= "string" then
@@ -1107,8 +1110,10 @@ local halt = function(self)
 	self.object:set_velocity(null_vector)
 end
 
+-- ,,rm
 -- register_maidroid registers a definition of a new maidroid.
 local register_maidroid = function(product_name, def)
+	minetest.log("************************************************** register_maidroid = "..product_name)
 	maidroid.registered_maidroids[product_name] = true
 
 	def.collisionbox = {-0.25, -0.5, -0.25, 0.25, 0.625, 0.25}
@@ -1261,12 +1266,16 @@ register_maidroid( "maidroid:maidroid", {
 	hp_max     = 15,
 	weight     = 20,
 	mesh       = "maidroid.b3d",
+	mesh       = "character.b3d",
 	textures   = { "[combine:40x40:0,0=maidroid_base.png:24,32=maidroid_eyes_white.png" },
+	-- textures   = "character_Mary_LT_mt.png",
 	egg_image  = "maidroid_maidroid_egg.png",
 })
 
 -- Compatibility with tagicar maidroids
-if maidroid.settings.compat then
+-- ,,x1
+-- if maidroid.settings.compat then
+if False then
 	for i,_ in ipairs(dye.dyes) do
 		local product_name = "maidroid:maidroid_mk" .. tostring(i)
 		local texture_name = maidroid.generate_texture(i)

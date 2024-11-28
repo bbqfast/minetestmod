@@ -108,6 +108,17 @@ is_plantable = function(pos, name)
 	local node = minetest.get_node(pos)
 	local lpos = vector.add(pos, {x = 0, y = -1, z = 0})
 	local lnode = minetest.get_node(lpos)
+
+	-- minetest.set_node(self.destination, { name = "default:papyrus" })
+
+	
+	-- ,,x1
+	minetest.log("warning", "xxxxx"..lnode.name)
+
+	if lnode.name == "default:dirt_with_grass" or lnode.name == "default:dirt" then 
+		minetest.set_node(lpos, { name = "farming:soil" })
+	end
+	
 	return node.name == "air"
 		and minetest.get_item_group(lnode.name, "soil") > 1
 end
