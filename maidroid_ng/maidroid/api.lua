@@ -1,3 +1,4 @@
+minetest.log("warning", "*************************  maidroid API")
 ------------------------------------------------------------
 -- Copyright (c) 2016 tacigar. All rights reserved.
 ------------------------------------------------------------
@@ -17,6 +18,30 @@ maidroid.animation = {
 	MINE      = {x = 189, y = 198},
 	WALK_MINE = {x = 200, y = 219},
 }
+
+
+local maid_skins = {
+    "character_Mary_LT_mt.png^[invert:r",
+    "character_Dave_Lt_mt.png^[invert:r",
+    "character_Dave_Lt_mt.png^[invert:g",
+    "character_Dave_Lt_mt.png^[invert:b",
+    "character_Mary_LT_mt.png^[invert:g",
+    "character_Mary_LT_mt.png^[invert:b",
+    -- Add more skin filenames here
+}
+
+-- animation = {
+-- 	speed_normal = 30,
+-- 	speed_run = 30,
+-- 	stand_start = 0,
+-- 	stand_end = 79,
+-- 	walk_start = 168,
+-- 	walk_end = 187,
+-- 	run_start = 168,
+-- 	run_end = 187,
+-- 	punch_start = 189,
+-- 	punch_end = 198,
+-- },
 
 -- all known maidroid states
 maidroid.states = {}
@@ -232,6 +257,8 @@ end
 -- set_animation sets the maidroid's animation.
 -- this method is wrapper for self.object:set_animation.
 local set_animation = function(self, frame)
+	-- ,,x1
+	-- turn off animation
 	self.object:set_animation(frame, 15, 0)
 end
 
@@ -595,11 +622,13 @@ local autoheal = function(self)
 end
 
 -- generate_texture return a string with the maidroid texture
-maidroid.generate_texture = function(index)
-	minetest.log("******************************************   generate_texture")
+maidroid.generate_texture2 = function(index)
+	minetest.log("warning", "******************************************   generate_texture")
 	-- error("This is an error message", 2)
 
-	local texture_name = "[combine:40x40:0,0=maidroid_base.png"
+	-- ,,x1
+	-- local texture_name = "[combine:40x40:0,0=maidroid_base.png"
+	local texture_name = ""
 	local color = index
 	if type(index) ~= "string" then
 		color = dye.dyes[index][1]
@@ -611,6 +640,12 @@ maidroid.generate_texture = function(index)
 		color = "#484848"
 	end
 	texture_name = texture_name .. "^(maidroid_hairs.png^[colorize:" .. color .. ":255)"
+	return texture_name
+end
+
+maidroid.generate_texture = function(index)
+	minetest.log("warning", "******************************************   generate_texture")
+	texture_name=""
 	return texture_name
 end
 
@@ -747,7 +782,8 @@ get_formspec = function(self, player, tab)
 	local form = "size[11,7.4]"
 		.. "box[0.2,3.9;2.3,2.7;black]"
 		.. "box[0.3,4;2.1,2.5;#343848]"
-		.. "model[0.2,4;3,3;3d;maidroid.b3d;"
+		-- .. "model[0.2,4;3,3;3d;maidroid.b3d;"
+		.. "model[0.2,4;3,3;3d;character.b3d;"
 		.. minetest.formspec_escape(self.textures[1])
 		.. ";0,180;false;true;200,219;7.5]" -- ]model
 		.. "label[0,6.6;" .. S("Health") .. "]"
@@ -834,6 +870,7 @@ end
 
 -- on_activate is a callback function that is called when the object is created or recreated.
 local function on_activate(self, staticdata)
+	minetest.log("warning", "*************************  on_activate")
 	-- parse the staticdata, and compose a inventory.
 	if staticdata == "" then
 		create_inventory(self)
@@ -1113,7 +1150,7 @@ end
 -- ,,rm
 -- register_maidroid registers a definition of a new maidroid.
 local register_maidroid = function(product_name, def)
-	minetest.log("************************************************** register_maidroid = "..product_name)
+	minetest.log("warning", "************************************************** register_maidroid = "..product_name)
 	maidroid.registered_maidroids[product_name] = true
 
 	def.collisionbox = {-0.25, -0.5, -0.25, 0.25, 0.625, 0.25}
@@ -1194,6 +1231,7 @@ local register_maidroid = function(product_name, def)
 	})
 
 	-- register maidroid egg.
+	-- ,,x4
 	minetest.register_tool("maidroid:maidroid_egg", {
 		description = S("Maidroid Egg"),
 		inventory_image = def.egg_image,
@@ -1205,6 +1243,17 @@ local register_maidroid = function(product_name, def)
 			end
 			-- set maidroid's direction.
 			local new_maidroid = minetest.add_entity(pointed_thing.above, "maidroid:maidroid")
+
+			if new_maidroid then
+				m_skin = maid_skins[math.random(6) - 1]
+				-- Set the custom texture for the "maidroid:maidroid" entity
+				-- maidroid_entity:set_textures({ { name = m_skin, animation = { type = "vertical_frames", length = 1.0 } } })
+				new_maidroid:set_properties({
+					textures = {m_skin}
+				})
+
+				-- new_maidroid:get_luaentity().set_set_textures({ { name = m_skin } })
+			end
 			new_maidroid:get_luaentity():set_yaw(new_maidroid:get_pos(), user:get_pos())
 			new_maidroid:get_luaentity().owner = ""
 			new_maidroid:get_luaentity():update_infotext()
@@ -1265,12 +1314,16 @@ end)
 register_maidroid( "maidroid:maidroid", {
 	hp_max     = 15,
 	weight     = 20,
-	mesh       = "maidroid.b3d",
+	-- mesh       = "maidroid.b3d",
 	mesh       = "character.b3d",
-	textures   = { "[combine:40x40:0,0=maidroid_base.png:24,32=maidroid_eyes_white.png" },
-	-- textures   = "character_Mary_LT_mt.png",
+	textures   = {"character_Mary_LT_mt.png"},
+	-- textures   = {m_skin},
 	egg_image  = "maidroid_maidroid_egg.png",
 })
+-- textures   = { "[combine:40x40:0,0=maidroid_base.png:24,32=maidroid_eyes_white.png" },
+-- textures   = { "maidroid_base.png" },
+-- textures2   = { "[combine:40x40:0,0=maidroid_base.png:24,32=maidroid_eyes_white.png" },
+-- textures   = { "[combine:40x40:0,0=maidroid_base.png:24,32=maidroid_eyes_white.png" },
 
 -- Compatibility with tagicar maidroids
 -- ,,x1
