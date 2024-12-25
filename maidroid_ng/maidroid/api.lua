@@ -870,18 +870,21 @@ end
 
 -- on_activate is a callback function that is called when the object is created or recreated.
 local function on_activate(self, staticdata)
-	minetest.log("warning", "*************************  on_activate")
 	-- parse the staticdata, and compose a inventory.
 	if staticdata == "" then
+		minetest.log("warning", "*************************  on_activate null staticdata")
 		create_inventory(self)
 	else
+		minetest.log("warning", "*************************  on_activate has staticdata")
 		-- Clone and remove object if it is an "old maidroid"
 		if maidroid.settings.compat and self.name:find("maidroid_mk", 9) then
 			minetest.log("warning", "[MOD] maidroid: old maidroid found. replacing with new")
 
 			-- Fix old datas
 			local data = minetest.deserialize(staticdata)
-			data.textures = maidroid.generate_texture(tonumber(self.name:sub(-2):gsub("k","")))
+			-- ,,x1 see if load old tesxtures
+			-- data.textures = maidroid.generate_texture(tonumber(self.name:sub(-2):gsub("k","")))
+			-- data.textures = {maid_skins[math.random(6) - 1] }
 			table.insert(data.inventory.main, data.inventory.board[1])
 			table.insert(data.inventory.main, data.inventory.wield_item[1])
 			table.remove(data.inventory,data.inventory.board)
@@ -891,7 +894,10 @@ local function on_activate(self, staticdata)
 			-- Create new format maidroid
 			local obj = minetest.add_entity(self:get_pos(), "maidroid:maidroid")
 			obj:get_luaentity():on_activate(minetest.serialize(data))
+
+			-- ,,x4
 			obj:set_yaw(self.object:get_yaw())
+			-- obj:get_luaentity().set_set_textures({ { name = maid_skins[0] } })
 
 			-- Remove this old maidroid
 			self.object:remove()
@@ -909,6 +915,15 @@ local function on_activate(self, staticdata)
 		for list_name, list in pairs(data.inventory) do
 			inventory:set_list(list_name, list)
 		end
+
+		local my_texture = maid_skins[1]
+		minetest.log("warning", "*************************  on_activate: "..tostring(data.textures))
+		self.textures = { my_texture }
+		-- data.textures = { my_texture }
+		self.object:set_properties({
+			textures = {my_texture}
+		})
+
 		if data.textures ~= nil and data.textures ~= "" then
 			self.textures = { data.textures }
 			self.object:set_properties({textures = { data.textures }})
@@ -944,6 +959,21 @@ local get_staticdata = function(self, captured)
 		tbchannel = self.tbchannel
 	}
 
+	-- data.textures = luaentity.object:get_properties()["textures"][1]
+
+	minetest.log("warning", "====================== get_staticdata1:"..dump(self))
+	minetest.log("warning", "====================== get_staticdata2:"..dump(data))
+	-- minetest.log("warning", "====================== get_staticdata3:"..dump(self:get_properties()))
+
+	local eeee = self.object:get_properties()
+	minetest.log("warning", "====================== get_staticdata3:"..dump(eeee))
+	data["textures"] = eeee["textures"][1]
+
+	-- if self:get_properties ~= nil then 
+	-- 	minetest.log("warning", "====================== get_staticdata3:"..dump(self:get_properties()))
+	-- end
+
+
 	-- save inventory
 	local inventory = self:get_inventory()
 	for list_name, list in pairs(inventory:get_lists()) do
@@ -958,6 +988,7 @@ local get_staticdata = function(self, captured)
 		data.home = self.home
 	end
 
+	minetest.log("warning", "====================== get_staticdata4:"..dump(data))
 	return minetest.serialize(data)
 end
 
@@ -1231,13 +1262,15 @@ local register_maidroid = function(product_name, def)
 	})
 
 	-- register maidroid egg.
-	-- ,,x4
+	-- ,,egg
 	minetest.register_tool("maidroid:maidroid_egg", {
 		description = S("Maidroid Egg"),
 		inventory_image = def.egg_image,
 		stack_max = 1,
 
 		on_use = function(itemstack, user, pointed_thing)
+			minetest.log("warning", "====================== maidroid_egg:on_use")
+
 			if pointed_thing.above == nil then
 				return nil
 			end
@@ -1245,12 +1278,20 @@ local register_maidroid = function(product_name, def)
 			local new_maidroid = minetest.add_entity(pointed_thing.above, "maidroid:maidroid")
 
 			if new_maidroid then
-				m_skin = maid_skins[math.random(6) - 1]
+				local rand = math.random(6)
+				minetest.log("warning", "====================== maidroid_egg:rand="..tostring(rand))
+				local m_skin = maid_skins[rand]
 				-- Set the custom texture for the "maidroid:maidroid" entity
 				-- maidroid_entity:set_textures({ { name = m_skin, animation = { type = "vertical_frames", length = 1.0 } } })
 				new_maidroid:set_properties({
 					textures = {m_skin}
 				})
+
+				-- print(dump(new_maidroid:get_luaentity()))
+				minetest.log("warning", "====================== maidroid_egg")
+				minetest.log("warning", dump(new_maidroid:get_properties()))
+				minetest.log("warning", dump(new_maidroid:get_properties()["textures"]))
+				-- print(new_maidroid:get_properties())
 
 				-- new_maidroid:get_luaentity().set_set_textures({ { name = m_skin } })
 			end
@@ -1328,7 +1369,7 @@ register_maidroid( "maidroid:maidroid", {
 -- Compatibility with tagicar maidroids
 -- ,,x1
 -- if maidroid.settings.compat then
-if False then
+if false then
 	for i,_ in ipairs(dye.dyes) do
 		local product_name = "maidroid:maidroid_mk" .. tostring(i)
 		local texture_name = maidroid.generate_texture(i)

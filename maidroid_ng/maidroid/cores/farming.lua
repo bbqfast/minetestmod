@@ -26,9 +26,34 @@ local core_path = maidroid.cores.path
 local search = maidroid.helpers.search_surrounding
 
 local mature_plants = {}
+local weed_plants = {}
 local seeds = {}
 
 local farming_redo = farming and farming.mod and farming.mod == "redo"
+
+ll = function(msg)
+	pre="**************************************************"
+	pre="++++++++++++++++++++++++++++++++++++++++++++++++++"
+	if msg == nil then
+		msg = "null"
+	end
+
+	minetest.log("warning", pre..msg)
+end
+
+ld = function(msg, dest)
+	if (dest ~= nil) then
+		local destnode = minetest.get_node(dest)
+		ll(msg.." "..destnode.name)
+	end
+	
+end
+
+-- ,,x1
+local function extract_before_underscore(str)
+    -- return str:match("([^_]*)")
+    return str:match("(.*)_[0-9]+")
+end
 
 if farming_redo then
 	local mature, crop
@@ -39,8 +64,15 @@ if farming_redo then
 			crop = v.crop .. "_1"
 			mature_plants[mature] = {chance=1, crop=crop}
 			seeds[v.seed] = v.crop .. "_1"
+			-- ll("mature: "..mature.." crop: "..mature_plants[mature].crop)
 		end
 	end
+
+	-- ,,plant list
+	mature_plants["default:grass_3"] = {chance=1, crop="default:grass_1"}
+
+	weed_plants["default:grass"] = {chance=1, crop="default:grass_1"}
+	weed_plants["default:marram_grass"] = {chance=1, crop="default::marram_grass_1"}
 	-- Pepper can be harvested when green or yellow too
 	mature_plants["farming:pepper_7"] = {chance=1, crop="farming:pepper_1"}
 	mature_plants["farming:pepper_6"] = {chance=3, crop="farming:pepper_1"}
@@ -113,17 +145,49 @@ is_plantable = function(pos, name)
 
 	
 	-- ,,x1
-	minetest.log("warning", "xxxxx"..lnode.name)
+	-- minetest.log("warning", "xxxxx"..lnode.name)
 
-	if lnode.name == "default:dirt_with_grass" or lnode.name == "default:dirt" then 
-		minetest.set_node(lpos, { name = "farming:soil" })
-	end
+	-- if lnode.name == "default:dirt_with_grass" or lnode.name == "default:dirt" then 
+	-- 	minetest.set_node(lpos, { name = "farming:soil" })
+	-- end
 	
 	return node.name == "air"
-		and minetest.get_item_group(lnode.name, "soil") > 1
+		and (minetest.get_item_group(lnode.name, "soil") > 1 or lnode.name == "default:dirt_with_grass" or lnode.name == "default:dirt")
 end
 
--- is_mowable reports whether maidroid can mow.
+is_weed = function(name)
+	if name == nil then
+		return false
+	end
+
+	if string.find(name, "flower") then
+		ll("name: "..name.." name: "..name)
+		return true
+	end
+
+	-- ll(name)
+	local trim_name = extract_before_underscore(name)
+	-- ll("PRE     name: "..name.." trim name: "..trim_name)
+	-- ll(tm)
+
+	if trim_name ~= nil then 
+		if string.find(trim_name, "grass") then
+			ll("name: "..name.." trim name: "..trim_name)
+		end
+		local weed = weed_plants[trim_name]
+		if weed ~= nil then
+			ll("weed found: "..trim_name)
+			-- ll(weed)
+			return true
+		end		
+	-- else
+	-- 	ll("Error extracting node name:"..name)
+	end
+	return false
+
+end
+
+-- is_mowable reports whether maidroid can mow.,,mo
 is_mowable = function(pos, name)
 	if minetest.is_protected(pos, name) then
 		return false
@@ -131,6 +195,27 @@ is_mowable = function(pos, name)
 
 	local node = minetest.get_node(pos)
 	local desc = mature_plants[node.name]
+
+	-- local tm = extract_before_underscore(node.name)
+	-- ll(tm)
+
+	-- if tm ~= nil then 
+	-- 	if string.find(tm, "grass") then
+	-- 		ll(node.name)
+	-- 	end
+	-- end
+
+	-- local weed = weed_plants[tm]
+	-- if weed ~= nil then
+	-- 	ll(tm)
+	-- 	-- ll(weed)
+	-- 	return true
+	-- end
+
+	if is_weed(node.name) then
+		return true
+	end
+
 
 	if desc == nil then
 		return false
@@ -279,6 +364,9 @@ task = function(self)
 	local inv = self:get_inventory()
 	local dest = search(pos, is_plantable, self.owner)
 	if dest then
+		-- local destnode = minetest.get_node(dest)
+		-- ll("task::isdest = "..destnode.name)
+		-- ld("task::isdest", dest)
 		if not ( self.selected_seed and							-- Is there already a selected seed
 			inv:contains_item("main", self.selected_seed)) then -- in inventory
 			if not select_seed(self) then						-- Try to find a seed in inventory
@@ -294,6 +382,7 @@ task = function(self)
 
 	-- Harvesting
 	dest = search(pos, is_mowable, self.owner)
+	ld("task::mow section", dest)
 	if task_base(self, mow, dest) then
 		return
 	end
@@ -425,6 +514,27 @@ end
 
 plant = function(self, dtime)
 	-- Skip until timer is ok
+
+	pos = self.destination
+
+	local lpos = vector.add(pos, {x = 0, y = -1, z = 0})
+	local lnode = minetest.get_node(lpos)
+	local lnode = minetest.get_node(lpos)
+
+
+	minetest.set_node(lpos, { name = "farming:soil" })
+	
+	-- minetest.set_node(self.destination, { name = "default:papyrus" })
+
+	
+	-- ,,x1
+	-- minetest.log("warning", "xxxxx"..lnode.name)
+
+	-- if lnode.name == "default:dirt_with_grass" or lnode.name == "default:dirt" then 
+	-- 	minetest.set_node(lpos, { name = "farming:soil" })
+	-- end
+
+
 	if update_action_timers(self, dtime, self.selected_seed) then return end
 
 	if	not place_plant_support(self, self.selected_seed) then
@@ -463,13 +573,14 @@ end
 
 mow = function(self, dtime)
 	-- Skip until timer is ok
-	if update_action_timers(self, dtime, self.selected_tool) then return end
-
+	-- ,,xx,,cc
+	-- if update_action_timers(self, dtime, self.selected_tool) then return end
+	ll("mow")
 	local destnode = minetest.get_node(self.destination)
 	local mature = destnode.name
 	local stacks
 
-	if not mature_plants[mature] then
+	if not mature_plants[mature] and not is_weed(mature) then
 		to_wander(self, 0, timers.change_dir_max )
 		return
 	end -- target node changed
@@ -593,6 +704,7 @@ is_scythe = function(name)
 end
 
 is_tool = function(stack)
+	-- ll("farming:is_tool  ")
 	local name = stack:get_name()
 	return minetest.get_item_group(name, "hoe") > 0
 		or is_scythe(name)

@@ -111,6 +111,7 @@ on_step = function(self, dtime, moveresult)
 end
 
 is_tool = function(stack)
+	-- minetest.log("warning", "************************************************** torch:is_tool  ")
 	local stackname = stack:get_name()
 	if minetest.get_item_group(stackname, "torch") > 0 then
 		return true

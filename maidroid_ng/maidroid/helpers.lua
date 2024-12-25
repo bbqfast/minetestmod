@@ -62,6 +62,7 @@ local init_voxels = function(range)
 end
 
 function maidroid.helpers.search_surrounding(pos, pred, name, range)
+	-- minetest.log("warning", "*************************  search_surrounding:"..name)
 	pos = vector.round(pos)
 	local voxels
 	if not range then -- Use the default search range
