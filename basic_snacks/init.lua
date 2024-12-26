@@ -8,3 +8,4 @@
 
 dofile(minetest.get_modpath("snacks").."/crafts.lua")
 dofile(minetest.get_modpath("snacks").."/cooking.lua")
+dofile(minetest.get_modpath("snacks").."/lt_people.lua")
