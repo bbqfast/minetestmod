@@ -7,6 +7,12 @@ lottclasses.race["man"] = {"GAMEman", "men", "Man"}
 lottclasses.race["hobbit"] = {"GAMEhobbit", "hobbits", "Hobbit"}
 lottclasses.race["orc"] = {"GAMEorc", "orcs", "Orc"}
 
+minetest.log("-- -------------------------------- -- --------------------------------asdf hand range override")
+
+minetest.override_item("", {
+	range = 10
+})
+
 -- create race privileges
 for races, rdata in pairs(lottclasses.race) do
 	minetest.register_privilege(rdata[1], {
@@ -162,6 +168,20 @@ local function set_race(name, race)
 	minetest.chat_send_player(name, "You are now a member of the race of "..lottclasses.race[race][2]..", go forth into the world.")
 end
 
+local function clear_race(playername)
+	local privs = minetest.get_player_privs(playername)
+
+	privs["GAMEfemale"]=nil
+	privs["GAMEmale"]=nil 
+	privs["GAMEelf"]=nil
+	privs["GAMEman"]=nil
+	privs["GAMEdwarf"]=nil
+	privs["GAMEhobbit"]=nil
+	privs["GAMEorc"]=nil
+	privs["GAMEwizard"]=nil
+	minetest.set_player_privs(playername, privs)
+end
+
 minetest.register_on_player_receive_fields(function(player, formname, fields)
 	if formname ~= "race_selector" then return end
 	local name = player:get_player_name()
@@ -239,11 +259,14 @@ minetest.register_chatcommand("race", {
 		end
 		
 		if not changerace then
-			for races, rdata in pairs(lottclasses.race) do
-				if privs[rdata[1]] then
-					return true, "Race of "..playername..": "..rdata[3]
-				end
-			end
+			-- for races, rdata in pairs(lottclasses.race) do
+			-- 	if privs[rdata[1]] then
+			-- 		return true, "Race of "..playername..": "..rdata[3]
+			-- 	end
+			-- end
+
+			clear_race(playername)
+
 			if name == playername then
 				if minetest.is_singleplayer() then
 					minetest.show_formspec(name, "race_selector", race_chooser .. fly_stuff)
