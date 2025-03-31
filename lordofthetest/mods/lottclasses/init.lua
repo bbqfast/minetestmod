@@ -6,6 +6,7 @@ lottclasses.race["elf"] = {"GAMEelf", "elves", "Elf"}
 lottclasses.race["man"] = {"GAMEman", "men", "Man"}
 lottclasses.race["hobbit"] = {"GAMEhobbit", "hobbits", "Hobbit"}
 lottclasses.race["orc"] = {"GAMEorc", "orcs", "Orc"}
+lottclasses.race["ltee"] = {"GAMEltee", "lts", "LT"}
 
 minetest.log("-- -------------------------------- -- --------------------------------asdf hand range override")
 
@@ -38,25 +39,28 @@ dofile(minetest.get_modpath("lottclasses").."/change-privs.lua")
 dofile(minetest.get_modpath("lottclasses").."/allies.lua")
 dofile(minetest.get_modpath("lottclasses").."/immunity.lua")
 
-local race_chooser = "size[8,6]"..
-	"background[8,6;1,1;gui_formbg.png;true]"..
-	"label[0,0;" .. minetest.colorize("#A52A2A", "Please select the race you wish to be") .. "]"..
-	"image[0.25,1.4;0.75,0.75;dwarf.png]"..
-	"button_exit[1,1.5;2,0.5;dwarf;Dwarf]"..
-	"image[4.75,1.4;0.75,0.75;elf.png]"..
-	"button_exit[5.5,1.5;2,0.5;elf;Elf]"..
-	"image[0.25,2.4;0.75,0.75;man.png]"..
-	"button_exit[1,2.5;2,0.5;man;Man]"..
-	"image[4.75,2.4;0.75,0.75;orc.png]"..
-	"button_exit[5.5,2.5;2,0.5;orc;Orc]"..
-	"image[0.25,3.4;0.75,0.75;hobbit.png]"..
-	"button_exit[1,3.5;2,0.5;hobbit;Hobbit]"..
-	"dropdown[5.5,3.4;2;gender;Male,Female;1]"
+local race_chooser ="size[8,7.5]" ..
+    "background[8,6;1,1;gui_formbg.png;true]"..
+    "label[0,0;" .. minetest.colorize("#A52A2A", "Please select the race you wish to be") .. "]"..
+    "image[0.25,1.4;0.75,0.75;dwarf.png]"..
+    "button_exit[1,1.5;2,0.5;dwarf;Dwarf]"..
+    "image[4.75,1.4;0.75,0.75;elf.png]"..
+    "button_exit[5.5,1.5;2,0.5;elf;Elf]"..
+    "image[0.25,2.4;0.75,0.75;man.png]"..
+    "button_exit[1,2.5;2,0.5;man;Man]"..
+    "image[4.75,2.4;0.75,0.75;orc.png]"..
+    "button_exit[5.5,2.5;2,0.5;orc;Orc]"..
+    "image[0.25,3.4;0.75,0.75;hobbit.png]"..
+    "button_exit[1,3.5;2,0.5;hobbit;Hobbit]"..
+    "image[4.75,3.4;0.75,0.75;ltee.png]"..
+    "button_exit[5.5,3.5;2,0.5;ltee;LT]"..
+    "dropdown[5.5,4.4;2;gender;Male,Female;1]"
 	
-local fly_stuff = "button[1,4.75;2,0.5;fast;Fast]" ..
-	"button[3,4.75;2,0.5;fly;Fly]" ..
-	"button[5,4.75;2,0.5;noclip;Noclip]" ..
-	"button[2.5,5.5;3,0.5;fast_fly_noclip;Fast, Fly & Noclip]"
+local fly_stuff = 
+    "button[1,5.75;2,0.5;fast;Fast]" ..
+    "button[3,5.75;2,0.5;fly;Fly]" ..
+    "button[5,5.75;2,0.5;noclip;Noclip]" ..
+    "button[2.5,6.5;3,0.5;fast_fly_noclip;Fast, Fly & Noclip]"
 
 local function add_item(player, item)
 	local inv = player:get_inventory()
@@ -108,6 +112,14 @@ local function give_initial_stuff(player, race)
 		add_item(player, 'default:axe_steel')
 		add_item(player, 'default:shovel_steel')
 		add_item(player, 'default:sword_steel')
+		add_item(player, 'lottinventory:master_book')
+		add_item(player, 'lottachievements:achievement_book')
+	elseif race == "ltee" then
+		add_item(player, 'default:pick_steel')
+		add_item(player, 'default:axe_steel')
+		add_item(player, 'default:shovel_steel')
+		add_item(player, 'default:sword_steel')
+		add_item(player, 'default:gold_ingot')
 		add_item(player, 'lottinventory:master_book')
 		add_item(player, 'lottachievements:achievement_book')
 	end
@@ -179,6 +191,7 @@ local function clear_race(playername)
 	privs["GAMEhobbit"]=nil
 	privs["GAMEorc"]=nil
 	privs["GAMEwizard"]=nil
+	privs["GAMEltee"]=nil
 	minetest.set_player_privs(playername, privs)
 end
 

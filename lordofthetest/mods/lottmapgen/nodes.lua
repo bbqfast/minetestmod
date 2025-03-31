@@ -259,6 +259,21 @@ minetest.register_node("lottmapgen:rohan_grass", {
 	}),
 })
 
+-- ,,x2
+minetest.register_node("lottmapgen:ltee_grass", {
+	description = "Shire Grass",
+	tiles = {"default_grass.png^[colorize:#ff0000:105", "default_dirt.png",
+		{name =  "default_dirt.png^(default_grass_side.png^[colorize:#86ad06:105)", tileable_vertical = false}
+	},
+	is_ground_content = true,
+	groups = {crumbly=3, soil=1, lottmapgen_grass=1, not_in_creative_inventory=1},
+	drop = 'default:dirt',
+	sounds = default.node_sound_dirt_defaults({
+		footstep = {name="default_grass_footstep", gain=0.25},
+	}),
+})
+
+
 minetest.register_node("lottmapgen:shire_grass", {
 	description = "Shire Grass",
 	tiles = {"default_grass.png^[colorize:#86ad06:105", "default_dirt.png",

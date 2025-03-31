@@ -1,0 +1,25 @@
+
+
+
+
+alt-d open file path
+
+local HIRAN = 0.4
+local LORAN = -0.4
+
+
+
+
+
+'mods/lottmapgen/init.lua'
+'mods/lottmapgen/nodes.lua'
+'mods/lottmapgen/functions.lua'
+'mods/lottother/mob_spawners.lua'
+'mods/lottclasses/init.lua'
+'mods\lottclasses\allies.lua'
+
+
+- modify we file
+- log if LT generated
+- refrigurator mod
+- spawn LT villager

@@ -91,6 +91,28 @@ minetest.register_node("lottother:hobbitms", {
 	groups = {not_in_creative_inventory=1,dig_immediate=3},
 })
 
+-- LTs
+-- ,,x5
+minetest.register_node("lottother:lteems", {
+	description = "LT Mob Spawner",
+	drawtype = "glasslike",
+	tiles = {"lottother_air.png"},
+	drop = '',
+	paramtype = "light",
+	sunlight_propagates = true,
+	is_ground_content = false,
+	walkable = false,
+	buildable_to = true,
+	pointable = false,
+	on_construct = function(pos, node)
+		if math.random(1, 2) == 2 then
+			minetest.add_entity({x = pos.x, y = pos.y+1, z = pos.z}, "lottmobs:ltee")
+		end
+		minetest.remove_node(pos)
+	end,
+	groups = {not_in_creative_inventory=1,dig_immediate=3},
+})
+
 --Gondor
 
 minetest.register_node("lottother:gondorms", {
@@ -165,6 +187,8 @@ minetest.register_alias("lottother:angmarms_on", "lottother:angmarms")
 minetest.register_alias("lottother:angmarms_off", "lottother:angmarms")
 minetest.register_alias("lottother:hobbitms_on", "lottother:hobbitms")
 minetest.register_alias("lottother:hobbitms_off", "lottother:hobbitms")
+minetest.register_alias("lottother:lteems_on", "lottother:lteems")
+minetest.register_alias("lottother:lteems_off", "lottother:lteems")
 minetest.register_alias("lottother:elfms_on", "lottother:elfms")
 minetest.register_alias("lottother:elfms_off", "lottother:elfms")
 minetest.register_alias("lottother:mordorms_on", "lottother:mordorms")

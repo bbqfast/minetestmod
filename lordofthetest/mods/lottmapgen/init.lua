@@ -175,6 +175,7 @@ minetest.register_on_generated(function(minp, maxp, seed)
 	local c_mirkwoodgrass = minetest.get_content_id("lottmapgen:mirkwood_grass")
 	local c_rohangrass = minetest.get_content_id("lottmapgen:rohan_grass")
 	local c_shiregrass = minetest.get_content_id("lottmapgen:shire_grass")
+	local c_lteegrass = minetest.get_content_id("lottmapgen:ltee_grass") -- ,,x3
 	local c_ironhillgrass = minetest.get_content_id("lottmapgen:ironhill_grass")
 	local c_salt = minetest.get_content_id("lottores:mineral_salt")
 	local c_pearl = minetest.get_content_id("lottores:mineral_pearl")
@@ -358,6 +359,8 @@ minetest.register_on_generated(function(minp, maxp, seed)
 										data[vi] = c_rohangrass
 									elseif biome == 13 then
 										data[vi] = c_shiregrass
+									elseif biome == 14 then -- ,,x4
+										data[vi] = c_lteegrass
 									end
 									local y = surfy + 1
 									local vi = area:index(x, y, z)
@@ -528,6 +531,10 @@ minetest.register_on_generated(function(minp, maxp, seed)
 											lottmapgen.enqueue_building("Rohan Fort", {x=x, y=y, z=z})
 										end
 									elseif biome == 13 then
+										-- ,,x1
+										-- lottmapgen.enqueue_building("Hobbit Hole", {x=x, y=y, z=z})
+										minetest.log("warning", "Hobbit Hole")
+
 										if math.random(TREE7) == 2 then
 											lottmapgen_defaulttree(x, y, z, area, data)
 										elseif math.random(TREE7) == 3 then
@@ -542,7 +549,36 @@ minetest.register_on_generated(function(minp, maxp, seed)
 											data[vi] = c_melon
 										elseif math.random(PLANT14) == 13 then
 											lottmapgen.enqueue_building("Hobbit Hole", {x=x, y=y, z=z})
+										-- elseif math.random(PLANT14) == 14 then
+										-- 	minetest.log("warning", "LT house")
+										-- 	lottmapgen.enqueue_building("LT house", {x=x, y=y, z=z})
 										end
+									elseif biome == 14 then
+										if math.random(TREE7) == 2 then
+											lottmapgen_defaulttree(x, y, z, area, data)
+										elseif math.random(TREE7) == 3 then
+											lottmapgen_appletree(x, y, z, area, data)
+										elseif math.random(TREE7) == 4 then
+											lottmapgen_plumtree(x, y, z, area, data)
+										elseif math.random(TREE7) == 9 then
+											lottmapgen_oaktree(x, y, z, area, data)
+										elseif math.random(PLANT7) == 7 then
+											lottmapgen_farmingplants(data, vi, p2data)
+										elseif math.random(PLANT9) == 8 then
+											data[vi] = c_melon
+										elseif math.random(PLANT14) == 13 then
+											minetest.log("warning", "LT house")
+											lottmapgen.enqueue_building("LT house", {x=x, y=y, z=z})
+	
+											-- lottmapgen.enqueue_building("Hobbit Hole", {x=x, y=y, z=z})
+										-- elseif math.random(PLANT14) == 14 then
+										-- 	minetest.log("warning", "LT house")
+										-- 	lottmapgen.enqueue_building("LT house", {x=x, y=y, z=z})
+										end
+
+										-- minetest.log("warning", "LT house")
+										-- lottmapgen.enqueue_building("LT house", {x=x, y=y, z=z})
+
 									end
 								end
 							end

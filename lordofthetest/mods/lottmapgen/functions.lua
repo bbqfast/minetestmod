@@ -939,6 +939,8 @@ function lottmapgen_orcore(x, y, z, area, data)
 end
 
 function lottmapgen_biomes(biome, n_temp, n_humid, n_ran, LOTET, LOHUT, LORAN, HITET, HIHUT, HIRAN)
+
+
 	if n_temp < LOTET then
 		if n_humid < LOHUT then
 			return 1 -- (Angmar)
@@ -957,7 +959,22 @@ function lottmapgen_biomes(biome, n_temp, n_humid, n_ran, LOTET, LOHUT, LORAN, H
 		elseif n_ran > HIRAN then
 			return 11 -- (Iron Hills)
 		else
-			return 13 -- (Shire)
+			-- ,,x3
+			-- minetest.log("action", string.format(
+			-- 	"lottmapgen_biomes biome: %s, n_temp: %f, n_humid: %f, n_ran: %f",
+			-- 	tostring(biome), n_temp, n_humid, n_ran
+			-- ))
+			if n_ran < 0.1 then
+				-- minetest.log("action", string.format(
+				-- 	"lottmapgen_biomes n_ran: %f",
+				-- 	n_ran
+				-- ))			
+
+				return 13 -- (Shire)
+			else
+				-- minetest.log("LT land")
+				return 14 -- test random 
+			end
 		end
 	else
 		if n_humid < LOHUT then

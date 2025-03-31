@@ -28,6 +28,13 @@ lottclasses.allies = {
                 GAMEman = true,
                 GAMEorc = false,
                 GAMEhobbit = true
+        },
+        -- ,,x6
+        GAMEltee = {
+                GAMEelf = true,
+                GAMEorc = false,
+                GAMEhobbit = true,
+                GAMEdwarf = true
         }
 }
 
@@ -36,7 +43,8 @@ lottclasses.races = {
         "GAMEman",
         "GAMEorc",
         "GAMEhobbit",
-        "GAMEdwarf"
+        "GAMEdwarf",
+        "GAMEltee"
 }
 
 lottclasses.races_prefix = {
@@ -44,7 +52,8 @@ lottclasses.races_prefix = {
         "Human",
         "Orc",
         "Hobbit",
-        "Dwarven"
+        "Dwarven",
+        "LT"
 }
 
 lottclasses.races_pretty = {
@@ -52,7 +61,8 @@ lottclasses.races_pretty = {
         "Men",
         "Orcs",
         "Hobbits",
-        "Dwarves"
+        "Dwarves",
+        "LTs"
 }
 
 lottclasses.player_same_race_or_ally = function(player, race)

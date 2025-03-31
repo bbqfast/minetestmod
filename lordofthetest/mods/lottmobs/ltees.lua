@@ -1,5 +1,5 @@
-function lottmobs.register_elf(n, hpmin, hpmax, textures, wv, rv, damg, arm, drops, price)
-	mobs:register_mob("lottmobs:elf" .. n, {
+function lottmobs.register_ltee(n, hpmin, hpmax, textures, wv, rv, damg, arm, drops, price)
+	mobs:register_mob("lottmobs:ltee" .. n, {
 		type = "npc",
                 race = "GAMEelf",
                 hp_min = hpmin,
@@ -52,8 +52,8 @@ function lottmobs.register_elf(n, hpmin, hpmax, textures, wv, rv, damg, arm, dro
 		step = 1,
 		on_die = lottmobs.guard_die,
 	})
-	mobs:register_spawn("lottmobs:elf" .. n, {"lottmapgen:lorien_grass"}, 20, 0, 18000, 3, 31000)
-        lottmobs.register_guard_craftitem("lottmobs:elf"..n, "Elven Guard", "lottmobs_elven_guard"..n.."_inv.png")
+	mobs:register_spawn("lottmobs:ltee" .. n, {"lottmapgen:ltee_grass"}, 20, 0, 18000, 3, 31000)
+	lottmobs.register_guard_craftitem("lottmobs:ltee"..n, "Elven Guard", "lottmobs_elven_guard"..n.."_inv.png")
 end
 
 --Basic elves
@@ -107,7 +107,7 @@ local drops1 = {
 	max = 2,},
 }
 
-lottmobs.register_elf("", 20, 35, textures1, 2.5, 5, 4, 200, drops1, 30)
+lottmobs.register_ltee("", 20, 35, textures1, 2.5, 5, 4, 200, drops1, 30)
 
 --Elves in full armor
 
@@ -160,7 +160,7 @@ local drops2 = {
 	max = 2,},
 }
 
-lottmobs.register_elf(1, 20, 35, textures2, 2, 4.5, 6, 100, drops2, 50)
+lottmobs.register_ltee(1, 20, 35, textures2, 2, 4.5, 6, 100, drops2, 50)
 
 --Elves with chestplates and powerful weapons!
 
@@ -213,4 +213,4 @@ local drops3 = {
 	max = 2,},
 }
 
-lottmobs.register_elf(2, 20, 35, textures3, 2.25, 4.75, 8, 150, drops3, 50)
+lottmobs.register_ltee(2, 20, 35, textures3, 2.25, 4.75, 8, 150, drops3, 50)
