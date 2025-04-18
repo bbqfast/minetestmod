@@ -16,7 +16,9 @@ local LORAN = -0.4
 'mods/lottmapgen/functions.lua'
 'mods/lottother/mob_spawners.lua'
 'mods/lottclasses/init.lua'
-'mods\lottclasses\allies.lua'
+'mods/lottclasses/allies.lua'
+
+'mods/lottmapgen/worldedit.lua'
 
 
 - modify we file

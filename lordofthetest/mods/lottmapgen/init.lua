@@ -424,6 +424,7 @@ minetest.register_on_generated(function(minp, maxp, seed)
 											data[vi] = c_mallos
 											p2data[vi] = 42
 										elseif math.random(PLANT14) == 13 then
+											minetest.log("warning", "Gondor Hole")
 											lottmapgen.enqueue_building("Gondor Fort", {x=x, y=y, z=z})
 										end
 									elseif biome == 6 then
@@ -471,6 +472,7 @@ minetest.register_on_generated(function(minp, maxp, seed)
 											data[vi] = c_bomordor
 											p2data[vi] = 42
 										elseif math.random(PLANT14) == 13 then
+											minetest.log("warning", "orc fort")
 											lottmapgen.enqueue_building("Orc Fort", {x=x, y=y, z=z})
 										end
 									elseif biome == 9 then
@@ -533,7 +535,7 @@ minetest.register_on_generated(function(minp, maxp, seed)
 									elseif biome == 13 then
 										-- ,,x1
 										-- lottmapgen.enqueue_building("Hobbit Hole", {x=x, y=y, z=z})
-										minetest.log("warning", "Hobbit Hole")
+										-- minetest.log("warning", "Hobbit Hole")
 
 										if math.random(TREE7) == 2 then
 											lottmapgen_defaulttree(x, y, z, area, data)
@@ -548,6 +550,8 @@ minetest.register_on_generated(function(minp, maxp, seed)
 										elseif math.random(PLANT9) == 8 then
 											data[vi] = c_melon
 										elseif math.random(PLANT14) == 13 then
+											minetest.log("warning", "Hobbit Hole")
+
 											lottmapgen.enqueue_building("Hobbit Hole", {x=x, y=y, z=z})
 										-- elseif math.random(PLANT14) == 14 then
 										-- 	minetest.log("warning", "LT house")

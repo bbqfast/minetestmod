@@ -36,6 +36,51 @@ function worldedit2.read_header(value)
 	end
 	return nil
 end
+-- ,,x7
+
+local function deserialize_workaround(content)
+	local nodes, err
+	minetest.log("warning", "WorldEdit: deserializing data with LuaJIT workaround")
+	if not minetest.global_exists("jit") then
+		nodes, err = minetest.deserialize(content, true)
+	elseif not content:match("^%s*return%s*{") then
+		-- The data doesn't look like we expect it to so we can't apply the workaround.
+		-- hope for the best
+		minetest.log("warning", "WorldEdit: deserializing data but can't apply LuaJIT workaround")
+		nodes, err = minetest.deserialize(content, true)
+	else
+		-- XXX: This is a filthy hack that works surprisingly well
+		-- in LuaJIT, `minetest.deserialize` will fail due to the register limit
+		nodes = {}
+		content = content:gsub("^%s*return%s*{", "", 1):gsub("}%s*$", "", 1) -- remove the starting and ending values to leave only the node data
+		-- remove string contents strings while preserving their length
+		local escaped = content:gsub("\\\\", "@@"):gsub("\\\"", "@@"):gsub("(\"[^\"]*\")", function(s) return string.rep("@", #s) end)
+		local startpos, startpos1 = 1, 1
+		local endpos
+		local entry
+		while true do -- go through each individual node entry (except the last)
+			startpos, endpos = escaped:find("}%s*,%s*{", startpos)
+			if not startpos then
+				break
+			end
+			local current = content:sub(startpos1, startpos)
+			entry, err = minetest.deserialize("return " .. current, true)
+			if not entry then
+				break
+			end
+			table.insert(nodes, entry)
+			startpos, startpos1 = endpos, endpos
+		end
+		if not err then
+			entry = minetest.deserialize("return " .. content:sub(startpos1), true) -- process the last entry
+			table.insert(nodes, entry)
+		end
+	end
+	if err then
+		minetest.log("warning", "WorldEdit: deserialize: " .. err)
+	end
+	return nodes
+end
 
 --- Loads the schematic in `value` into a node list in the latest format.
 -- Contains code based on [table.save/table.load](http://lua-users.org/wiki/SaveTableToFile)
@@ -83,28 +128,29 @@ local function load_schematic(value)
 			})
 		end
 	elseif version == 4 or version == 5 then -- Nested table format
-		if not (rawget(_G, "jit") and jit) then
-			-- This is broken for larger tables in the current version of LuaJIT
-			nodes = minetest.deserialize(content)
-		else
-			-- XXX: This is a filthy hack that works surprisingly well - in LuaJIT, `minetest.deserialize` will fail due to the register limit
-			nodes = {}
-			content = content:gsub("return%s*{", "", 1):gsub("}%s*$", "", 1) -- remove the starting and ending values to leave only the node data
-			local escaped = content:gsub("\\\\", "@@"):gsub("\\\"", "@@"):gsub("(\"[^\"]*\")", function(s) return string.rep("@", #s) end)
-			local startpos, startpos1, endpos = 1, 1
-			while true do -- go through each individual node entry (except the last)
-				startpos, endpos = escaped:find("},%s*{", startpos)
-				if not startpos then
-					break
-				end
-				local current = content:sub(startpos1, startpos)
-				local entry = minetest.deserialize("return " .. current)
-				table.insert(nodes, entry)
-				startpos, startpos1 = endpos, endpos
-			end
-			local entry = minetest.deserialize("return " .. content:sub(startpos1)) -- process the last entry
-			table.insert(nodes, entry)
-		end
+		nodes = deserialize_workaround(content)
+		-- if not (rawget(_G, "jit") and jit) then
+		-- 	-- This is broken for larger tables in the current version of LuaJIT
+		-- 	nodes = minetest.deserialize(content)
+		-- else
+		-- 	-- XXX: This is a filthy hack that works surprisingly well - in LuaJIT, `minetest.deserialize` will fail due to the register limit
+		-- 	nodes = {}
+		-- 	content = content:gsub("return%s*{", "", 1):gsub("}%s*$", "", 1) -- remove the starting and ending values to leave only the node data
+		-- 	local escaped = content:gsub("\\\\", "@@"):gsub("\\\"", "@@"):gsub("(\"[^\"]*\")", function(s) return string.rep("@", #s) end)
+		-- 	local startpos, startpos1, endpos = 1, 1
+		-- 	while true do -- go through each individual node entry (except the last)
+		-- 		startpos, endpos = escaped:find("},%s*{", startpos)
+		-- 		if not startpos then
+		-- 			break
+		-- 		end
+		-- 		local current = content:sub(startpos1, startpos)
+		-- 		local entry = minetest.deserialize("return " .. current)
+		-- 		table.insert(nodes, entry)
+		-- 		startpos, startpos1 = endpos, endpos
+		-- 	end
+		-- 	local entry = minetest.deserialize("return " .. content:sub(startpos1)) -- process the last entry
+		-- 	table.insert(nodes, entry)
+		-- end
 	else
 		return nil
 	end
@@ -158,11 +204,24 @@ function worldedit2.deserialize(origin_pos, value)
 	local add_node, get_meta = minetest.add_node, minetest.get_meta
 	for i, entry in ipairs(nodes) do
 		entry.x, entry.y, entry.z = origin_x + entry.x, origin_y + entry.y, origin_z + entry.z
-		-- Entry acts as both position and node
-		add_node(entry, entry)
-		if entry.meta then
-			get_meta(entry):from_table(entry.meta)
-		end
+		-- Entry acts as both position and node,,d1
+
+		-- add_node(entry, entry)
+		-- if entry.meta then
+		-- 	get_meta(entry):from_table(entry.meta)
+		-- end
+
+		local success, err = pcall(function()
+			add_node(entry, entry)
+			if entry.meta then
+				get_meta(entry):from_table(entry.meta)
+			end
+		end)
+		if not success then
+			minetest.log("error", "[deserialize] Failed to place node at " ..
+				minetest.pos_to_string(entry) .. ": " .. tostring(err))
+		end		
+
 	end
 	return #nodes
 end
