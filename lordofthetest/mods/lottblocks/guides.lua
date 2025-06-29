@@ -69,6 +69,19 @@ minetest.register_craftitem("lottblocks:deep_depths", {
 	end,
 })
 
+-- ,,ltee book
+minetest.register_craftitem("lottblocks:ltee_handbook", {
+	description = "LTee Notes Vol I",
+	inventory_image = "default_book.png^[colorize:green:100",
+	groups = {book = 1, forbidden = 1},
+	stack_max = 1,
+	text = minetest.deserialize(dofile(modp.."/guide_text/ltee_handbook.lua")),
+	on_use = function(itemstack, user)
+		guide_on_use(itemstack, user)
+	end,
+})
+
+
 minetest.register_craftitem("lottblocks:farmer_handbook", {
 	description = "Hobbit Farmer Essentials Vol I",
 	inventory_image = "default_book.png^[colorize:green:100",

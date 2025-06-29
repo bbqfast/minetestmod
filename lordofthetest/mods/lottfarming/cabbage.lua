@@ -51,7 +51,7 @@ minetest.register_node("lottfarming:cabbage_2", {
 })
 
 minetest.register_node("lottfarming:cabbage_3", {
-	description = "Cabbage",
+	description = "Cabbage 3",
 	paramtype2 = "facedir",
 	tiles = {"lottfarming_cabbage_top.png", "lottfarming_cabbage_top.png", "lottfarming_cabbage_side.png", "lottfarming_cabbage_side.png", "lottfarming_cabbage_side.png", "lottfarming_cabbage_side.png"},
 		drop = {
@@ -70,7 +70,7 @@ minetest.register_node("lottfarming:cabbage_3", {
 })
 
 minetest.register_node("lottfarming:cabbage", {
-	description = "Cabbage",
+	description = "Cabbage X",
 	paramtype2 = "facedir",
 	tiles = {"lottfarming_cabbage_top.png", "lottfarming_cabbage_top.png", "lottfarming_cabbage_side.png", "lottfarming_cabbage_side.png", "lottfarming_cabbage_side.png", "lottfarming_cabbage_side.png"},
 	groups = {choppy=2, oddly_breakable_by_hand=2, flammable=2, plant=1, salad=1},

@@ -68,6 +68,50 @@ minetest.register_node("lottblocks:hobbit_chest", {
         end,
 })
 
+-- ,,x7
+minetest.register_node("lottblocks:ltee_chest", {
+	description = "LT Chest",
+	tiles = {"lottblocks_hobbit_chest_top.png", "lottblocks_hobbit_chest_top.png", "lottblocks_hobbit_chest_side.png",
+			"lottblocks_hobbit_chest_side.png", "lottblocks_hobbit_chest_side.png", "lottblocks_hobbit_chest_front.png"},
+	paramtype2 = "facedir",
+	groups = {choppy=2,oddly_breakable_by_hand=2},
+	legacy_facedir_simple = true,
+	is_ground_content = false,
+	sounds = default.node_sound_wood_defaults(),
+	on_construct = function(pos, node, active_object_count, active_object_count_wider)
+			local meta = minetest.get_meta(pos)
+			meta:set_string("infotext", "LT Chest")
+			local inv = meta:get_inventory()
+			inv:set_size("main", 8*4)
+	end,
+	on_rightclick = function(pos, node, clicker, itemstack)
+		local player = clicker:get_player_name()
+		local item = itemstack:get_name()
+		if minetest.check_player_privs(player, {GAMEltee=true})
+		or minetest.check_player_privs(player, {GAMEwizard=true}) then
+			minetest.show_formspec(
+				-- player, "lottblocks:hobbit_chest", default.get_chest_formspec(pos, "gui_hobbitbg.png")
+				player, "lottblocks:ltee_chest", default.get_chest_formspec(pos, "gui_hobbitbg.png")
+			)
+		elseif item == "lottblocks:lockpick" then
+			-- lockpick(itemstack, pos, "hobbit", player)
+			lockpick(itemstack, pos, "ltee", player)
+		else
+			minetest.chat_send_player(player, "Only LT can open this kind of chest!")
+		end
+	end,
+	can_dig = function(pos,player)
+		local meta = minetest.get_meta(pos)
+		local inv = meta:get_inventory()
+		return inv:is_empty("main")
+	end,
+	on_punch = function(pos,player)
+		local meta = minetest.get_meta(pos)
+		meta:set_string("infotext", "LT Chest")
+		meta:set_string("formspec", "")
+	end,
+})
+
 minetest.register_node("lottblocks:gondor_chest", {
         description = "Gondorian Chest",
         tiles = {"lottblocks_gondor_chest_top.png", "lottblocks_gondor_chest_bottom.png", "lottblocks_gondor_chest_side.png",

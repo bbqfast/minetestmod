@@ -116,6 +116,7 @@ local function give_initial_stuff(player, race)
 		add_item(player, 'lottachievements:achievement_book')
 	elseif race == "ltee" then
 		add_item(player, 'default:pick_steel')
+		add_item(player, 'farming:bread 5')
 		add_item(player, 'default:axe_steel')
 		add_item(player, 'default:shovel_steel')
 		add_item(player, 'default:sword_steel')

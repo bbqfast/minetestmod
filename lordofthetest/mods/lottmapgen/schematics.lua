@@ -27,9 +27,11 @@ local lottmapgen_list = {
 		center = {x=13, y=3, z=24} },
 	["Dwarf House"] =    {build="dwarfhouse",   area_owner = "Dwarf Smith",   area_name = "Dwarf House",
 		center = {x=16, y=1, z=3} },
-	["LT house"] =    {build="lthouse",   area_owner = "LT villager", area_name = "LT House",
+	["LT house"] =    {build="lthousesm",   area_owner = "LT villager", area_name = "LT House",
 	center = {x=13, y=3, z=24} }
 }
+
+-- lthousesm.we
 
 -- load bounding box from files
 for i, v in pairs(lottmapgen_list) do

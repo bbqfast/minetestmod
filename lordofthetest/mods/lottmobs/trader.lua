@@ -22,6 +22,7 @@
 -------------------------------------------------------------------------------
 
 function lottmobs.allow_move(inv, from_list, from_index, to_list, to_index, count, player)
+	minetest.log("action", "Attempting to move items from " .. from_list .. " to " .. to_list .. " by player: " .. player:get_player_name())
 	if to_list ~= "selection" or
 		from_list == "price" or
 		from_list == "payment" or
@@ -29,8 +30,11 @@ function lottmobs.allow_move(inv, from_list, from_index, to_list, to_index, coun
 		from_list == "identifier" then
 		return 0
 	end
+
 	-- forbid moving of parts of stacks
 	local old_stack = inv.get_stack(inv, from_list, from_index)
+	minetest.log("action", "Inventory: " .. dump(inv))
+	minetest.log("action", "Old stack: " .. dump(old_stack:to_table()))
 	if count ~= old_stack.get_count(old_stack) then
 		return 0;
 	end
@@ -45,6 +49,7 @@ function lottmobs.allow_put(inv, listname, index, stack, player)
 end
 
 function lottmobs.allow_take(inv, listname, index, stack, player)
+	minetest.log("action", "Player " .. player:get_player_name() .. " is attempting to take items from " .. listname)
 	if listname == "takeaway" or
 		listname == "payment" then
 		return 99
@@ -124,6 +129,7 @@ end
 lottmobs.trader_inventories = {}
 
 function lottmobs.add_goods(entity, race)
+	minetest.log("action", "Adding goods for trader entity: " .. tostring(entity) .. ", race: " .. tostring(race))
 	local goods_to_add = nil
 	for i=1,15 do
 		if same_race == true then
@@ -153,7 +159,8 @@ end
 function lottmobs_trader(self, clicker, entity, race, image, priv)
 	lottmobs.face_pos(self, clicker:get_pos())
 	local player = clicker:get_player_name()
-	if self.id == 0 then
+	-- if self.id == 0 then
+	if self.id == 0 or self.id == nil then
 		self.id = (math.random(1, 1000) * math.random(1, 10000)) .. self.name .. (math.random(1, 1000) ^ 2)
 	end
 	if self.game_name == "mob" then
@@ -161,6 +168,7 @@ function lottmobs_trader(self, clicker, entity, race, image, priv)
 		--self.nametag = self.game_name
 	end
 	local unique_entity_id = self.id
+	minetest.log("action", "Trader ID: " .. tostring(self.id))
 	local is_inventory = minetest.get_inventory({type="detached", name=unique_entity_id})
 	local same_race = false
 	if minetest.get_player_privs(player)[priv] ~= nil then
@@ -171,6 +179,8 @@ function lottmobs_trader(self, clicker, entity, race, image, priv)
 		allow_put = lottmobs.allow_put,
 		allow_take = lottmobs.allow_take,
 		on_move = function(inventory, from_list, from_index, to_list, to_index, count, player)
+		minetest.log("action", "Moving items from " .. from_list .. " to " .. to_list)
+		minetest.log("action", "From index: " .. from_index .. ", to index: " .. to_index)
 			if from_list == "goods" and
 			to_list == "selection" then
 				local inv = inventory

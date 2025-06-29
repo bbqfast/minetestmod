@@ -2,15 +2,18 @@
 -- See README.txt for licensing and other information.
 
 -- The API documentation in here was moved into doc/lua_api.txt
-
+minetest.log("warning","******* DEAFULT")
 WATER_ALPHA = 160
 WATER_VISC = 1
 LAVA_VISC = 7
 LIGHT_MAX = 14
 SAVEDIR = "LOTT"
+default = {}
+default.LIGHT_MAX = 14
+default.get_translator = S
+
 
 -- Definitions made by this mod that other mods can use too
-default = {}
 default.gui_bg     = ""
 default.gui_bg_img = "background[5,5;1,1;gui_formbg.png;true]"
 default.gui_slots  = "listcolors[#606060AA;#606060;#141318;#30434C;#FFF]"

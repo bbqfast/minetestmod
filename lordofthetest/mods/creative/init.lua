@@ -232,3 +232,20 @@ if minetest.settings:get_bool("creative_mode") then
 	end
 
 end
+
+-- ,,x7
+-- Override the engine's creative mode function
+local old_is_creative_enabled = minetest.is_creative_enabled
+
+function minetest.is_creative_enabled(name)
+	if name == "" then
+		return old_is_creative_enabled(name)
+	end
+	return minetest.check_player_privs(name, {creative = true}) or
+		old_is_creative_enabled(name)
+end
+
+-- For backwards compatibility:
+function creative.is_enabled_for(name)
+	return minetest.is_creative_enabled(name)
+end

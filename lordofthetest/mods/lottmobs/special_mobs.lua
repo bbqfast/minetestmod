@@ -202,3 +202,65 @@ mobs:register_mob("lottmobs:dwarf_trader", {
 	end,
 })
 mobs:register_spawn("lottmobs:dwarf_trader", {"lottmapgen:ironhill_grass"}, 20, -1, 60000, 3, 31000)
+
+
+-- ,,ltee
+
+
+mobs:register_mob("lottmobs:ltee_trader", {
+	type = "npc",
+        race = "GAMEltee",
+        hp_min = 20,
+	hp_max = 30,
+	collisionbox = {-0.3,-.85,-0.3, 0.3,0.68,0.3},
+	textures = {
+		-- {"lottmobs_dwarf_trader.png", "lottarmor_trans.png", "lottarmor_trans.png", "lottarmor_trans.png"},
+		{"character_Carlos_LT_third_LT_stolen_mt.png"},
+	},
+	visual = "mesh",
+	visual_size = {x=1.1, y=0.85},
+	mesh = "lottarmor_character.b3d",
+	view_range = 10,
+	makes_footstep_sound = true,
+	walk_velocity = 1,
+	run_velocity = 2,
+	armor = 200,
+	damage = 4,
+	drops = {},
+	light_resistant = true,
+	drawtype = "front",
+	water_damage = 0,
+	lava_damage = 10,
+	light_damage = 0,
+	attack_type = "dogfight",
+	follow = "lottother:narya",
+	animation = {
+		speed_normal = 15,
+		speed_run = 15,
+		stand_start = 0,
+		stand_end = 79,
+		walk_start = 168,
+		walk_end = 187,
+		run_start = 168,
+		run_end = 187,
+		punch_start = 189,
+		punch_end = 198,
+	},
+	jump = true,
+	sounds = {
+		war_cry = "mobs_die_yell",
+		death = "default_death",
+		attack = "default_punch2",
+	},
+	attacks_monsters = true,
+	peaceful = true,
+	group_attack = true,
+	step = 1,
+	on_rightclick = function(self, clicker)
+		self.game_name = "NPC"
+		lottmobs_trader(self, clicker, entity, lottmobs.ltee, "gui_angmarbg.png", "GAMEltee")
+	end,
+})
+mobs:register_spawn("lottmobs:ltee_trader", {"lottmapgen:ltee_grass"}, 20, -1, 60000, 3, 31000)
+
+

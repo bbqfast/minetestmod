@@ -18,10 +18,73 @@ local LORAN = -0.4
 'mods/lottclasses/init.lua'
 'mods/lottclasses/allies.lua'
 
+
 'mods/lottmapgen/worldedit.lua'
 
+tranders
+'mods\lottmobs\special_mobs.lua'
+'mods\lottmobs\trader_goods.lua'
 
 - modify we file
 - log if LT generated
 - refrigurator mod
 - spawn LT villager
+
+
+
+
+mods to remove from home decor
+- 3d extras
+- doors and gates
+- wardrobe
+
+
+
+bb9now3 - citadel - trade - galaxy
+bb9now2 - near mining guild - 3.7M - vesta
+ii
+
+
+
+Best skin editor with fill function
+https://www.planetminecraft.com/skin-editor/
+
+
+
+https://github.com/Uberi/Minetest-WorldEdit/blob/master/ChatCommands.md
+worldedit commands
+
+//p set
+//pos2
+ 
+//save lthouse 
+    it will add .we extention 
+
+    
+
+Home decor crashs
+- wardrobe
+- 3d extras
+- doors and gates
+
+
+Dr. Andreas Ludwig Kalcker Phd
+
+
+
+
+mob spawn
+======================================
+/spawnentity mobs:sheep
+/spawnentity lottmobs:ltee_trader
+
+
+
+
+
+worldedit
+======================================
+
+execute_worldedit_command("save", name, gui_filename[name])
+
+worldedit.register_command("save", {

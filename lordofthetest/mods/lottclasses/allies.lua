@@ -3,35 +3,41 @@ lottclasses.allies = {
                 GAMEman = true,
                 GAMEorc = false,
                 GAMEhobbit = true,
-                GAMEdwarf = true
+                GAMEdwarf = true,
+                GAMEltee = true
         },
         GAMEman = {
                 GAMEelf = true,
                 GAMEorc = false,
                 GAMEhobbit = true,
-                GAMEdwarf = true
+                GAMEdwarf = true,
+                GAMEltee = true
         },
         GAMEorc = {
                 GAMEelf = false,
                 GAMEman = false,
                 GAMEhobbit = false,
-                GAMEdwarf = false
+                GAMEdwarf = false,
+                GAMEltee = false
         },
         GAMEhobbit = {
                 GAMEelf = true,
                 GAMEman = true,
                 GAMEorc = false,
-                GAMEdwarf = true
+                GAMEdwarf = true,
+                GAMEltee = true
         },
         GAMEdwarf = {
                 GAMEelf = true,
                 GAMEman = true,
                 GAMEorc = false,
-                GAMEhobbit = true
+                GAMEhobbit = true,
+                GAMEltee = true
         },
         -- ,,x6
         GAMEltee = {
                 GAMEelf = true,
+                GAMEman = true,
                 GAMEorc = false,
                 GAMEhobbit = true,
                 GAMEdwarf = true

@@ -43,9 +43,15 @@ function lottmobs.register_ltee(n, hpmin, hpmax, textures, wv, rv, damg, arm, dr
 			attack = "mobs_slash_attack",
 		},
 		attacks_monsters = true,
+		-- on_rightclick = function(self, clicker)
+		-- 	lottmobs.guard(self, clicker, "default:gold_ingot", "Elf", "elf", price)
+		-- end,
 		on_rightclick = function(self, clicker)
-			lottmobs.guard(self, clicker, "default:gold_ingot", "Elf", "elf", price)
-		end,
+			minetest.log("warning", "NPC right-clicked by " .. clicker:get_player_name())	
+			error("Debugging error: NPC right-clicked")
+
+			lottmobs_trader(self, clicker, entity, lottmobs.elf, "gui_elfbg.png", "GAMEelf")
+		end,		
 		do_custom = lottmobs.do_custom_guard,
 		peaceful = true,
 		group_attack = true,
@@ -228,6 +234,7 @@ local hostile_mobs = {
     ["lottmobs:spider"] = true,
     ["lottmobs:ent"] = true,
     ["lottmobs:uruk_hai"] = true,
+    ["lottmobs:warg"] = true,
 }
 
 local function is_hostile_mob(name)
@@ -246,7 +253,8 @@ minetest.register_entity("lottmobs:npc", {
         -- mesh = "character.b3d", -- Replace with your NPC's model
         -- textures = {"character.png"}, -- Replace with your NPC's texture
 		mesh       = "character.b3d",
-		textures   = {"character_Mary_LT_mt.png"},
+		-- textures   = {"character_Mary_LT_mt.png"},
+		textures   = {"lt_angel_2_mt.png"},
         static_save = false,
 		drawtype = "front",
 		animation = {
@@ -307,7 +315,15 @@ minetest.register_entity("lottmobs:npc", {
     end,	
 	on_die = function(self, killer)
 		minetest.log("action", "NPC '" .. (self.player_name or "unknown") .. "' has died.")
-	end,	
+	end,
+	on_rightclick = function(self, clicker)
+		minetest.log("warning", "NPC right-clicked by " .. clicker:get_player_name())	
+		-- error("Debugging error: NPC right-clicked")
+		self.game_name = "NPC"
+		-- lottmobs_trader(self, clicker, entity, lottmobs.ltee, "gui_gondorbg.png", "GAMEltee")
+		lottmobs_trader(self, clicker, entity, lottmobs.ltee_angel, "gui_gondorbg.png", "GAMEltee")
+		-- lottmobs_trader(self, clicker, entity, lottmobs.elf, "gui_elfbg.png", "GAMEelf")
+	end, 		
     on_step = function(self, dtime)
 		-- minetest.log("warning", "NPC step")
         self.timer = self.timer + dtime
@@ -331,27 +347,44 @@ minetest.register_entity("lottmobs:npc", {
 					if not self.hud_id then
 						-- Define the quotes
 						self.quotes = {
-							"My name is Anna",
-							"! I am here to protect you from mobs",
+							"Hi, LT!  Welcome to Middle-Earth",
+							"I'm LT angel",
+							"we're newly arrived race on the middle earth",
+							"We don't have our own territory yet",
+							"! There are dangerous mobs around",
+							"I'm here to help fight off mobs",
 							"Feel free to explore around"
 						}
 						self.current_quote_index = 1
 						self.quote_timer = 0
 				
+						local text_elem={
+							hud_elem_type="text",
+							text=self.quotes[self.current_quote_index],
+							position={x=0.5,y=0.8},
+							--scale={x=2,y=2},
+							number=0xFFFFFF,
+							size={x=2},
+							alignment={x=0,y=0},
+							style=1,
+						}
+						self.hud_id=player:hud_add(text_elem)
+					
 						-- Add the initial HUD
-						self.hud_id = player:hud_add({
-							hud_elem_type = "text",
-							position = {x = 0.5, y = 0.8}, -- Bottom center of the screen
-							offset = {x = 0, y = 0},
-							text = self.quotes[self.current_quote_index],
-							alignment = {x = 0, y = 1}, -- Center alignment
-							scale = {x = 1700, y = 1700}, -- Larger text
-							number = 0xFFFFFF, -- White color
-						})
+						-- self.hud_id = player:hud_add({
+						-- 	hud_elem_type = "text",
+						-- 	position = {x = 0.5, y = 0.8}, -- Bottom center of the screen
+						-- 	offset = {x = 0, y = 0},
+						-- 	text = self.quotes[self.current_quote_index],
+						-- 	alignment = {x = 0, y = 1}, -- Center alignment
+						-- 	scale = {x = 1700, y = 1700}, -- Larger text
+						-- 	number = 0xFFFFFF, -- White color
+						-- })
 					else
 						-- Cycle through quotes every 3 seconds
 						self.quote_timer = (self.quote_timer or 0) + dtime
-						if self.quote_timer >= 3 then
+						-- if self.quote_timer >= 3 then
+						if self.quote_timer >= 1 then
 							self.quote_timer = 0
 							self.current_quote_index = self.current_quote_index % #self.quotes + 1
 							player:hud_change(self.hud_id, "text", self.quotes[self.current_quote_index])
@@ -429,7 +462,7 @@ minetest.register_entity("lottmobs:npc", {
 					return
 				end
 
-                if dist > 2 then
+                if dist > 10 then
 					local yaw = math.atan2(dir.z, dir.x) + math.pi / 2
 					yaw = yaw + math.pi
 					self.object:set_yaw(yaw)
@@ -438,7 +471,7 @@ minetest.register_entity("lottmobs:npc", {
 					-- local speed = math.min(dist * 0.8, 40) -- Adjust the multiplier (0.5) and max speed (6) as needed
 					local speed = dist * 0.8
 					self.object:set_velocity(vector.multiply(dir, speed))   
-					minetest.log("warning", "NPC moving towards player at speed: " .. speed .. ", distance: " .. dist)
+					-- minetest.log("warning", "NPC moving towards player at speed: " .. speed .. ", distance: " .. dist)
 					
                     -- self.object:set_velocity(vector.multiply(dir, 2))
                     self:set_animation("walk")

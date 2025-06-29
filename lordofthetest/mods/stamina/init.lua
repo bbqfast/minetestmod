@@ -252,6 +252,7 @@ end
 
 -- override core.do_item_eat() so we can redirect hp_change to stamina
 core.do_item_eat = function(hp_change, replace_with_item, itemstack, user, pointed_thing)
+	minetest.log("warning", "[stamina] core.do_item_eat has been overridden by the stamina mod.")
 	local old_itemstack = itemstack
 	if not stamina_players[user:get_player_name()] then
 		return

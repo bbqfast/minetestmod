@@ -119,6 +119,28 @@ dofile(minetest.get_modpath("lottmapgen").."/functions.lua")
 dofile(minetest.get_modpath("lottmapgen").."/worldedit.lua")
 dofile(minetest.get_modpath("lottmapgen").."/schematics.lua")
 
+
+function myenqueue0(name, pos)
+	minetest.log("warning", "lottmapgen: enqueue_building: " .. name .. " at " .. minetest.pos_to_string(pos))
+	return lottmapgen.enqueue_building(name, pos)
+end
+
+function myenqueuerand(name1, name2, pos)
+    local chosen_name = math.random(2) == 1 and name1 or name2
+    minetest.log("warning", "lottmapgen: enqueue_building: " .. chosen_name .. " at " .. minetest.pos_to_string(pos))
+    return lottmapgen.enqueue_building(chosen_name, pos)
+end
+
+function myenqueue(name1, pos)
+	name2 = "LT house"
+	-- temp fix for LT house
+	name1 = "LT house"
+    local chosen_name = math.random(2) == 1 and name1 or name2
+    minetest.log("warning", "lottmapgen: enqueue_building: " .. chosen_name .. " at " .. minetest.pos_to_string(pos))
+    return lottmapgen.enqueue_building(chosen_name, pos)
+end
+
+
 -- On generated function
 minetest.register_on_generated(function(minp, maxp, seed)
 	if minp.y < (water_level-1000) or minp.y > 5000 then
@@ -378,7 +400,10 @@ minetest.register_on_generated(function(minp, maxp, seed)
 											data[vi] = c_seregon
 											p2data[vi] = 40
 										elseif math.random(PLANT14) == 13 then
-											lottmapgen.enqueue_building("Angmar Fort", {x=x, y=y, z=z}) -- data[vi] = c_angfort
+											-- xxxxx
+											-- lottmapgen.enqueue_building("Angmar Fort", {x=x, y=y, z=z}) -- data[vi] = c_angfort
+											myenqueue("Angmar Fort", {x=x, y=y, z=z}) -- data[vi] = c_angfort
+											-- lottmapgen.enqueue_building("LT house", {x=x, y=y, z=z})
 										end
 									elseif biome == 2 then
 										data[vi] = c_snowblock
@@ -424,8 +449,11 @@ minetest.register_on_generated(function(minp, maxp, seed)
 											data[vi] = c_mallos
 											p2data[vi] = 42
 										elseif math.random(PLANT14) == 13 then
-											minetest.log("warning", "Gondor Hole")
-											lottmapgen.enqueue_building("Gondor Fort", {x=x, y=y, z=z})
+											-- minetest.log("warning", "Gondor Hole")
+											-- xxxxx
+											-- lottmapgen.enqueue_building("Gondor Fort", {x=x, y=y, z=z})
+											myenqueue("Gondor Fort", {x=x, y=y, z=z})
+											-- lottmapgen.enqueue_building("LT house", {x=x, y=y, z=z})
 										end
 									elseif biome == 6 then
 										if math.random(TREE3) == 2 then
@@ -459,11 +487,15 @@ minetest.register_on_generated(function(minp, maxp, seed)
 										elseif math.random(PLANT4) == 11 then
 											lottmapgen_lorienplants(data, vi, p2data)
 										elseif math.random(PLANT14) == 13 then
+											-- xxxxx
 											if math.random(1, 2) == 1 then
-												lottmapgen.enqueue_building("Mallorn House", {x=x, y=y, z=z})
+												-- lottmapgen.enqueue_building("Mallorn House", {x=x, y=y, z=z})
+												myenqueue("Mallorn House", {x=x, y=y, z=z})
 											else
-												lottmapgen.enqueue_building("Lorien House", {x=x, y=y, z=z})
+												-- lottmapgen.enqueue_building("Lorien House", {x=x, y=y, z=z})
+												myenqueue("Lorien House", {x=x, y=y, z=z})
 											end
+											-- lottmapgen.enqueue_building("LT house", {x=x, y=y, z=z})
 										end
 									elseif biome == 8 then
 										if math.random(TREE10) == 2 then
@@ -473,7 +505,10 @@ minetest.register_on_generated(function(minp, maxp, seed)
 											p2data[vi] = 42
 										elseif math.random(PLANT14) == 13 then
 											minetest.log("warning", "orc fort")
-											lottmapgen.enqueue_building("Orc Fort", {x=x, y=y, z=z})
+											-- xxxxx
+											-- lottmapgen.enqueue_building("Orc Fort", {x=x, y=y, z=z})
+											myenqueue("Orc Fort", {x=x, y=y, z=z})
+											-- lottmapgen.enqueue_building("LT house", {x=x, y=y, z=z})
 										end
 									elseif biome == 9 then
 										if math.random(TREE3) == 2 then
@@ -530,7 +565,10 @@ minetest.register_on_generated(function(minp, maxp, seed)
 											data[vi] = c_pilinehtar
 											p2data[vi] = 2
 										elseif math.random(PLANT14) == 13 then
-											lottmapgen.enqueue_building("Rohan Fort", {x=x, y=y, z=z})
+											-- xxxxx
+											-- lottmapgen.enqueue_building("Rohan Fort", {x=x, y=y, z=z})
+											myenqueue("Rohan Fort", {x=x, y=y, z=z})
+											-- lottmapgen.enqueue_building("LT house", {x=x, y=y, z=z})
 										end
 									elseif biome == 13 then
 										-- ,,x1
@@ -552,7 +590,10 @@ minetest.register_on_generated(function(minp, maxp, seed)
 										elseif math.random(PLANT14) == 13 then
 											minetest.log("warning", "Hobbit Hole")
 
-											lottmapgen.enqueue_building("Hobbit Hole", {x=x, y=y, z=z})
+											-- xxxx
+											-- lottmapgen.enqueue_building("Hobbit Hole", {x=x, y=y, z=z})
+											myenqueue("Hobbit Hole", {x=x, y=y, z=z})
+											-- lottmapgen.enqueue_building("LT house", {x=x, y=y, z=z})
 										-- elseif math.random(PLANT14) == 14 then
 										-- 	minetest.log("warning", "LT house")
 										-- 	lottmapgen.enqueue_building("LT house", {x=x, y=y, z=z})
@@ -572,7 +613,8 @@ minetest.register_on_generated(function(minp, maxp, seed)
 											data[vi] = c_melon
 										elseif math.random(PLANT14) == 13 then
 											minetest.log("warning", "LT house")
-											lottmapgen.enqueue_building("LT house", {x=x, y=y, z=z})
+											myenqueue("LT house", {x=x, y=y, z=z})
+											-- lottmapgen.enqueue_building("LT house", {x=x, y=y, z=z})
 	
 											-- lottmapgen.enqueue_building("Hobbit Hole", {x=x, y=y, z=z})
 										-- elseif math.random(PLANT14) == 14 then

@@ -105,10 +105,11 @@ minetest.register_node("lottother:lteems", {
 	buildable_to = true,
 	pointable = false,
 	on_construct = function(pos, node)
-		if math.random(1, 2) == 2 then
-			minetest.add_entity({x = pos.x, y = pos.y+1, z = pos.z}, "lottmobs:ltee")
-		end
-		minetest.remove_node(pos)
+		minetest.add_entity({x = pos.x, y = pos.y+1, z = pos.z}, "lottmobs:ltee")
+		-- if math.random(1, 2) == 2 then
+		-- 	minetest.add_entity({x = pos.x, y = pos.y+1, z = pos.z}, "lottmobs:ltee")
+		-- end
+		-- minetest.remove_node(pos)
 	end,
 	groups = {not_in_creative_inventory=1,dig_immediate=3},
 })
