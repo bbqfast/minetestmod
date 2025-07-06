@@ -266,7 +266,7 @@ lottmobs.ltee_angel = {
 		{"snacks:boba_tea 10", "default:gold_ingot 18", 15},
 		{"default:sword_steel 1", "default:wood 5", 20},
 		{"lottweapons:silver_battleaxe 1", "default:gold_ingot 15", 14},
-		{"lottores:galvornsword 1", "default:gold_ingot 21", 25},
+		{"default:pick_steel 1", "default:wood 21", 25},
 		{"lottplants:elanor 10", "default:gold_ingot 2", 22},
 		{"lottarmor:chestplate_galvorn 1", "default:gold_ingot 37", 25},
 		{"lottarmor:helmet_galvorn 1", "default:gold_ingot 28", 25},

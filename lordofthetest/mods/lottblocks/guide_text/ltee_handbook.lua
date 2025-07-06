@@ -1,4 +1,4 @@
-return "return {[\"background\"] = \"gui_hobbitbg.png\", [\"title\"] = \"Hobbits and Farming and Foods\", [\"owner\"] = \"A Hobbit Farmer\"," ..
+return "return {[\"background\"] = \"gui_hobbitbg.png\", [\"title\"] = \"Notes for the new LTs\", [\"owner\"] = \"A Hobbit Farmer\"," ..
 	"[\"text\"] = \"" ..
 	"\\\nHello!"..
 	"\\\nWe're the new LT race here"..

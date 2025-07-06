@@ -572,3 +572,31 @@ minetest.register_chatcommand("spawn_npc", {
         end
     end
 })
+
+
+minetest.register_chatcommand("recipe", {
+    params = "<itemname>",
+    description = "Check crafting recipe for an item",
+    privs = {shout = true},
+    func = function(name, param)
+        if param == "" then
+            return false, "Please provide an item name. Usage: /recipe <itemname>"
+        end
+
+        local recipes = minetest.get_all_craft_recipes(param)
+
+        if not recipes or #recipes == 0 then
+            return true, "No crafting recipe found for: " .. param
+        end
+
+        local message = "Recipes for: " .. param
+        for i, recipe in ipairs(recipes) do
+            message = message .. "\nMethod: " .. recipe.type
+            for j, item in ipairs(recipe.items) do
+                message = message .. "\n[" .. j .. "]: " .. item
+            end
+        end
+
+        return true, message
+    end
+})

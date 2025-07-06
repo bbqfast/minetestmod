@@ -21,9 +21,12 @@ local LORAN = -0.4
 
 'mods/lottmapgen/worldedit.lua'
 
-tranders
+traders
 'mods\lottmobs\special_mobs.lua'
 'mods\lottmobs\trader_goods.lua'
+
+guides
+'mods\lottblocks\guides.lua'
 
 - modify we file
 - log if LT generated
