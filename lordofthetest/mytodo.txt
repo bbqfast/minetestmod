@@ -1,0 +1,14 @@
+
+Game model:
+- LT castle
+- LT shop
+- LT house improvement
+
+Game play
+- update LT guide inventory list
+- update LT trader inventory list
+
+
+Game item:
+- LT handbook improvement
+- LT races lores

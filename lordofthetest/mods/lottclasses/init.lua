@@ -122,6 +122,7 @@ local function give_initial_stuff(player, race)
 		add_item(player, 'default:sword_steel')
 		add_item(player, 'default:gold_ingot')
 		add_item(player, 'lottinventory:master_book')
+		add_item(player, 'lottblocks:ltee_handbook')
 		add_item(player, 'lottachievements:achievement_book')
 	end
 end

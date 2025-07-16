@@ -7,13 +7,12 @@ alt-d open file path
 local HIRAN = 0.4
 local LORAN = -0.4
 
-
-
-
-
+ctrl-D to open
 'mods/lottmapgen/init.lua'
 'mods/lottmapgen/nodes.lua'
 'mods/lottmapgen/functions.lua'
+'mods/lottmapgen/schematics.lua' - map we file to array
+
 'mods/lottother/mob_spawners.lua'
 'mods/lottclasses/init.lua'
 'mods/lottclasses/allies.lua'
@@ -22,11 +21,21 @@ local LORAN = -0.4
 'mods/lottmapgen/worldedit.lua'
 
 traders
-'mods\lottmobs\special_mobs.lua'
-'mods\lottmobs\trader_goods.lua'
+'mods/lottmobs/special_mobs.lua'
+'mods/lottmobs/trader_goods.lua'
 
 guides
-'mods\lottblocks\guides.lua'
+'mods/lottblocks/guides.lua'
+'mods/lottblocks/guide_text/ltee_handbook.lua'
+'mods/lottblocks/guide_text/ltee_journal_1.lua'
+
+defaults
+'mods\default\functions.lua'
+
+custom buildings
+ltee_shop1.we
+
+
 
 - modify we file
 - log if LT generated
@@ -79,7 +88,8 @@ Dr. Andreas Ludwig Kalcker Phd
 mob spawn
 ======================================
 /spawnentity mobs:sheep
-/spawnentity lottmobs:ltee_trader
+/spawnentity lottmobs:ltee_trader_1
+/spawnentity lottmobs:ltee_trader_2
 
 
 

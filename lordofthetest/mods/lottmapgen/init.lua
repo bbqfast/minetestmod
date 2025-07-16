@@ -131,10 +131,13 @@ function myenqueuerand(name1, name2, pos)
     return lottmapgen.enqueue_building(chosen_name, pos)
 end
 
+-- ,,x1
 function myenqueue(name1, pos)
 	name2 = "LT house"
+	name2 = "LT Shop"
 	-- temp fix for LT house
 	name1 = "LT house"
+	name1 = "LT Shop"
     local chosen_name = math.random(2) == 1 and name1 or name2
     minetest.log("warning", "lottmapgen: enqueue_building: " .. chosen_name .. " at " .. minetest.pos_to_string(pos))
     return lottmapgen.enqueue_building(chosen_name, pos)

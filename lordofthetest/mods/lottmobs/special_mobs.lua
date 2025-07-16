@@ -207,7 +207,7 @@ mobs:register_spawn("lottmobs:dwarf_trader", {"lottmapgen:ironhill_grass"}, 20, 
 -- ,,ltee
 
 
-mobs:register_mob("lottmobs:ltee_trader", {
+mobs:register_mob("lottmobs:ltee_trader_1", {
 	type = "npc",
         race = "GAMEltee",
         hp_min = 20,
@@ -258,9 +258,96 @@ mobs:register_mob("lottmobs:ltee_trader", {
 	step = 1,
 	on_rightclick = function(self, clicker)
 		self.game_name = "NPC"
-		lottmobs_trader(self, clicker, entity, lottmobs.ltee, "gui_angmarbg.png", "GAMEltee")
+		lottmobs_trader(self, clicker, entity, lottmobs.ltee1, "gui_angmarbg.png", "GAMEltee")
 	end,
 })
-mobs:register_spawn("lottmobs:ltee_trader", {"lottmapgen:ltee_grass"}, 20, -1, 60000, 3, 31000)
+mobs:register_spawn("lottmobs:ltee_trader_1", {"lottmapgen:ltee_grass"}, 20, -1, 60000, 3, 31000)
 
+-- ,,lt2
 
+mobs:register_mob("lottmobs:ltee_trader_2", {
+    type = "npc",
+    race = "GAMEltee",
+    hp_min = 20,
+    hp_max = 30,
+    collisionbox = {-0.3, -.85, -0.3, 0.3, 0.68, 0.3},
+    textures = {
+        {"character_Carla_sixth_stolen_LT_mt.png"},
+    },
+    visual = "mesh",
+    visual_size = {x = 1.1, y = 0.85},
+    mesh = "lottarmor_character.b3d",
+    view_range = 10,
+    makes_footstep_sound = true,
+    walk_velocity = 0,
+    run_velocity = 0,
+    armor = 200,
+    damage = 4,
+    drops = {},
+    light_resistant = true,
+    drawtype = "front",
+    water_damage = 0,
+    lava_damage = 10,
+    light_damage = 0,
+    attack_type = "dogfight",
+    follow = "lottother:narya",
+    animation = {
+        speed_normal = 15,
+        speed_run = 15,
+        stand_start = 0,
+        stand_end = 79,
+        walk_start = 168,
+        walk_end = 187,
+        run_start = 168,
+        run_end = 187,
+        punch_start = 189,
+        punch_end = 198,
+    },
+    jump = false,
+    sounds = {
+        war_cry = "mobs_die_yell",
+        death = "default_death",
+        attack = "default_punch2",
+    },
+    attacks_monsters = true,
+    peaceful = true,
+    group_attack = true,
+    step = 1,
+    on_rightclick = function(self, clicker)
+		minetest.log("action", "lottmobs:ltee_trader_2 on_rightclick called")
+        self.game_name = "NPC"
+        lottmobs_trader(self, clicker, entity, lottmobs.ltee2, "gui_angmarbg.png", "GAMEltee")
+    end,
+    on_activate = function(self)
+		-- error("xxxxxxxxx.")
+		-- minetest.log("action", "on_activate called for lottmobs:ltee_trader_2")
+        self.timer = 0
+		self.spin_timer = 0
+        self.say = true
+    end,		
+    do_custom = function(self, dtime)
+        -- Make the mob face the nearest player
+		-- error("An intentional exception has been thrown in the on_step function.")
+        -- minetest.log("action", "on_step called for lottmobs:ltee_trader_2")
+		local pos = self.object:get_pos()
+        local players = minetest.get_connected_players()
+        local closest_player, closest_dist = nil, math.huge
+
+        for _, player in ipairs(players) do
+            local player_pos = player:get_pos()
+            local dist = vector.distance(pos, player_pos)
+            if dist < closest_dist then
+                closest_player = player
+                closest_dist = dist
+            end
+        end
+
+        if closest_player then
+            local player_pos = closest_player:get_pos()
+            local vec = vector.subtract(player_pos, pos)
+            local yaw = math.atan2(vec.z, vec.x) - math.pi / 2
+            self.object:set_yaw(yaw)
+        end
+    end,
+})
+mobs:register_spawn("lottmobs:ltee_trader_2", {"lottmapgen:ltee_grass"}, 20, -1, 60000, 3, 31000)

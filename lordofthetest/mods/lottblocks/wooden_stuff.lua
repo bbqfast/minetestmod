@@ -11,6 +11,7 @@ function lottblocks.register_wooden_stuff(name, description, texture, wood_name)
 	groups_door.door = 1
 
 	if name ~= "wood" then
+		-- ,,err
 		doors:register_door("lottblocks:door_" .. name, {
 			description =  description .. " Door",
 			inventory_image = "lottblocks_door_" .. name .. ".png",

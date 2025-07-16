@@ -279,7 +279,7 @@ lottmobs.ltee_angel = {
 	}
 }
 
-lottmobs.ltee = {
+lottmobs.ltee1 = {
 	items = {
 		-- {"lottplants:mallorntree 10", "default:gold_ingot 4", 5},
 		{"snacks:cupcake 10", "default:gold_ingot 4", 5},
@@ -315,5 +315,61 @@ lottmobs.ltee = {
 		{"lottblocks:mallorn_pillar 30", "default:gold_ingot 6", 4},
 		{"lottplants:mallornsapling 3", "default:gold_ingot 2", 17},
 		{"default:goldblock " .. math.random(8, 10), "lottores:pearl 9", 25},
+	}
+}
+
+lottmobs.ltee2 = {
+	items = {
+		-- {"lottplants:mallorntree 10", "default:gold_ingot 4", 5},
+		{"snacks:cupcake 10", "default:gold_ingot 4", 5},
+		{"snacks:matcha_cake 4", "default:bronze_ingot 30", 17},
+		{"snacks:boba_tea 10", "default:silver_ingot 20", 15},
+		{"snacks:cupcake 10", "default:gold_ingot 4", 5},
+		{"snacks:matcha_cake 4", "default:bronze_ingot 30", 17},
+		{"snacks:boba_tea 10", "default:silver_ingot 20", 15},
+		{"snacks:cupcake 10", "default:gold_ingot 4", 5},
+		{"snacks:matcha_cake 4", "default:bronze_ingot 30", 17},
+		{"snacks:boba_tea 10", "default:silver_ingot 20", 15},
+		{"snacks:cupcake 10", "default:gold_ingot 4", 5},
+		{"snacks:matcha_cake 4", "default:bronze_ingot 30", 17},
+		{"snacks:boba_tea 10", "default:silver_ingot 20", 15},
+		{"snacks:cupcake 10", "default:gold_ingot 4", 5},
+		{"snacks:matcha_cake 4", "default:bronze_ingot 30", 17},
+		{"snacks:boba_tea 10", "default:silver_ingot 20", 15},
+	},
+	items_race = {
+		-- {"lottplants:mallorntree 10", "default:gold_ingot 4", 5},
+		{"snacks:cupcake 10", "default:gold_ingot 4", 5},
+		{"snacks:matcha_cake 4", "default:bronze_ingot 30", 17},
+		{"snacks:boba_tea 10", "default:silver_ingot 20", 15},
+
+		{"snacks:cupcake 10", "default:gold_ingot 4", 5},
+		{"snacks:matcha_cake 4", "default:bronze_ingot 30", 17},
+		{"snacks:boba_tea 10", "default:silver_ingot 20", 15},
+		{"snacks:cupcake 10", "default:gold_ingot 4", 5},
+		{"snacks:matcha_cake 4", "default:bronze_ingot 30", 17},
+		{"snacks:boba_tea 10", "default:silver_ingot 20", 15},
+		{"snacks:cupcake 10", "default:gold_ingot 4", 5},
+		{"snacks:matcha_cake 4", "default:bronze_ingot 30", 17},
+		{"snacks:boba_tea 10", "default:silver_ingot 20", 15},
+		{"snacks:cupcake 10", "default:gold_ingot 4", 5},
+		{"snacks:matcha_cake 4", "default:bronze_ingot 30", 17},
+		{"snacks:boba_tea 10", "default:silver_ingot 20", 15},
+
+		-- {"lottweapons:galvorn_spear 1", "default:gold_ingot 22", 20},
+		-- {"lottweapons:silver_battleaxe 1", "default:gold_ingot 15", 14},
+		-- {"lottores:galvornsword 1", "default:gold_ingot 21", 25},
+
+		-- {"lottplants:elanor 10", "default:gold_ingot 2", 22},
+		-- {"lottarmor:chestplate_galvorn 1", "default:gold_ingot 37", 25},
+		-- {"lottarmor:helmet_galvorn 1", "default:gold_ingot 28", 25},
+
+		-- {"lottarmor:boots_galvorn 1", "default:gold_ingot 23", 25},
+		-- {"lottarmor:leggings_galvorn 1", "default:gold_ingot 32", 25},
+		-- {"lottplants:niphredil 12", "default:gold_ingot 3", 14},
+		
+		-- {"lottblocks:mallorn_pillar 30", "default:gold_ingot 6", 4},
+		-- {"lottplants:mallornsapling 3", "default:gold_ingot 2", 17},
+		-- {"default:goldblock " .. math.random(8, 10), "lottores:pearl 9", 25},
 	}
 }
