@@ -156,6 +156,22 @@ minetest.register_node("lottother:ltee_trader_2_ms", {
 	groups = {not_in_creative_inventory=1,dig_immediate=3},
 })
 
+minetest.register_node("lottother:ltee_trader_3_ms", {
+	description = "LT trader 3 Spawner",
+	drawtype = "glasslike",
+	tiles = {"lottother_air.png"},
+	drop = '',
+	paramtype = "light",
+	sunlight_propagates = true,
+	is_ground_content = false,
+	walkable = false,
+	buildable_to = true,
+	pointable = false,
+	on_construct = function(pos, node)
+		minetest.add_entity({x = pos.x, y = pos.y+1, z = pos.z}, "lottmobs:ltee_trader_3")
+	end,
+	groups = {not_in_creative_inventory=1,dig_immediate=3},
+})
 --Gondor
 
 minetest.register_node("lottother:gondorms", {
@@ -234,6 +250,8 @@ minetest.register_alias("lottother:lteems_on", "lottother:lteems")
 minetest.register_alias("lottother:lteems_off", "lottother:lteems")
 minetest.register_alias("lottother:ltee_trader_2_ms_on", "lottother:ltee_trader_2_ms")
 minetest.register_alias("lottother:ltee_trader_2_ms_off", "lottother:ltee_trader_2_ms")
+minetest.register_alias("lottother:ltee_trader_3_ms_on", "lottother:ltee_trader_3_ms")
+minetest.register_alias("lottother:ltee_trader_3_ms_off", "lottother:ltee_trader_3_ms")
 minetest.register_alias("lottother:elfms_on", "lottother:elfms")
 minetest.register_alias("lottother:elfms_off", "lottother:elfms")
 minetest.register_alias("lottother:mordorms_on", "lottother:mordorms")

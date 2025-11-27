@@ -30,6 +30,8 @@ local lottmapgen_list = {
 	["LT house"] =    {build="lthousesm",   area_owner = "LT villager", area_name = "LT House",
 	center = {x=13, y=3, z=24} },
 	["LT Shop"] =    {build="ltee_shop1",   area_owner = "LT villager", area_name = "LT Shop",
+	center = {x=13, y=3, z=24} },
+	["LT Shop Lrg"] =    {build="lteeshop_lrg",   area_owner = "LT villager", area_name = "LT Shop",
 	center = {x=13, y=3, z=24} }
 
 }

@@ -62,6 +62,7 @@ minetest.register_node("lottfarming:melon_3", {
 			{ items = {'lottfarming:melon 8'} },
 		}
 	},
+	walkable = false,
 	groups = {choppy=2, oddly_breakable_by_hand=1, flammable=2, plant=1},
 	sounds = default.node_sound_wood_defaults(),
 })

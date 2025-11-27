@@ -65,6 +65,11 @@ minetest.register_node("lottfarming:cabbage_3", {
 			{ items = {'lottfarming:cabbage'}, rarity = 5 }
 		}
 	},
+		waving = 1,
+		walkable = false,
+		buildable_to = true,
+		is_ground_content = true,
+
 	groups = {choppy=2, oddly_breakable_by_hand=2, flammable=2, plant=1},
 	sounds = default.node_sound_wood_defaults(),
 })
@@ -73,6 +78,7 @@ minetest.register_node("lottfarming:cabbage", {
 	description = "Cabbage X",
 	paramtype2 = "facedir",
 	tiles = {"lottfarming_cabbage_top.png", "lottfarming_cabbage_top.png", "lottfarming_cabbage_side.png", "lottfarming_cabbage_side.png", "lottfarming_cabbage_side.png", "lottfarming_cabbage_side.png"},
+	walkable = false,
 	groups = {choppy=2, oddly_breakable_by_hand=2, flammable=2, plant=1, salad=1},
 	sounds = default.node_sound_wood_defaults(),
      on_use = minetest.item_eat(4)

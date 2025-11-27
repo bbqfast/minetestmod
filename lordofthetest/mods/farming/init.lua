@@ -6,6 +6,18 @@ farming = {}
 --
 -- Soil
 --
+
+ll = function(msg)
+	local pre="**************************************************"
+	local pre="++++++++++++++++++++++++++++++++++++++++++++++++++"
+	if msg == nil then
+		msg = "null"
+	end
+
+	-- minetest.log("warning", pre..msg)
+end
+
+
 minetest.register_node("farming:soil", {
 	description = "Soil",
 	tiles = {"farming_soil.png", "default_dirt.png"},
@@ -109,7 +121,7 @@ end
 minetest.register_tool("farming:hoe_wood", {
 	description = "Wooden Hoe",
 	inventory_image = "farming_tool_woodhoe.png",
-
+	groups = {hoe = 1},
 	on_use = function(itemstack, user, pointed_thing)
 		return farming.hoe_on_use(itemstack, user, pointed_thing, 30)
 	end,
@@ -118,7 +130,7 @@ minetest.register_tool("farming:hoe_wood", {
 minetest.register_tool("farming:hoe_stone", {
 	description = "Stone Hoe",
 	inventory_image = "farming_tool_stonehoe.png",
-
+	groups = {hoe = 1},
 	on_use = function(itemstack, user, pointed_thing)
 		return farming.hoe_on_use(itemstack, user, pointed_thing, 90)
 	end,
@@ -127,7 +139,7 @@ minetest.register_tool("farming:hoe_stone", {
 minetest.register_tool("farming:hoe_steel", {
 	description = "Steel Hoe",
 	inventory_image = "farming_tool_steelhoe.png",
-
+	groups = {hoe = 1},
 	on_use = function(itemstack, user, pointed_thing)
 		return farming.hoe_on_use(itemstack, user, pointed_thing, 200)
 	end,
@@ -136,7 +148,7 @@ minetest.register_tool("farming:hoe_steel", {
 minetest.register_tool("farming:hoe_bronze", {
 	description = "Bronze Hoe",
 	inventory_image = "farming_tool_bronzehoe.png",
-
+	groups = {hoe = 1},
 	on_use = function(itemstack, user, pointed_thing)
 		return farming.hoe_on_use(itemstack, user, pointed_thing, 220)
 	end,
@@ -346,38 +358,119 @@ for i=1,8 do
 	})
 end
 
+-- helper: extract light check and growth for crops
+-- generic crop growth helper
+-- opts = {
+--   group = "wheat",          -- group name used for logging (optional)
+--   max_stage = 8,            -- maximum growth stage number
+--   plant_prefix = "farming:wheat_" -- node name prefix; final node is plant_prefix..stage
+-- }
+-- function farming._maybe_grow_crop(pos, node, current_stage, opts)
+function _maybe_grow_crop(pos, node, current_stage, opts)
+	opts = opts or {}
+	local group = opts.group or "crop"
+	local max_stage = opts.max_stage or 8
+	local plant_prefix = opts.plant_prefix or ("farming:"..group.."_")
+
+	-- sanity
+	if current_stage >= max_stage then
+		--minetest.log("action", string.format("++++++++++ [farming] %s already full grown at %s", group, minetest.pos_to_string(pos)))
+		ll(string.format("[farming] %s already full grown at %s", group, minetest.pos_to_string(pos)))
+		return
+	end
+
+	local light_level = minetest.get_node_light(pos)
+	--minetest.log("action", string.format("++++++++++ [farming] %s light_level=%s at %s", group, tostring(light_level), minetest.pos_to_string(pos)))
+	ll(string.format("[farming] %s light_level=%s at %s", group, tostring(light_level), minetest.pos_to_string(pos)))
+	if not light_level then
+		--minetest.log("action", "++++++++++ [farming] light level unavailable, aborting")
+		ll("[farming] light level unavailable, aborting")
+		return
+	end
+
+	local c = math.max(1, math.ceil(2 * (light_level - 13) ^ 2 + 1))
+	--minetest.log("action", "++++++++++ [farming] computed chance cap c="..tostring(c))
+	ll("[farming] computed chance cap c="..tostring(c))
+
+	local roll = math.random(1, c)
+	--minetest.log("action", "++++++++++ [farming] random roll="..tostring(roll).." (1 means grow); light_level>=13="..tostring(light_level>=13))
+	ll("[farming] random roll="..tostring(roll).." (1 means grow); light_level>=13="..tostring(light_level>=13))
+
+	-- grow if roll hits or if very bright
+	if roll == 1 or light_level >= 13 then
+		local new_stage = current_stage + 1
+		if new_stage > max_stage then new_stage = max_stage end
+		--minetest.log("action", string.format("++++++++++ [farming] growing %s from %d to %d at %s", group, current_stage, new_stage, minetest.pos_to_string(pos)))
+		ll(string.format("[farming] growing %s from %d to %d at %s", group, current_stage, new_stage, minetest.pos_to_string(pos)))
+		minetest.set_node(pos, {name = plant_prefix .. new_stage})
+	else
+		--minetest.log("action", string.format("++++++++++ [farming] %s did not grow this tick (roll=%d, cap=%d)", group, roll, c))
+		ll(string.format("[farming] %s did not grow this tick (roll=%d, cap=%d)", group, roll, c))
+	end
+end
+
+-- Ensure helper exists (defensive): create wrapper if missing
+-- if not farming then farming = {} end
+-- if not farming._maybe_grow_wheat then
+-- function farming._maybe_grow_wheat(pos, node, wheat_group)
+function _maybe_grow_wheat(pos, node, wheat_group)
+	-- return farming._maybe_grow_crop(pos, node, wheat_group, {
+	return _maybe_grow_crop(pos, node, wheat_group, {
+		group = "wheat",
+		max_stage = 8,
+		plant_prefix = "farming:wheat_",
+	})
+end
+
+function _maybe_grow_cotton(pos, node, wheat_group)
+	-- return farming._maybe_grow_crop(pos, node, wheat_group, {
+	return _maybe_grow_crop(pos, node, wheat_group, {
+		group = "cotton",
+		max_stage = 8,
+		plant_prefix = "farming:cotton_",
+	})
+end
+
 minetest.register_abm({
 	nodenames = {"group:wheat"},
 	neighbors = {"group:soil"},
-	interval = 60,
-	chance = 20,
+	-- interval = 30,
+	interval = 10,
+	-- chance = 20,
+	chance = 100 ,
 	action = function(pos, node)
-		-- return if already full grown
-		if minetest.get_item_group(node.name, "wheat") == 8 then
-			return
-		end
+			--minetest.log("action", "++++++++++ [farming] wheat ABM called at "..minetest.pos_to_string(pos).." node="..tostring(node.name))
+			ll("[farming] wheat ABM called at "..minetest.pos_to_string(pos).." node="..tostring(node.name))
 
-		-- check if on wet soil
-		pos.y = pos.y-1
-		local n = minetest.get_node(pos)
-		if minetest.get_item_group(n.name, "soil") < 3 then
-			return
-		end
-		pos.y = pos.y+1
+			-- return if already full grown
+			local wheat_group = minetest.get_item_group(node.name, "wheat")
+			--minetest.log("action", "++++++++++ [farming] wheat group value = "..tostring(wheat_group))
+			ll("[farming] wheat group value = "..tostring(wheat_group))
+			if wheat_group == 8 then
+				--minetest.log("action", "++++++++++ [farming] wheat already full grown, aborting")
+				ll("[farming] wheat already full grown, aborting")
+				return
+			end
 
-		-- check light
-		local light_level = minetest.get_node_light(pos)
-		if not light_level then
-			return
-		end
-		local c = math.ceil(2 * (light_level - 13) ^ 2 + 1)
+			-- check if on wet soil
+			pos.y = pos.y-1
+			local n = minetest.get_node(pos)
+			local soil_group = minetest.get_item_group(n.name, "soil")
+			--minetest.log("action", "++++++++++ [farming] soil below is "..tostring(n.name).." with soil group="..tostring(soil_group))
+			ll("[farming] soil below is "..tostring(n.name).." with soil group="..tostring(soil_group))
+			if soil_group < 3 then
+				--minetest.log("action", "++++++++++ [farming] soil not wet enough (soil_group < 3), aborting")
+				ll("[farming] soil not wet enough (soil_group < 3), aborting")
+				pos.y = pos.y+1
+				return
+			end
+			pos.y = pos.y+1
 
-		if light_level > 7 and (math.random(1, c) == 1 or light_level >= 13) then
-			local height = minetest.get_item_group(node.name, "wheat") + 1
-			minetest.set_node(pos, {name="farming:wheat_" .. height})
+			-- delegate light check and growth to helper
+			-- farming._maybe_grow_wheat(pos, node, wheat_group)
+			_maybe_grow_wheat(pos, node, wheat_group)
 		end
-	end
-})
+	})
 
 --
 -- Cotton
@@ -432,38 +525,78 @@ for i=1,8 do
 	})
 end
 
+-- ,,x1 hack speed
+-- minetest.settings:get("time_speed")
+minetest.settings:set("time_speed", "72")
+
 minetest.register_abm({
 	nodenames = {"group:cotton"},
 	neighbors = {"group:soil"},
-	interval = 60,
+	-- interval = 60,
+	interval = 10,
 	chance = 20,
 	action = function(pos, node)
-		-- return if already full grown
-		if minetest.get_item_group(node.name, "cotton") == 8 then
-			return
-		end
+			--minetest.log("action", "++++++++++ [farming] cotton ABM called at "..minetest.pos_to_string(pos).." node="..tostring(node.name))
+			ll("[farming] cotton ABM called at "..minetest.pos_to_string(pos).." node="..tostring(node.name))
 
-		-- check if on wet soil
-		pos.y = pos.y-1
-		local n = minetest.get_node(pos)
-		if minetest.get_item_group(n.name, "soil") < 3 then
-			return
-		end
-		pos.y = pos.y+1
+			-- return if already full grown
+			local cotton_group = minetest.get_item_group(node.name, "cotton")
+			--minetest.log("action", "++++++++++ [farming] cotton group value = "..tostring(cotton_group))
+			ll("[farming] cotton group value = "..tostring(cotton_group))
+			if cotton_group == 8 then
+				--minetest.log("action", "++++++++++ [farming] cotton already full grown, aborting")
+				ll("[farming] cotton already full grown, aborting")
+				return
+			end
 
-		-- check light
-		local light_level = minetest.get_node_light(pos)
-		if not light_level then
-			return
-		end
-		local c = math.ceil(2 * (light_level - 13) ^ 2 + 1)
+			-- check if on wet soil
+			pos.y = pos.y-1
+			local n = minetest.get_node(pos)
+			local soil_group = minetest.get_item_group(n.name, "soil")
+			--minetest.log("action", "++++++++++ [farming] soil below is "..tostring(n.name).." with soil group="..tostring(soil_group))
+			ll("[farming] soil below is "..tostring(n.name).." with soil group="..tostring(soil_group))
+			if soil_group < 3 then
+				--minetest.log("action", "++++++++++ [farming] soil not wet enough (soil_group < 3), aborting")
+				ll("[farming] soil not wet enough (soil_group < 3), aborting")
+				pos.y = pos.y+1
+				return
+			end
+			pos.y = pos.y+1
 
-		if light_level > 7 and (math.random(1, c) == 1 or light_level >= 13) then
-			local height = minetest.get_item_group(node.name, "cotton") + 1
-			minetest.set_node(pos, {name="farming:cotton_"..height})
+			-- check light
+			-- local light_level = minetest.get_node_light(pos)
+			-- --minetest.log("action", "++++++++++ [farming] light_level="..tostring(light_level))
+			-- ll("[farming] light_level="..tostring(light_level))
+			-- if not light_level then
+			-- 	--minetest.log("action", "++++++++++ [farming] light level unavailable, aborting")
+			-- 	ll("[farming] light level unavailable, aborting")
+			-- 	return
+			-- end
+			-- local c = math.ceil(2 * (light_level - 13) ^ 2 + 1)
+			-- --minetest.log("action", "++++++++++ [farming] computed chance cap c="..tostring(c))
+			-- ll("[farming] computed chance cap c="..tostring(c))
+
+			-- -- if light_level > 7 then
+			-- if light_level > 1 or true then
+			-- 	local roll = math.random(1, c)
+			-- 	--minetest.log("action", "++++++++++ [farming] random roll="..tostring(roll).." (1 means grow); light_level>=13="..tostring(light_level>=13))
+			-- 	ll("[farming] random roll="..tostring(roll).." (1 means grow); light_level>=13="..tostring(light_level>=13))
+			-- 	if true or roll == 1 or light_level >= 13 then
+			-- 		local height = minetest.get_item_group(node.name, "cotton") + 1
+			-- 		--minetest.log("action", "++++++++++ [farming] growing cotton from "..tostring(minetest.get_item_group(node.name, "cotton")).." to height "..tostring(height))
+			-- 		ll("[farming] growing cotton from "..tostring(minetest.get_item_group(node.name, "cotton")).." to height "..tostring(height))
+			-- 		minetest.set_node(pos, {name="farming:cotton_"..height})
+			-- 	else
+			-- 		--minetest.log("action", "++++++++++ [farming] did not grow cotton this tick (roll did not meet condition)")
+			-- 		ll("[farming] did not grow cotton this tick (roll did not meet condition)")
+			-- 	end
+			-- else
+			-- 	--minetest.log("action", "++++++++++ [farming] light too low (<=7), no growth")
+			-- 	ll("[farming] light too low (<=7), no growth")
+			-- end
+			_maybe_grow_wheat(pos, node, cotton_group)
 		end
-	end
-})
+	})
 
 minetest.register_node("farming:straw", {
 	description = "Straw",
