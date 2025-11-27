@@ -9,6 +9,30 @@ minetest.log("warning", "*************************  maidroid API")
 local S = maidroid.translator
 local mods = maidroid.mods
 
+mydump = function(lbl, obj)
+	pre="**************************************************"
+	pre="++++++++++++++++++++++++++++++++++++++++++++++++++"
+	if msg == nil then
+		msg = "null"
+	end
+
+	-- minetest.log("warning", pre..msg)
+	-- minetest.log("warning", "====================== "..lbl..":"..dump(obj))
+	
+	
+end
+
+mylog = function(msg)
+	pre="**************************************************"
+	pre="++++++++++++++++++++++++++++++++++++++++++++++++++"
+	if msg == nil then
+		msg = "null"
+	end
+
+	minetest.log("warning", pre..msg)
+end
+
+
 -- animation frame data of "models/maidroid.b3d".
 maidroid.animation = {
 	STAND     = {x =   1, y =  78},
@@ -949,24 +973,41 @@ local function on_activate(self, staticdata)
 	self:select_core()
 end
 
+-- Add this helper near other local functions (above get_staticdata)
+local function safe_read_file(path)
+	local ok, content = pcall(function()
+		local f = io.open(path, "r")
+		if not f then error("unable to open file for read") end
+		local c = f:read("*a")
+		f:close()
+		return c
+	end)
+	return ok, content
+end
+
 -- called when the object is destroyed.
 local get_staticdata = function(self, captured)
 	local data = {
 		nametag = self.nametag,
 		owner_name = self.owner,
 		inventory = {},
-		textures = self.textures[1],
+		textures = self.textures[0],
 		tbchannel = self.tbchannel
 	}
 
 	-- data.textures = luaentity.object:get_properties()["textures"][1]
 
-	minetest.log("warning", "====================== get_staticdata1:"..dump(self))
-	minetest.log("warning", "====================== get_staticdata2:"..dump(data))
+	-- minetest.log("warning", "====================== get_staticdata1:"..dump(self))
+	mydump("get_staticdata1 - self:", self)
+	-- minetest.log("warning", "====================== get_staticdata2:"..dump(data))
+	mydump("get_staticdata2 - data", data)
 	-- minetest.log("warning", "====================== get_staticdata3:"..dump(self:get_properties()))
 
 	local eeee = self.object:get_properties()
-	minetest.log("warning", "====================== get_staticdata3:"..dump(eeee))
+	-- minetest.log("warning", "====================== get_staticdata3:"..dump(eeee))
+	mydump("get_staticdata2 - get_properties", eeee)
+	-- ,,x1,,skip
+	-- to work aroudn texture loss problem save texture from object properties
 	data["textures"] = eeee["textures"][1]
 
 	-- if self:get_properties ~= nil then 
@@ -988,7 +1029,87 @@ local get_staticdata = function(self, captured)
 		data.home = self.home
 	end
 
-	minetest.log("warning", "====================== get_staticdata4:"..dump(data))
+
+	local id_str = "N/A"
+	do
+		if self.object then
+			-- try to call get_id() if available, otherwise fallback to tostring(self.object)
+			if self.object.get_id then
+				local ok, id = pcall(function() return self.object:get_id() end)
+				if ok and id then
+					id_str = tostring(id)
+				else
+					id_str = tostring(self.object)
+				end
+			else
+				id_str = tostring(self.object)
+			end
+		end
+		minetest.log("warning", "====================== get_staticdata3 : " .. tostring(self.nametag)
+			.. "  entity_id=" .. id_str)
+	end
+	
+	-- write data dump to disk named by id_str and print the file location
+	-- local ok, ser = pcall(function() return minetest.serialize(data) end)
+	local ok, ser = pcall(function() return dump(data) end)
+	if not ok then
+        log("Inner pcall caught:", msg)
+    end
+	local dumptext = ok and ser or tostring(data)
+	mylog("maidroid staticdata dump: " .. dumptext)
+
+	local worldpath = minetest.get_worldpath() or "."
+
+	-- Prefer nametag for filenames when available, otherwise fall back to id_str.
+	local id_source
+	if self.nametag and self.nametag ~= "" then
+		id_source = self.nametag
+	else
+		id_source = id_str
+		return nil
+	end
+	
+
+	local ok, safe_id = pcall(function()
+		local s = tostring(id_source or "")
+		if s == "" then s = tostring(id_str or "unknown") end
+		return s:gsub("[^%w%._%-]", "_")
+	end)
+	if not ok then
+		minetest.log("error", "maidroid: failed to sanitize id_str: " .. tostring(safe_id))
+		-- local fallback = tostring(id_str or "")
+		-- safe_id = fallback:gsub("[^%w%._%-]", "_")
+	end
+	local filename = "maidroid_staticdata_" .. safe_id .. ".txt"
+	local filepath = worldpath .. "/" .. filename
+
+	local file, ferr = io.open(filepath, "w")
+	if file then
+		file:write(dumptext)
+		file:close()
+		minetest.log("warning", "Saved maidroid staticdata to: " .. filepath)
+	else
+		minetest.log("warning", "Failed saving maidroid staticdata to: " .. filepath .. " error: " .. tostring(ferr))
+	end
+
+
+
+	-- Replace the selected block in get_staticdata with this single call:
+	local ok_read, readtext = safe_read_file(filepath)
+
+	if ok_read and readtext then
+		if readtext == dumptext then
+			minetest.log("warning", "maidroid: staticdata verification OK: " .. filename)
+		else
+			minetest.log("warning", "maidroid: staticdata verification FAILED (content mismatch): " .. filename)
+			-- log small prefixes to avoid overly large logs
+			mylog("expected prefix: " .. tostring(dumptext):sub(1,200))
+			mylog("read     prefix: " .. tostring(readtext):sub(1,200))
+		end
+	else
+		minetest.log("warning", "maidroid: staticdata verification error reading file: " .. tostring(readtext))
+	end
+
 	return minetest.serialize(data)
 end
 
@@ -1227,6 +1348,7 @@ local register_maidroid = function(product_name, def)
 		on_punch       = on_punch,
 		get_staticdata = get_staticdata,
 		on_deactivate  = function(self)
+			mylog("maidroid_on_deactivate")
 			self.wield_item:remove()
 			if self.hat then
 				self.hat:remove()
@@ -1282,15 +1404,38 @@ local register_maidroid = function(product_name, def)
 				minetest.log("warning", "====================== maidroid_egg:rand="..tostring(rand))
 				local m_skin = maid_skins[rand]
 				-- Set the custom texture for the "maidroid:maidroid" entity
-				-- maidroid_entity:set_textures({ { name = m_skin, animation = { type = "vertical_frames", length = 1.0 } } })
 				new_maidroid:set_properties({
 					textures = {m_skin}
 				})
 
-				-- print(dump(new_maidroid:get_luaentity()))
-				minetest.log("warning", "====================== maidroid_egg")
-				minetest.log("warning", dump(new_maidroid:get_properties()))
-				minetest.log("warning", dump(new_maidroid:get_properties()["textures"]))
+				-- assign a random display name (nametag) to the new maidroid
+				local male_names = { "Dave", "Alex", "Max", "Kai", "Leo", "Finn", "Eli", "Sam", "Noah", "Jude" }
+				local female_names = { "Ada", "Eve", "Luna", "Nova", "Iris", "Mira", "Zoe", "Kira", "Maidy", "Sera" }
+				local names
+				local skin = tostring(m_skin or "")
+				if skin:find("Dave") then
+					names = male_names
+				elseif skin:find("Mary") then
+					names = female_names
+				else
+					-- fallback: use both lists if skin not recognized
+					error("")
+					names = {}
+					for _, n in ipairs(male_names) do table.insert(names, n) end
+					for _, n in ipairs(female_names) do table.insert(names, n) end
+				end
+				local chosen = names[math.random(#names)]
+				-- append a short random number to reduce chance of collisions
+				local display_name = chosen .. " " .. tostring(math.random(100,999))
+
+				-- set on the luaentity and on the object so the nametag is visible immediately
+				local lua = new_maidroid:get_luaentity()
+				if lua then
+					lua.nametag = display_name
+				end
+				new_maidroid:set_nametag_attributes({ text = display_name, color = { a = 255, r = 96, g = 224, b = 96 } })
+
+				mydump("maidroid_egg_on_use", new_maidroid:get_properties())
 				-- print(new_maidroid:get_properties())
 
 				-- new_maidroid:get_luaentity().set_set_textures({ { name = m_skin } })

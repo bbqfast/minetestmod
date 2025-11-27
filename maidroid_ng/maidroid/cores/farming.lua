@@ -31,9 +31,19 @@ local seeds = {}
 
 local farming_redo = farming and farming.mod and farming.mod == "redo"
 
-ll = function(msg)
-	pre="**************************************************"
-	pre="++++++++++++++++++++++++++++++++++++++++++++++++++"
+-- local lottfarming_on = lottfarming
+
+-- check if lottfarming is installed, and set a flag
+local lottfarming_on = false
+
+if minetest.get_modpath("lottfarming") then
+    lottfarming_on=true
+end
+
+local ll = function(msg)
+	local pre="**************************************************"
+	local pre="++++++++++++++++++++++++++++++++++++++++++++++++++"
+	-- local pre="llllllllllllllllllllllllllllllllll "
 	if msg == nil then
 		msg = "null"
 	end
@@ -41,10 +51,29 @@ ll = function(msg)
 	minetest.log("warning", pre..msg)
 end
 
-ld = function(msg, dest)
+local lf = function(func, msg)
+	local pre="**************************************************"
+	local pre="++++++++++++++++++++++++++++++++++++++++++++++++++"
+	if msg == nil then
+		msg = "null"
+	end
+
+	black_list={}
+	-- black_list["mow"]=true
+	black_list["select_seed"]=true
+	black_list["mow"]=true
+
+	if (black_list[func] == nil) then
+		-- ll("LF mow: "..msg)
+		ll(func.."(): "..msg.." | lottfarming_on="..tostring(lottfarming_on))
+		-- ll(func.."(): "..msg)
+	end
+end
+
+local ld = function(msg, dest)
 	if (dest ~= nil) then
 		local destnode = minetest.get_node(dest)
-		ll(msg.." "..destnode.name)
+		-- ll(msg.." "..destnode.name)
 	end
 	
 end
@@ -55,6 +84,12 @@ local function extract_before_underscore(str)
     return str:match("(.*)_[0-9]+")
 end
 
+weed_plants["default:grass"] = {chance=1, crop="default:grass_1"}
+weed_plants["default:marram_grass"] = {chance=1, crop="default::marram_grass_1"}
+-- Pepper can be harvested when green or yellow too
+mature_plants["farming:pepper_7"] = {chance=1, crop="farming:pepper_1"}
+mature_plants["farming:pepper_6"] = {chance=3, crop="farming:pepper_1"}
+mature_plants["farming:pepper_5"] = {chance=9, crop="farming:pepper_1"}
 if farming_redo then
 	local mature, crop
 	for _, v in pairs(farming.registered_plants) do
@@ -84,10 +119,19 @@ else
 	local plant_list = { "cotton", "wheat" }
 	local crop
 	for _, plantname in ipairs(plant_list) do
-		crop = "farming:" .. plantname .. "_1"
-		mature_plants["farming:" .. plantname .. "_8"] = {chance=1,crop=crop}
-		seeds["farming:seed_" .. plantname] = crop
+			crop = "farming:" .. plantname .. "_1"
+			mature_plants["farming:" .. plantname .. "_8"] = {chance=1,crop=crop}
+			seeds["farming:seed_" .. plantname] = crop
+			-- Debug: log mature_plants contents using ll
+			local _count = 0
+			for k, v in pairs(mature_plants) do
+				_count = _count + 1
+				ll("[maidroid:farming] mature_plants[" .. tostring(k) .. "] = chance=" .. tostring(v and v.chance) .. " crop=" .. tostring(v and v.crop))
+			end
+			ll("[maidroid:farming] mature_plants total: " .. tostring(_count))
+			-- ll("init:  - - - - - - - farming:seed_" .. plantname)
 	end
+
 	if maidroid.mods.better_farming then
 		local mature, seed
 		for _, def in ipairs(better_farming.plant_infos) do
@@ -98,8 +142,30 @@ else
 			seeds[seed] = crop
 		end
 	end
-
 end
+
+if lottfarming_on then
+	seeds["lottfarming:cabbage_seed"]= "lottfarming:cabbage_1"
+	seeds["lottfarming:melon_seed"]= "lottfarming:melon_1"
+	seeds["lottfarming:turnips_seed"]= "lottfarming:turnips_1"
+	seeds["lottfarming:tomatoes_seed"]= "lottfarming:tomatoes_1"
+	seeds["lottfarming:berries_seed"]= "lottfarming:berries_1"
+	seeds["lottfarming:potato_seed"]= "lottfarming:potato_1"
+	seeds["lottfarming:barley_seed"]= "lottfarming:barley_1"
+	seeds["lottfarming:athelas_seed"]= "lottfarming:athelas_1"
+	seeds["lottfarming:pipeweed_seed"]= "lottfarming:pipeweed_1"	
+	-- [plant_name_without_steps
+	mature_plants["lottfarming:cabbage_3"] = {chance=1, crop="lottfarming:cabbage_1"}
+	mature_plants["lottfarming:melon_3"] = {chance=1, crop="lottfarming:melon_1"}
+	mature_plants["lottfarming:turnips_4"] = {chance=1, crop="lottfarming:turnips_1"}
+	mature_plants["lottfarming:tomatoes_4"] = {chance=1, crop="lottfarming:tomatoes_1"}
+	mature_plants["lottfarming:berries_4"] = {chance=1, crop="lottfarming:berries_1"}
+	mature_plants["lottfarming:potato_3"] = {chance=1, crop="lottfarming:potato_1"}
+	mature_plants["lottfarming:barley_3"] = {chance=1, crop="lottfarming:barley_1"}
+	mature_plants["lottfarming:athelas_3"] = {chance=1, crop="lottfarming:athelas_1"}
+	mature_plants["lottfarming:pipeweed_4"] = {chance=1, crop="lottfarming:pipeweed_1"}	
+end
+
 
 local ethereal_plants={}
 if maidroid.mods.ethereal then
@@ -133,6 +199,7 @@ if maidroid.mods.cucina_vegana then
 end
 
 -- is_plantable reports whether maidroid can plant any seed.
+-- ,,isp
 is_plantable = function(pos, name)
 	if minetest.is_protected(pos, name) then
 		return false
@@ -161,7 +228,7 @@ is_weed = function(name)
 	end
 
 	if string.find(name, "flower") then
-		ll("name: "..name.." name: "..name)
+		-- lf("is_weed", "name: "..name.." name: "..name)
 		return true
 	end
 
@@ -172,16 +239,18 @@ is_weed = function(name)
 
 	if trim_name ~= nil then 
 		if string.find(trim_name, "grass") then
-			ll("name: "..name.." trim name: "..trim_name)
+			lf("is_weed", "name: "..name.." trim name: "..trim_name)
 		end
 		local weed = weed_plants[trim_name]
 		if weed ~= nil then
-			ll("weed found: "..trim_name)
+			lf("is_weed", "weed found: "..trim_name)
 			-- ll(weed)
 			return true
+		else
+			lf("is_weed", "weed not found: "..trim_name)
 		end		
-	-- else
-	-- 	ll("Error extracting node name:"..name)
+	else
+		lf("is_weed", "Error extracting node name:"..name)
 	end
 	return false
 
@@ -189,39 +258,46 @@ end
 
 -- is_mowable reports whether maidroid can mow.,,mo
 is_mowable = function(pos, name)
-	if minetest.is_protected(pos, name) then
-		return false
-	end
-
-	local node = minetest.get_node(pos)
-	local desc = mature_plants[node.name]
-
-	-- local tm = extract_before_underscore(node.name)
-	-- ll(tm)
-
-	-- if tm ~= nil then 
-	-- 	if string.find(tm, "grass") then
-	-- 		ll(node.name)
-	-- 	end
-	-- end
-
-	-- local weed = weed_plants[tm]
-	-- if weed ~= nil then
-	-- 	ll(tm)
-	-- 	-- ll(weed)
-	-- 	return true
-	-- end
-
-	if is_weed(node.name) then
-		return true
-	end
-
-
-	if desc == nil then
-		return false
-	end
-	return math.random(desc.chance) == 1
+	return true
 end
+
+
+-- 	if minetest.is_protected(pos, name) then
+-- 		return false
+-- 	end
+
+-- 	local node = minetest.get_node(pos)
+-- 	local desc = mature_plants[node.name]
+
+-- 	-- ll("is_mowable "..node.name)
+-- 	local tm = extract_before_underscore(node.name)
+-- 	-- ll(tm)
+
+-- 	if tm ~= nil then 
+-- 		-- if string.find(tm, "grass") then
+-- 		if string.find(node.name, "grass") then
+-- 			ll("is_mowable node="..node.name)
+-- 			ll("is_mowable raw naem="..tm)
+-- 		end
+-- 	end
+
+-- 	local weed = weed_plants[tm]
+-- 	if weed ~= nil then
+-- 		-- ll(tm)
+-- 		ll("This is weed: "..weed)
+-- 		return true
+-- 	end
+
+-- 	if is_weed(node.name) then
+-- 		return true
+-- 	end
+
+
+-- 	if desc == nil then
+-- 		return false
+-- 	end
+-- 	return math.random(desc.chance) == 1
+-- end
 
 local papyrus_neighbors = {}
 papyrus_neighbors["default:dirt"] = true
@@ -282,19 +358,38 @@ end
 
 -- select_seed select the first available seed stack
 select_seed = function(self)
+	local inv = self:get_inventory()
 	local support
 
 	self.selected_seed = nil
-	for _, stack in pairs(self:get_inventory():get_list("main")) do
-		if not stack:is_empty() and is_seed(stack:get_name()) then
-			support = supports[stack:get_name()]
-			if not support or self:get_inventory():contains_item("main", support) then
-				self.selected_seed = stack:get_name()
-				return true
+	lf("select_seed", "starting for owner=" .. tostring(self.owner))
+
+	local list = inv:get_list("main") or {}
+	for idx, stack in ipairs(list) do
+		if not stack:is_empty() then
+			local name = stack:get_name()
+			lf("select_seed", "checking slot " .. tostring(idx) .. " item='" .. tostring(name) .. "'")
+			if is_seed(name) then
+				support = supports[name]
+				if support then
+					lf("select_seed", "seed '" .. name .. "' requires support '" .. support .. "'; checking inventory")
+					if inv:contains_item("main", support) then
+						lf("select_seed", "support '" .. support .. "' available, selecting seed '" .. name .. "'")
+						self.selected_seed = name
+						return true
+					else
+						lf("select_seed", "support '" .. support .. "' NOT available for seed '" .. name .. "'")
+					end
+				else
+					lf("select_seed", "seed '" .. name .. "' requires no support, selecting")
+					self.selected_seed = name
+					return true
+				end
 			end
 		end
 	end
 
+	lf("select_seed", "no suitable seed found")
 	if self.state ~= maidroid.states.WANDER then
 		to_wander(self)
 	end
@@ -359,50 +454,173 @@ task_base = function(self, action, destination)
 	end
 end
 
-task = function(self)
-	local pos = self:get_pos()
-	local inv = self:get_inventory()
-	local dest = search(pos, is_plantable, self.owner)
-	if dest then
-		-- local destnode = minetest.get_node(dest)
-		-- ll("task::isdest = "..destnode.name)
-		-- ld("task::isdest", dest)
-		if not ( self.selected_seed and							-- Is there already a selected seed
-			inv:contains_item("main", self.selected_seed)) then -- in inventory
-			if not select_seed(self) then						-- Try to find a seed in inventory
-				craft_seeds(self)								-- Craft seeds if none
-			end -- TODO delay crafting
-		end
-		-- Planting
-		if self.selected_seed and
-			task_base(self, plant, dest) then
-			return
-		end
+is_valid_soil = function(name)
+	if not name then return false end
+	if name == "default:dirt_with_grass"
+		or name == "default:dirt"
+		or name == "lottmapgen:ltee_grass"
+		or name == "lottmapgen:gondor_grass" then
+		return true
 	end
-
-	-- Harvesting
-	dest = search(pos, is_mowable, self.owner)
-	ld("task::mow section", dest)
-	if task_base(self, mow, dest) then
-		return
+	-- Also accept any node whose name contains "soil"
+	if string.find(name, "soil") then
+		return true
 	end
-
-	-- Plant papyrus
-	if not is_scythe(self.selected_tool) then
-		dest = search(pos, is_papyrus_soil, self.owner)
-		if inv:contains_item("main", "default:papyrus")
-			and task_base(self, plant_papyrus, dest) then
-			return
-		end
-	end
-
-	-- Harvest papyrus
-	dest = search(pos, is_papyrus, self.owner)
-	task_base(self, collect_papyrus, dest)
+	return false
 end
+	task = function(self)
+		local pos = self:get_pos()
+		local inv = self:get_inventory()
+		-- ,,x1
+
+		lpos = vector.add(pos, {x=0, y=-1, z=0})
+		local lnode = minetest.get_node(lpos)
+		local cnode = minetest.get_node(pos)
+
+		-- Log node names under and at current position for debugging
+		local lname = lnode and lnode.name or "nil"
+		local cname = cnode and cnode.name or "nil"
+		minetest.log("warning", "task() [maidroid:farming] lnode=" .. lname .. " cnode=" .. cname)
+
+		-- error("dummy error")
+		if cnode.name == "air" and is_valid_soil(lnode.name) then
+			lf("task", "Convert dirt to soil at "..minetest.pos_to_string(lpos))
+			lf("task", "Before: "..cnode.name)
+			minetest.set_node(lpos, { name = "farming:soil" })
+		end
+
+
+		-- Ensure there is water within 3 nodes horizontally on the same y as lpos; if not, try to place a water source nearby
+		-- only if LT on standing soil
+		if lnode.name ~= "air" and cnode.name == "air" then
+			lf("task", "SPOT FOR WATER Checking for water near "..minetest.pos_to_string(lpos))
+			local water_found = false
+			for dx = -3, 3 do
+				if water_found then break end
+				for dz = -3, 3 do
+					local p = vector.add(lpos, { x = dx, y = 0, z = dz }) -- keep same y as lpos
+					local nodename = minetest.get_node(p).name
+					if nodename == "default:water_source" or minetest.get_item_group(nodename, "water") > 0 then
+						water_found = true
+						break
+					end
+				end
+			end
+
+			if not water_found then
+				local under_name = minetest.get_node(lpos).name
+				-- If the node under is dirt/soil, place a water source (unless protected)
+				if is_valid_soil(under_name) or minetest.get_item_group(under_name, "soil") > 0 then
+					if not minetest.is_protected(lpos, self.owner) then
+						minetest.set_node(lpos, { name = "default:water_source" })
+						water_found = true
+						lf("task", "Placed water at "..minetest.pos_to_string(lpos).." (converted soil to water)")
+					else
+						lf("task", "Cannot place water at "..minetest.pos_to_string(lpos).." - protected")
+					end
+				end
+			end
+		end
+		-- if not water_found then
+		-- 	ll("No water found near " .. minetest.pos_to_string(lpos) .. " on same y, attempting to place water at lpos or nearby")
+		-- 	local placed = false
+		-- 	local owner = self.owner
+
+		-- 	-- Try current lpos first, then nearby positions within a small radius
+		-- 	local candidates = {}
+		-- 	table.insert(candidates, vector.new(lpos))
+		-- 	for dx = -1, 1 do
+		-- 		for dz = -1, 1 do
+		-- 			local p = vector.add(lpos, { x = dx, y = 0, z = dz })
+		-- 			-- avoid duplicating lpos
+		-- 			if not (p.x == lpos.x and p.y == lpos.y and p.z == lpos.z) then
+		-- 				table.insert(candidates, p)
+		-- 			end
+		-- 		end
+		-- 	end
+
+		-- 	for _, p in ipairs(candidates) do
+		-- 		if placed then break end
+		-- 		local pstr = minetest.pos_to_string(p)
+		-- 		if minetest.is_protected(p, owner) then
+		-- 			ll("Position " .. pstr .. " is protected for owner " .. tostring(owner) .. ", skipping")
+		-- 		else
+		-- 			local nodename = minetest.get_node(p).name
+		-- 			-- If it's already water, consider success and stop
+		-- 			if nodename == "default:water_source" or minetest.get_item_group(nodename, "water") > 0 then
+		-- 				ll("Found existing water at " .. pstr .. " (" .. nodename .. ")")
+		-- 				placed = true
+		-- 				break
+		-- 			end
+		-- 			local rnode = minetest.registered_nodes[nodename]
+		-- 			-- Allow placement on air, buildable_to nodes, or replaceable soil (so we don't overwrite important nodes)
+		-- 			if nodename == "air" or (rnode and rnode.buildable_to) or minetest.get_item_group(nodename, "soil") > 0 then
+		-- 				minetest.set_node(p, { name = "default:water_source" })
+		-- 				placed = true
+		-- 				ll("Placed water at " .. pstr .. " (replaced " .. tostring(nodename) .. ")")
+		-- 				break
+		-- 			else
+		-- 				ll("Node at " .. pstr .. " (" .. tostring(nodename) .. ") is not suitable for placement")
+		-- 			end
+		-- 		end
+		-- 	end
+
+		-- 	if not placed then
+		-- 		ll("Attempted all candidate positions but failed to place water near " .. minetest.pos_to_string(lpos))
+		-- 	else
+		-- 		ll("Successfully ensured water near " .. minetest.pos_to_string(lpos))
+		-- 	end
+		-- else
+		-- 	ll("Water already present near " .. minetest.pos_to_string(lpos) .. ", no placement needed")
+		-- end
+
+		local dest = search(pos, is_plantable, self.owner)
+		if dest then
+			-- local destnode = minetest.get_node(dest)
+			-- ll("task::isdest = "..destnode.name)
+			-- ld("task::isdest", dest)
+			if not ( self.selected_seed and							-- Is there already a selected seed
+				inv:contains_item("main", self.selected_seed)) then -- in inventory
+				if not select_seed(self) then						-- Try to find a seed in inventory
+					craft_seeds(self)								-- Craft seeds if none
+				end -- TODO delay crafting
+			end
+			-- Planting
+			if self.selected_seed and
+				task_base(self, plant, dest) then
+				return
+			end
+		end
+
+		-- Harvesting
+		dest = search(pos, is_mowable, self.owner)
+		ld("task() task::mow section", dest)
+		if task_base(self, mow, dest) then
+			return
+		end
+
+		-- Plant papyrus
+		if not is_scythe(self.selected_tool) then
+			dest = search(pos, is_papyrus_soil, self.owner)
+			if inv:contains_item("main", "default:papyrus")
+				and task_base(self, plant_papyrus, dest) then
+				return
+			end
+		end
+
+		-- Harvest papyrus
+		dest = search(pos, is_papyrus, self.owner)
+		task_base(self, collect_papyrus, dest)
+	end
 
 is_seed = function(name)
-	return seeds[name] ~= nil
+	if name == nil then
+		-- ll("is_seed: name is nil")
+		return false
+	end
+	local ok = seeds[name] ~= nil
+	-- ll("is_seed >>>>  : checking '" .. tostring(name) .. "' -> " .. tostring(ok))
+	return ok
 end
 
 local seed_recipes = {}
@@ -575,63 +793,110 @@ mow = function(self, dtime)
 	-- Skip until timer is ok
 	-- ,,xx,,cc
 	-- if update_action_timers(self, dtime, self.selected_tool) then return end
-	ll("mow")
+	lf("mow", "start")
+
 	local destnode = minetest.get_node(self.destination)
 	local mature = destnode.name
-	local stacks
+	lf("mow2", "destination node = " .. tostring(mature))
 
-	if not mature_plants[mature] and not is_weed(mature) then
+	local in_mature_list = mature_plants[mature] ~= nil
+	local is_weed_here = is_weed(mature)
+	lf("mow", "condition mature_plants[mature] ~= nil = " .. tostring(in_mature_list))
+	lf("mow", "condition is_weed(mature) = " .. tostring(is_weed_here))
+
+	if not in_mature_list and not is_weed_here then
+		lf("mow", "early return (not mature and not weed)")
 		to_wander(self, 0, timers.change_dir_max )
 		return
 	end -- target node changed
 
-	if is_scythe(self.selected_tool) then -- Fast tool for farmers
+	local scythe_mode = is_scythe(self.selected_tool)
+	lf("mow", "condition is_scythe(self.selected_tool) = " .. tostring(scythe_mode))
+
+	if scythe_mode then -- Fast tool for farmers
 		local name = mature_plants[mature].crop
 		local p2 = minetest.registered_nodes[name].place_param2 or 1
 		local filters = mature
-		stacks = {}
-		if farming_redo and mature:sub(1,-2) == "farming:pepper_" then
+		local stacks = {}
+		lf("mow", "scythe mode: crop name = " .. tostring(name) .. ", p2 = " .. tostring(p2))
+
+		local is_pepper_case = false
+		if farming_redo and mature:sub(1, -2) == "farming:pepper_" then
+			is_pepper_case = true
 			filters = { "farming:pepper_5", "farming:pepper_6", "farming:pepper_7" }
-		end -- Treat pepper as a special case
+		end
+		lf("mow", "is_pepper_case = " .. tostring(is_pepper_case))
+		lf("mow", "filters = " .. (type(filters) == "table" and table.concat(filters, ", ") or tostring(filters)))
+
 		local nodes = minetest.find_nodes_in_area(
 			vector.add(self.destination, {x=-1,y=-1,z=-1}),
 			vector.add(self.destination, {x=1, y=1, z=1}),
 			filters
 		) -- Find connected nodes matching this mature plant
+		lf("mow", "find_nodes_in_area returned " .. tostring(#nodes) .. " nodes")
 
 		local count = 0
 		local ok = false
 		local drops
 		for _, pos in ipairs(nodes) do
-			if ok and count == 4 then -- Scythes treats 5 plants at most
+			local cond_break = ok and count == 4
+			lf("mow", "loop pos=" .. minetest.pos_to_string(pos) .. " cond_break (ok and count==4) = " .. tostring(cond_break))
+			if cond_break then -- Scythes treats 5 plants at most
+				lf("mow", "breaking loop because cond_break true")
 				break
 			end
-			if	ok or -- Target node already harvested
-				count < 4 or -- Slot still available for target
-				pos == self.destination then -- Always for target
-				if filters ~= mature then -- This pepper is hot
+
+			local cond_do = ok or count < 4 or (pos.x == self.destination.x and pos.y == self.destination.y and pos.z == self.destination.z)
+			lf("mow", "loop cond_do (ok or count<4 or pos==destination) = " .. tostring(cond_do) .. " (ok="..tostring(ok)..", count="..tostring(count)..", pos="..minetest.pos_to_string(pos)..")")
+
+			if cond_do then
+				local cond_pepper_filter = filters ~= mature
+				lf("mow", "cond_pepper_filter (filters ~= mature) = " .. tostring(cond_pepper_filter))
+				if cond_pepper_filter then -- This pepper is hot
 					drops = minetest.get_node_drops(minetest.get_node(pos).name)
 				else
 					drops = minetest.get_node_drops(mature)
 				end
+				lf("mow", "drops for pos " .. minetest.pos_to_string(pos) .. " = " .. tostring(drops and #drops or 0))
 				table.insert_all(stacks, drops) -- Save the drops
 				minetest.set_node(pos, { name = name, param2 = p2 } )
 				count = count + 1
+				lf("mow", "after harvesting pos " .. minetest.pos_to_string(pos) .. " count = " .. tostring(count))
 			end
-			if pos == self.destination then
+
+			if pos.x == self.destination.x and pos.y == self.destination.y and pos.z == self.destination.z then
 				count = count - 1
 				ok = true
+				lf("mow", "encountered target position, adjusted count = " .. tostring(count) .. ", ok set to true")
 			end
 		end
+
+		if maidroid.settings.farming_sound then
+			maidroid.helpers.emit_sound(mature, "default_dig_snappy", "dig", self.destination, 0.8)
+			lf("mow", "played scythe sound for " .. tostring(mature))
+		else
+			lf("mow", "farming_sound disabled")
+		end
+
+		self:add_items_to_main(stacks)
+		lf("mow", "added items to inventory (scythe mode), stacks count = " .. tostring(#stacks))
+		to_wander(self, 0, timers.change_dir_max )
 	else -- Normal mode
-		stacks = minetest.get_node_drops(mature)
+		lf("mow", "normal mode (not scythe)")
+		local stacks = minetest.get_node_drops(mature)
+		lf("mow", "node drops count = " .. tostring(#stacks))
 		minetest.remove_node(self.destination)
+		lf("mow", "removed node at destination")
+		if maidroid.settings.farming_sound then
+			maidroid.helpers.emit_sound(mature, "default_dig_snappy", "dig", self.destination, 0.8)
+			lf("mow", "played normal dig sound for " .. tostring(mature))
+		else
+			lf("mow", "farming_sound disabled")
+		end
+		self:add_items_to_main(stacks)
+		lf("mow", "added items to inventory (normal mode), stacks count = " .. tostring(#stacks))
+		to_wander(self, 0, timers.change_dir_max )
 	end
-	if maidroid.settings.farming_sound then
-		maidroid.helpers.emit_sound(mature, "default_dig_snappy", "dig", self.destination, 0.8)
-	end
-	self:add_items_to_main(stacks)
-	to_wander(self, 0, timers.change_dir_max )
 end
 
 collect_papyrus = function(self, dtime)
@@ -704,10 +969,14 @@ is_scythe = function(name)
 end
 
 is_tool = function(stack)
-	-- ll("farming:is_tool  ")
 	local name = stack:get_name()
-	return minetest.get_item_group(name, "hoe") > 0
+	ll("stack  "..name)
+	local istool = minetest.get_item_group(name, "hoe") > 0
 		or is_scythe(name)
+
+	-- ll("farming:is_tool  "..istool)
+	return istool
+	-- return true
 end
 
 local hat
