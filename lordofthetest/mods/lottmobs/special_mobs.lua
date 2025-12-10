@@ -359,10 +359,12 @@ mobs:register_spawn("lottmobs:ltee_trader_1", {"lottmapgen:ltee_grass"}, 20, -1,
 
 -- make mobs:register_mob("lottmobs:ltee_trader_1 and mobs:register_mob("lottmobs:ltee_trader_2 call a common function
 mobs:register_mob("lottmobs:ltee_trader_2", ltee_settings("character_Carla_sixth_stolen_LT_mt.png", "lottarmor_character.b3d", lottmobs.ltee2))
-mobs:register_spawn("lottmobs:ltee_trader_2", {"lottmapgen:ltee_grass"}, 20, -1, 60000, 3, 31000)
+-- shop trader shouldn't spawn in the world
+-- mobs:register_spawn("lottmobs:ltee_trader_2", {"lottmapgen:ltee_grass"}, 20, -1, 60000, 3, 31000)
 
 mobs:register_mob("lottmobs:ltee_trader_3", ltee_settings("character_Sarah_LT_fourth_LT_stolen_mt.png", "lottarmor_character.b3d", lottmobs.ltee3))
-mobs:register_spawn("lottmobs:ltee_trader_3", {"lottmapgen:ltee_grass"}, 20, -1, 60000, 3, 31000)
+-- shop trader shouldn't spawn in the world
+-- mobs:register_spawn("lottmobs:ltee_trader_3", {"lottmapgen:ltee_grass"}, 20, -1, 60000, 3, 31000)
 
 -- mobs:register_mob("lottmobs:ltee_trader_2", {
 --     type = "npc",

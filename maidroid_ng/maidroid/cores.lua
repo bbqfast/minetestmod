@@ -23,6 +23,11 @@ if maidroid.settings.torcher then
 	dofile(maidroid.modpath .. "/cores/torcher.lua") -- Use: Follow
 end
 
+if maidroid.settings.digger then
+	dofile(maidroid.modpath .. "/cores/digger.lua") -- Use: Follow
+end
+
+
 if maidroid.settings.ocr then
 	dofile(maidroid.modpath .. "/cores/ocr.lua")
 end

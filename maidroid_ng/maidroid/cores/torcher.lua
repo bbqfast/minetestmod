@@ -14,6 +14,21 @@ local timers = maidroid.timers
 local follow = maidroid.cores.follow.on_step
 local wander = maidroid.cores.wander.on_step
 
+
+local lf = function(func, msg)
+	local pre = "++++++++++++++++++++++++++++++++++++++++++++++++++"
+	if func == nil then func = "unknown" end
+	if msg == nil then msg = "null" end
+
+	local black_list = {}
+	black_list["select_seed"] = true
+	black_list["mow"] = true
+
+	if black_list[func] == nil then
+		minetest.log("warning", pre .. func .. "(): " .. msg .. " | lottfarming_on=" .. tostring(lottfarming_on))
+	end
+end
+
 maidroid.register_tool_rotation("default:torch", vector.new(15, 0, 0))
 
 on_start = function(self)
@@ -32,6 +47,11 @@ on_stop = function(self)
 	self.is_placing = nil
 	self:halt()
 	self:set_animation(maidroid.animation.STAND)
+
+    self.object:set_properties({
+        physical = true,
+        collide_with_objects = true,
+    })	
 end
 
 on_pause = function(self)
@@ -45,23 +65,26 @@ local function is_dark(pos)
 end
 
 on_step = function(self, dtime, moveresult)
-	-- When owner offline the maidroid does nothing.
+	local func_name = "tourcher:on_step"
 	local player = minetest.get_player_by_name(self.owner)
-
 	self:pickup_item()
 
-	-- When owner offline just wander
+	self.object:set_properties({
+		physical = false,
+		collide_with_objects = false,
+	})	
+
 	if not player then
+		lf(func_name, "owner offline, wandering")
 		wander(self, dtime, moveresult)
 		return
 	end
 
-	-- Save state and try to follow
 	local laststate = self.state
 	follow(self, dtime, moveresult, player)
 
-	-- Can't follow just wander
 	if self.state == maidroid.states.IDLE and self.far_from_owner then
+		lf(func_name, "too far from owner, state=" .. tostring(self.state))
 		if laststate ~= self.state then
 			minetest.chat_send_player(self.owner, S("One torcher is too far away"))
 		end
@@ -74,7 +97,9 @@ on_step = function(self, dtime, moveresult)
 	else
 		self.timers.place_torch = 0
 		if self.is_placing then
+			lf(func_name, "attempting to place torch")
 			if not self:get_inventory():contains_item("main", self.selected_tool) then
+				lf(func_name, "no torch tool in inventory, need core selection")
 				self.need_core_selection = true
 				return
 			end
@@ -86,19 +111,61 @@ on_step = function(self, dtime, moveresult)
 
 			local pos = vector.round(self:get_pos())
 			local stack = ItemStack(self.selected_tool)
-			if not minetest.is_protected(pos, self.owner) then
-				local _, success = minetest.item_place_node(stack, player, {
-					type = "node",
-					under = vector.add(pos, vector.new(0,-1,0)),
-					above = pos,
-				})
-				if success then
-					self:get_inventory():remove_item("main", stack)
+			local placed = false
+			local torch_found = false
+			for dy = -2, 2 do
+				for dx = -2, 2 do
+					for dz = -2, 2 do
+						local check_pos = vector.add(pos, {x = dx, y = dy, z = dz})
+						local node = minetest.get_node(check_pos)
+						if minetest.get_item_group(node.name, "torch") > 0 then
+							torch_found = true
+							lf(func_name, "existing torch found at " .. minetest.pos_to_string(check_pos))
+							break
+						end
+					end
+					if torch_found then break end
 				end
+				if torch_found then break end
+			end
+
+			if not torch_found then
+				local placed = false
+				for dy = -2, 2 do
+					for dx = -2, 2 do
+						for dz = -2, 2 do
+							if placed then break end
+							local try_pos = vector.add(pos, {x = dx, y = dy, z = dz})
+							if not minetest.is_protected(try_pos, self.owner) then
+								local _, success = minetest.item_place_node(stack, player, {
+									type = "node",
+									under = vector.add(try_pos, vector.new(0, -1, 0)),
+									above = try_pos,
+								})
+								-- lf(func_name, "torch placement attempted at " .. minetest.pos_to_string(try_pos) .. ", success=" .. tostring(success))
+								if success then
+									self:get_inventory():remove_item("main", stack)
+									placed = true
+									break
+								end
+							else
+								lf(func_name, "position protected: " .. minetest.pos_to_string(try_pos))
+							end
+						end
+						if placed then break end
+					end
+					if placed then break end
+				end
+				if not placed then
+					lf(func_name, "no valid torch placement around " .. minetest.pos_to_string(pos))
+				end
+			else
+				lf(func_name, "torch already present in region, skipping placement")
 			end
 			self.is_placing = false
 		else
-			if is_dark(vector.round(self:get_pos())) then -- if it is dark, set torch
+			if is_dark(vector.round(self:get_pos())) then
+				lf(func_name, "darkness detected, will place torch")
 				self.is_placing = true
 				if self.state == maidroid.states.IDLE then
 					self:set_animation(maidroid.animation.MINE)

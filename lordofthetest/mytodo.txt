@@ -4,6 +4,9 @@ Game model:
 - LT shop
 - LT house improvement
 
+Bugs:
+- shop traders spawn around the world
+
 Game play
 - update LT guide inventory list
 - update LT trader inventory list

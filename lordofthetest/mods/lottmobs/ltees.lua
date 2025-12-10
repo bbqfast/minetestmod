@@ -48,7 +48,7 @@ function lottmobs.register_ltee(n, hpmin, hpmax, textures, wv, rv, damg, arm, dr
 		-- end,
 		on_rightclick = function(self, clicker)
 			minetest.log("warning", "NPC right-clicked by " .. clicker:get_player_name())	
-			error("Debugging error: NPC right-clicked")
+			-- error("Debugging error: NPC right-clicked")
 
 			lottmobs_trader(self, clicker, entity, lottmobs.elf, "gui_elfbg.png", "GAMEelf")
 		end,		
@@ -328,7 +328,7 @@ minetest.register_entity("lottmobs:npc", {
 		-- minetest.log("warning", "NPC step")
         self.timer = self.timer + dtime
 		self.spin_timer = self.spin_timer + dtime
-        if self.timer < 0.2 then return end
+        if self.timer < 1 then return end
         self.timer = 0
 		-- minetest.log("warning", "NPC step")
         if self.player_name then

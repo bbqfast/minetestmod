@@ -4,10 +4,166 @@
 -- https://forum.minetest.net/viewtopic.php?f=11&t=6099
 -- https://github.com/minetest/minetest_game/blob/master/mods/default/torch.lua
 
+local lf = function(func, msg)
+	local pre = "++++++++++++++++++++++++++++++++++++++++++++++++++"
+	if func == nil then func = "unknown" end
+	if msg == nil then msg = "null" end
+
+	local black_list = {}
+	black_list["select_seed"] = true
+	black_list["mow"] = true
+
+	if black_list[func] == nil then
+		minetest.log("warning", pre .. func .. "(): " .. msg )
+	end
+end
+
+
 local function on_flood(pos, oldnode, newnode)
 	minetest.add_item(pos, ItemStack("default:torch 1"))
 	return false
 end
+
+local torch_light_radius = 6
+local torch_light_level = 15
+local torch_light_nodes = {}
+
+local function get_player_name(player)
+	return player and player:is_player() and player:get_player_name() or ""
+end
+
+-- local function set_temporary_light(pos, playername)
+-- 	lf("set_temporary_light", "player " .. playername .. " at " .. minetest.pos_to_string(pos))
+-- 	local key = minetest.pos_to_string(pos)
+-- 	if not torch_light_nodes[key] then
+-- 		lf("set_temporary_light", "key not present: " .. key)
+-- 		local node = minetest.get_node_or_nil(pos)
+-- 		-- If node is nil, it's likely outside loaded area; if not, check
+-- 		-- If player is in the air but this returns "stone", it's probably
+-- 		-- because the mapgen hasn't updated the node yet, or there's a bug.
+-- 		-- For debugging:
+-- 		if node then
+-- 			lf("set_temporary_light", "DEBUG: node at " .. minetest.pos_to_string(pos) .. " is " .. node.name)
+-- 		else
+-- 			lf("set_temporary_light", "DEBUG: node at " .. minetest.pos_to_string(pos) .. " is nil")
+-- 		end
+-- 		if node then
+-- 			lf("set_temporary_light", "node found: " .. node.name)
+-- 			if node.name == "air" then
+-- 				lf("set_temporary_light", "node is air at " .. key)
+-- 				minetest.set_node(pos, {name = "air", param1 = torch_light_level, param2 = 0})
+-- 				torch_light_nodes[key] = {player = playername, time = minetest.get_gametime()}
+-- 			else
+-- 				lf("set_temporary_light", "node is not air: " .. node.name)
+-- 			end
+-- 		else
+-- 			lf("set_temporary_light", "node not found at " .. key)
+-- 		end
+-- 	else
+-- 		lf("set_temporary_light", "key already present: " .. key)
+-- 	end
+-- end
+
+-- local function clear_temporary_lights(playername)
+-- 	for key, data in pairs(torch_light_nodes) do
+-- 		if data.player == playername then
+-- 			lf("clear_temporary_lights", "clearing light for player " .. playername .. " at " .. key)
+-- 			local pos = minetest.string_to_pos(key)
+-- 			local node = minetest.get_node(pos)
+-- 			if node.name == "air" then
+-- 				lf("clear_temporary_lights", "node is air at " .. key)
+-- 				minetest.set_node(pos, {name = "air"})
+-- 			else
+-- 				lf("clear_temporary_lights", "node is not air at " .. key .. ": " .. node.name)
+-- 			end
+-- 			torch_light_nodes[key] = nil
+-- 		end
+-- 	end
+-- end
+-- Register invisible light node
+minetest.register_node("default:torch_light_invis", {
+	description = "Invisible Torch Light (internal)",
+	drawtype = "airlike",
+	tiles = {"invisible.png"},
+	inventory_image = "invisible.png",
+	wield_image = "invisible.png",
+	paramtype = "light",
+	sunlight_propagates = true,
+	pointable = false,
+	walkable = false,
+	diggable = false,
+	buildable_to = true,
+	floodable = false,
+	light_source = torch_light_level,
+	groups = {not_in_creative_inventory=1, attached_node=1},
+	drop = "",
+})
+
+local player_light_pos = {}
+
+local function update_player_light(player, enable)
+	local pname = get_player_name(player)
+	if pname == "" then return end
+	local pos = vector.round(player:get_pos())
+	local key = minetest.pos_to_string(pos)
+	local prev = player_light_pos[pname]
+	-- Remove previous light node if player moved or torch is not held
+	if prev and (not enable or not vector.equals(prev, pos)) then
+		local prev_name = minetest.get_node(prev).name
+		if prev_name == "default:torch_light_invis" then
+			minetest.set_node(prev, {name = "air"})
+		end
+		player_light_pos[pname] = nil
+	end
+	-- Place new light node if enabled
+	if enable then
+		local nodename = minetest.get_node(pos).name
+		if nodename == "air" or nodename == "default:torch_light_invis" then
+			minetest.set_node(pos, {name = "default:torch_light_invis"})
+			player_light_pos[pname] = pos
+		end
+	end
+end
+
+minetest.register_globalstep(function(dtime)
+	for _, player in ipairs(minetest.get_connected_players()) do
+		local item = player:get_wielded_item()
+		local pname = get_player_name(player)
+		if item:get_name() == "default:torch" then
+			update_player_light(player, true)
+		else
+			update_player_light(player, false)
+		end
+	end
+end)
+
+minetest.register_on_leaveplayer(function(player)
+	update_player_light(player, false)
+end)
+
+-- minetest.register_globalstep(function(dtime)
+-- 	for _, player in ipairs(minetest.get_connected_players()) do
+-- 		local item = player:get_wielded_item()
+-- 		local pname = get_player_name(player)
+-- 		if item:get_name() == "default:torch" then
+-- 			local ppos = vector.round(player:get_pos())
+-- 			for dx = -torch_light_radius, torch_light_radius do
+-- 				for dy = -torch_light_radius, torch_light_radius do
+-- 					for dz = -torch_light_radius, torch_light_radius do
+-- 						local dist = math.abs(dx) + math.abs(dy) + math.abs(dz)
+-- 						if dist <= torch_light_radius then
+-- 							local pos = {x = ppos.x + dx, y = ppos.y + dy, z = ppos.z + dz}
+-- 							set_temporary_light(pos, pname)
+-- 						end
+-- 					end
+-- 				end
+-- 			end
+-- 		else
+-- 			clear_temporary_lights(pname)
+-- 		end
+-- 	end
+-- end)
+
 
 minetest.register_node("default:torch", {
 	description = "Torch",

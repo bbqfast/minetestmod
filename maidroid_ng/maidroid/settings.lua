@@ -53,6 +53,7 @@ m_settings.hat = g_settings:get_bool("maidroid.hat", true)
 
 -- Optional cores
 m_settings.torcher = g_settings:get_bool("maidroid.torcher", true)
+m_settings.digger = g_settings:get_bool("maidroid.digger", true)
 m_settings.farming = mods.farming and g_settings:get_bool("maidroid.farming", true)
 m_settings.ocr = mods.pdisc and g_settings:get_bool("maidroid.ocr", true)
 m_settings.stockbreeder = ( mods.petz or mods.animalia or mods.animal )

@@ -1,0 +1,17 @@
+- farming crop not growing
+- lott crop growing
+- figure out how to equip
+- log verbose control
+- digging ground
+
+DONE:
+- custom outfit
+
+
+
+
+"cores/farming.lua"
+"cores/torcher.lua"
+
+
+"cores/follow.lua"

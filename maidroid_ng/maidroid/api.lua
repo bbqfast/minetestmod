@@ -1139,6 +1139,12 @@ end
 
 -- toggle_entity_jump: forbid "jumping" if maidroid is over an entity
 local toggle_entity_jump = function(self, _, moveresult)
+
+	if not moveresult then
+		minetest.log("warning", "toggle_entity_jump: moveresult is nil")
+		return
+	end
+
 	local stepheight = self.object:get_properties().stepheight
 	-- Do not allow "jumping" when standing on object
 	if moveresult.standing_on_object and stepheight ~= 0 then
@@ -1520,7 +1526,7 @@ if false then
 		local texture_name = maidroid.generate_texture(i)
 		local egg_img_name = "maidroid_maidroid_egg.png"
 		register_maidroid(product_name, {
-			hp_max     = 15,
+			hp_max     = 15000,
 			weight     = 20,
 			mesh       = "maidroid.b3d",
 			textures   = { texture_name },
