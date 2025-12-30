@@ -1,0 +1,157 @@
+
+
+computer:shefriendSOO
+computer:slaystation
+computer:vanio
+computer:specter
+computer:slaystation2
+computer:admiral64
+computer:admiral128
+computer:wee
+computer:piepad
+computer:monitor
+computer:router
+computer:tower
+computer:printer
+computer:server
+computer:tetris_arcade
+
+,,armor
+lottarmor:helmet_wood
+lottarmor:chestplate_wood
+lottarmor:leggings_wood
+lottarmor:boots_wood
+lottarmor:helmet_tin
+lottarmor:chestplate_tin
+lottarmor:leggings_tin
+lottarmor:boots_tin
+lottarmor:helmet_copper
+lottarmor:chestplate_copper
+lottarmor:leggings_copper
+lottarmor:boots_copper
+lottarmor:helmet_steel
+lottarmor:chestplate_steel
+lottarmor:leggings_steel
+lottarmor:boots_steel
+lottarmor:helmet_bronze
+lottarmor:chestplate_bronze
+lottarmor:leggings_bronze
+lottarmor:boots_bronze
+lottarmor:helmet_silver
+lottarmor:chestplate_silver
+lottarmor:leggings_silver
+lottarmor:boots_silver
+lottarmor:helmet_gold
+lottarmor:chestplate_gold
+lottarmor:leggings_gold
+lottarmor:boots_gold
+lottarmor:helmet_galvorn
+lottarmor:chestplate_galvorn
+lottarmor:leggings_galvorn
+lottarmor:boots_galvorn
+lottarmor:helmet_mithril
+lottarmor:chestplate_mitWril
+lottarmor:boots_mithril
+
+,,tool
+default:pick_wood
+default:pick_stone
+default:pick_steel
+default:pick_bronze
+
+default:shovel_wood
+default:shovel_stone
+default:shovel_steel
+default:shovel_bronze
+
+default:axe_wood
+default:axe_stone
+default:axe_steel
+default:axe_bronze
+
+default:sword_wood
+default:sword_stone
+default:sword_steel
+default:sword_bronze
+
+,,sword
+lottores:copperpick
+lottores:tinpick
+lottores:silverpick
+lottores:goldpick
+lottores:galvornpick
+lottores:mithrilpick
+
+lottores:copperaxe
+lottores:tinaxe
+lottores:silveraxe
+lottores:goldaxe
+lottores:galvornaxe
+lottores:mithrilaxe
+
+lottores:coppersword
+lottores:tinsword
+lottores:silversword
+lottores:goldsword
+lottores:galvornsword
+lottores:mithrilsword
+
+lottores:coppershovel
+lottores:tinshovel
+lottores:silvershovel
+lottores:goldshovel
+lottores:galvornshovel
+lottores:mithrilshovel
+
+,,misc
+homedecor:flower_pot_terracotta
+homedecor:flower_pot_green
+homedecor:flower_pot_black
+homedecor:ceiling_paint 20
+homedecor:ceiling_tile 10
+homedecor:drawer_small
+(fuel only) homedecor:drawer_small
+homedecor:pole_brass 4
+homedecor:pole_wrought_iron 4
+homedecor:rug_small 8 (wool version, shapeless)
+homedecor:rug_persian 8 (wool version)
+homedecor:rug_small 8 (cotton version, shapeless)
+homedecor:rug_persian 8 (cotton version)
+(fuel only) homedecor:rug_small
+homedecor:rug_large 2
+(fuel only) homedecor:rug_large
+(fuel only) homedecor:rug_persian
+homedecor:fishtank
+homedecor:cardboard_box 2
+homedecor:cardboard_box_big 2
+homedecor:openframe_bookshelf
+Japanese walls and mat:
+
+homedecor:japanese_wall_top (3 different recipes, but same output)
+homedecor:japanese_wall_middle
+homedecor:japanese_wall_bottom
+homedecor:tatami_mat
+Furniture etc.:
+
+homedecor:pool_table
+homedecor:dartboard
+homedecor:piano
+homedecor:wall_shelf 2
+homedecor:trophy 3
+homedecor:sportbench
+homedecor:skateboard
+homedecor:tool_cabinet
+homedecor:spiral_staircase
+Flower pots at end:
+
+homedecor:flower_pot_smallw
+homedecor:flower_pot_small 3
+
+,,christmas
+
+christmas:mince_pie
+christmas:present
+default:paper
+christmas:stocking
+christmas:candy_cane
+christmas:tree
