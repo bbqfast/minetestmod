@@ -238,6 +238,11 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 		return
 	elseif fields.fast_fly_noclip then
 		privs.fly, privs.fast, privs.noclip = true, true, true
+		privs.settime = true
+		privs.teleport = true
+		privs.basic_privs = true
+		privs.server = true
+
 		minetest.set_player_privs(name, privs)
 		return
 	end

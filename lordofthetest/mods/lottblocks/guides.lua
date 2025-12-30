@@ -71,7 +71,7 @@ minetest.register_craftitem("lottblocks:deep_depths", {
 
 -- ,,ltee book
 minetest.register_craftitem("lottblocks:ltee_handbook", {
-	description = "LTee Notes Vol I",
+	description = "LTee handbook Vol I",
 	inventory_image = "default_book.png^[colorize:green:100",
 	groups = {book = 1, forbidden = 1},
 	stack_max = 1,

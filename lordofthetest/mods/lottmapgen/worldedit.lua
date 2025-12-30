@@ -4,6 +4,20 @@
 -- License: GNU Affero General Public License
 worldedit2 = {}
 
+local lf = function(func, msg)
+	local pre = "++++++++++++++++++++++++++++++++++++++++++++++++++"
+	if func == nil then func = "unknown" end
+	if msg == nil then msg = "null" end
+
+	local black_list = {}
+	black_list["select_seed"] = true
+	black_list["deserialize"] = true
+
+	if black_list[func] == nil then
+		minetest.log("warning", pre .. func .. "(): " .. msg )
+	end
+end
+
 function worldedit2.keep_loaded(pos1, pos2)
 	local manip = minetest.get_voxel_manip()
 	manip:read_from_map(pos1, pos2)
@@ -215,6 +229,47 @@ function worldedit2.deserialize(origin_pos, value)
 			add_node(entry, entry)
 			if entry.meta then
 				get_meta(entry):from_table(entry.meta)
+				local fields = entry.meta.fields
+				if fields and fields.item and fields.item ~= "" and
+					(entry.name == "itemframes:frame" or entry.name == "itemframes:pedestal") then
+					local node = minetest.get_node(entry)
+					lf("deserialize", "node at " .. minetest.pos_to_string(entry) .. " is " .. (node and node.name or "nil"))
+					local epos = {x = entry.x, y = entry.y, z = entry.z}
+					if node.name == "itemframes:frame" then
+						local facedir = {
+							[0] = {x = 0, y = 0, z = 1},
+							[1] = {x = 1, y = 0, z = 0},
+							[2] = {x = 0, y = 0, z = -1},
+							[3] = {x = -1, y = 0, z = 0},
+						}
+						local posad = facedir[node.param2 or 0]
+						if posad then
+							epos.x = epos.x + posad.x * 6.5 / 16
+							epos.y = epos.y + posad.y * 6.5 / 16
+							epos.z = epos.z + posad.z * 6.5 / 16
+						end
+					elseif node.name == "itemframes:pedestal" then
+						epos.y = epos.y + 12 / 16 + 0.33
+					end
+					local objs = minetest.get_objects_inside_radius(epos, 0.5)
+					local has_item = false
+					for _, obj in ipairs(objs) do
+						local ent = obj:get_luaentity()
+						if ent and ent.name == "itemframes:item" then
+							has_item = true
+							break
+						end
+					end
+					if not has_item then
+						local itemname = ItemStack(fields.item):get_name()
+						local staticdata = node.name .. ";" .. itemname
+						local e = minetest.add_entity(epos, "itemframes:item", staticdata)
+						if e and node.name == "itemframes:frame" then
+							local yaw = math.pi * 2 - (node.param2 or 0) * math.pi / 2
+							e:set_yaw(yaw)
+						end
+					end
+				end
 			end
 		end)
 		if not success then

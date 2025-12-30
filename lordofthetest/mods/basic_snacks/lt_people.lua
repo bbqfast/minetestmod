@@ -135,7 +135,10 @@ register_lt("club", "Club LT", "character_player_Cubes_lil_thing_Club_Mt.png",  
 -- register_lt("liam", "Liam LT", "character_Liam_fifth_stolen_LT_mt.png",  "[combine:8x8:0,0=character_Liam_fifth_stolen_LT_mt.png^[sheet:8x4:1,0")
 register_lt("liam", "Liam LT", "character_Liam_fifth_stolen_LT_mt.png",  get_preview("character_Liam_fifth_stolen_LT_mt.png"))
 register_lt("pat", "Pat LT", "character_player_peters_lt_pat_mt.png",  get_preview("character_player_peters_lt_pat_mt.png"))
+register_lt("carlos", "Carlos LT", "character_Carlos_LT_third_LT_stolen_mt.png",  get_preview("character_Carlos_LT_third_LT_stolen_mt.png"))
+register_lt("sarah", "Sarah LT", "character_Sarah_LT_fourth_LT_stolen_mt.png",  get_preview("character_Sarah_LT_fourth_LT_stolen_mt.png"))
 register_lt("dusk", "dusk", "character_player_Dusk_mt.png",  get_preview("character_player_Dusk_mt.png"))
+register_lt("santa", "santa", "character_santa_LT_mt.png",  get_preview("character_santa_LT_mt.png"))
 
 
 register_lt("farmer", "farmer", "character_farmer.png",  "character_farmer.png")

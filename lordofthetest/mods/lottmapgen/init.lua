@@ -12,6 +12,20 @@
 -- TODO
 -- fog
 
+local lf = function(func, msg)
+	local pre = "++++++++++++++++++++++++++++++++++++++++++++++++++"
+	if func == nil then func = "unknown" end
+	if msg == nil then msg = "null" end
+
+	local black_list = {}
+	black_list["select_seed"] = true
+	black_list["mow"] = true
+
+	if black_list[func] == nil then
+		minetest.log("warning", pre .. func .. "(): " .. msg )
+	end
+end
+
 -- Parameters
 lottmapgen = {}
 local HITET = 0.4 -- High temperature threshold
@@ -121,27 +135,35 @@ dofile(minetest.get_modpath("lottmapgen").."/schematics.lua")
 
 
 function myenqueue0(name, pos)
-	minetest.log("warning", "lottmapgen: enqueue_building: " .. name .. " at " .. minetest.pos_to_string(pos))
+	lf("myenqueue0", "enqueue_building: " .. name .. " at " .. minetest.pos_to_string(pos))
 	return lottmapgen.enqueue_building(name, pos)
 end
 
 function myenqueuerand(name1, name2, pos)
     local chosen_name = math.random(2) == 1 and name1 or name2
-    minetest.log("warning", "lottmapgen: enqueue_building: " .. chosen_name .. " at " .. minetest.pos_to_string(pos))
+    lf("myenqueuerand", "enqueue_building: " .. chosen_name .. " at " .. minetest.pos_to_string(pos))
     return lottmapgen.enqueue_building(chosen_name, pos)
 end
 
 -- ,,x1,,f1
-function myenqueue(name1, pos)
+function myenqueue(name, pos)
 	name2 = "LT house"
 	name2 = "LT Shop"
 	name2 = "LT Shop Lrg"
 	-- temp fix for LT house
 	name1 = "LT house"
-	name1 = "LT Shop"
-	name1 = "LT Shop Lrg"
+	-- name1 = "LT Shop"
+	-- name1 = "LT Shop Lrg"
+	-- name1 = "LT Shop Santa"
+    -- local chosen_name = math.random(2) == 1 and name1 or name2
+    local chosen_name = name
+    lf("myenqueue", "enqueue_building: " .. chosen_name .. " at " .. minetest.pos_to_string(pos))
+    return lottmapgen.enqueue_building(chosen_name, pos)
+end
+
+function myenqueue2(name1, name2, pos)
     local chosen_name = math.random(2) == 1 and name1 or name2
-    minetest.log("warning", "lottmapgen: enqueue_building: " .. chosen_name .. " at " .. minetest.pos_to_string(pos))
+    lf("myenqueue2", "enqueue_building: " .. chosen_name .. " at " .. minetest.pos_to_string(pos))
     return lottmapgen.enqueue_building(chosen_name, pos)
 end
 
@@ -412,6 +434,10 @@ minetest.register_on_generated(function(minp, maxp, seed)
 										end
 									elseif biome == 2 then
 										data[vi] = c_snowblock
+										if math.random(PLANT14) == 12 then
+											myenqueue("LT Shop Santa", {x=x, y=y, z=z})
+										end
+
 									elseif biome == 3 then
 										if math.random(PLANT3) == 2 then
 											data[vi] = c_dryshrub
@@ -422,6 +448,8 @@ minetest.register_on_generated(function(minp, maxp, seed)
 											lottmapgen_pinetree(x, y, z, area, data)
 										elseif math.random(TREE3) == 4 then
 											lottmapgen_firtree(x, y, z, area, data)
+										-- elseif math.random(PLANT6) == 12 then
+										-- 	myenqueue("LT Shop Santa", {x=x, y=y, z=z})
 										end
 									elseif biome == 4 then
 										if math.random(TREE5) == 2 then
@@ -592,9 +620,9 @@ minetest.register_on_generated(function(minp, maxp, seed)
 											lottmapgen_farmingplants(data, vi, p2data)
 										elseif math.random(PLANT9) == 8 then
 											data[vi] = c_melon
-										elseif math.random(PLANT14) == 13 then
-											minetest.log("warning", "Hobbit Hole")
-
+										elseif math.random(PLANT13) == 12 then
+											myenqueue("LT house", {x=x, y=y, z=z})
+										elseif math.random(PLANT13) == 13 then
 											-- xxxx
 											-- lottmapgen.enqueue_building("Hobbit Hole", {x=x, y=y, z=z})
 											myenqueue("Hobbit Hole", {x=x, y=y, z=z})
@@ -616,8 +644,9 @@ minetest.register_on_generated(function(minp, maxp, seed)
 											lottmapgen_farmingplants(data, vi, p2data)
 										elseif math.random(PLANT9) == 8 then
 											data[vi] = c_melon
-										elseif math.random(PLANT14) == 13 then
-											minetest.log("warning", "LT house")
+										elseif math.random(PLANT13) == 12 then
+											myenqueue("LT Shop", {x=x, y=y, z=z})
+										elseif math.random(PLANT13) == 13 then
 											myenqueue("LT house", {x=x, y=y, z=z})
 											-- lottmapgen.enqueue_building("LT house", {x=x, y=y, z=z})
 	
@@ -680,3 +709,15 @@ end)
 
 dofile(minetest.get_modpath("lottmapgen").."/deco.lua")
 dofile(minetest.get_modpath("lottmapgen").."/chests.lua")
+
+minetest.register_chatcommand("list_lttypes", {
+    description = "List all LT building types",
+    func = function(name)
+        local types = {}
+        for k, _ in pairs(lottmapgen.building_types) do
+            table.insert(types, k)
+        end
+        table.sort(types)
+        return true, "LT building types: " .. table.concat(types, ", ")
+    end
+})

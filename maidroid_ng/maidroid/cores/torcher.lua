@@ -25,7 +25,7 @@ local lf = function(func, msg)
 	black_list["mow"] = true
 
 	if black_list[func] == nil then
-		minetest.log("warning", pre .. func .. "(): " .. msg .. " | lottfarming_on=" .. tostring(lottfarming_on))
+		minetest.log("warning", pre .. func .. "(): " .. msg )
 	end
 end
 

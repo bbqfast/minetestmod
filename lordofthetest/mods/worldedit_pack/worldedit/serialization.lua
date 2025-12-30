@@ -1,6 +1,21 @@
 --- Schematic serialization and deserialiation.
 -- @module worldedit.serialization
 
+local lf = function(func, msg)
+	local pre = "++++++++++++++++++++++++++++++++++++++++++++++++++"
+	if func == nil then func = "unknown" end
+	if msg == nil then msg = "null" end
+
+	local black_list = {}
+	black_list["select_seed"] = true
+	black_list["mow"] = true
+
+	if black_list[func] == nil then
+		minetest.log("warning", pre .. func .. "(): " .. msg )
+	end
+end
+
+
 worldedit.LATEST_SERIALIZATION_VERSION = 5
 local LATEST_SERIALIZATION_HEADER = worldedit.LATEST_SERIALIZATION_VERSION .. ":"
 
@@ -259,13 +274,81 @@ function worldedit.deserialize(origin_pos, value)
 	local registered_nodes = minetest.registered_nodes
 	for i, entry in ipairs(nodes) do
 		-- ,,x1
-		minetest.log("warning", "add node: " .. i)
+		-- minetest.log("warning", "add node: " .. i)
 		if registered_nodes[entry.name] then
 			entry.x, entry.y, entry.z = origin_x + entry.x, origin_y + entry.y, origin_z + entry.z
 			-- Entry acts as both position and node
 			add_node(entry, entry)
 			if entry.meta then
+				lf("deserialize", "entry.meta present for node at " .. minetest.pos_to_string({x=entry.x, y=entry.y, z=entry.z}))
 				get_meta(entry):from_table(entry.meta)
+				local fields = entry.meta.fields
+				if fields then
+					lf("deserialize", "meta.fields present: " .. minetest.pos_to_string({x=entry.x, y=entry.y, z=entry.z}))
+				else
+					lf("deserialize", "meta.fields missing: " .. minetest.pos_to_string({x=entry.x, y=entry.y, z=entry.z}))
+				end
+				if fields and fields.item then
+					lf("deserialize", "fields.item present: " .. tostring(fields.item))
+				else
+					lf("deserialize", "fields.item missing or empty")
+				end
+				if fields and fields.item and fields.item ~= "" and
+					(entry.name == "itemframes:frame" or entry.name == "itemframes:pedestal") then
+					lf("deserialize", "itemframe or pedestal node with non-empty item at " .. minetest.pos_to_string({x=entry.x, y=entry.y, z=entry.z}))
+					local node = minetest.get_node(entry)
+					
+					local epos = {x = entry.x, y = entry.y, z = entry.z}
+					lf("deserialize", "Placing itemframe entity at " .. minetest.pos_to_string(epos) .. " for node " .. tostring(node.name) .. " with item " .. tostring(fields.item))
+					if node.name == "itemframes:frame" then
+						lf("deserialize", "Node is itemframes:frame")
+						local facedir = {
+							[0] = {x = 0, y = 0, z = 1},
+							[1] = {x = 1, y = 0, z = 0},
+							[2] = {x = 0, y = 0, z = -1},
+							[3] = {x = -1, y = 0, z = 0},
+						}
+						local posad = facedir[node.param2 or 0]
+						if posad then
+							lf("deserialize", "Adjusting position for facedir " .. tostring(node.param2 or 0))
+							epos.x = epos.x + posad.x * 6.5 / 16
+							epos.y = epos.y + posad.y * 6.5 / 16
+							epos.z = epos.z + posad.z * 6.5 / 16
+						else
+							lf("deserialize", "No facedir adjustment for param2=" .. tostring(node.param2 or 0))
+						end
+					elseif node.name == "itemframes:pedestal" then
+						lf("deserialize", "Node is itemframes:pedestal")
+						epos.y = epos.y + 12 / 16 + 0.33
+					else
+						lf("deserialize", "Node is neither frame nor pedestal: " .. tostring(node.name))
+					end
+					local objs = minetest.get_objects_inside_radius(epos, 0.5)
+					local has_item = false
+					for _, obj in ipairs(objs) do
+						local ent = obj:get_luaentity()
+						if ent and ent.name == "itemframes:item" then
+							lf("deserialize", "Existing itemframes:item entity found nearby")
+							has_item = true
+							break
+						end
+					end
+					if not has_item then
+						lf("deserialize", "No itemframes:item entity found, adding entity")
+						local itemname = ItemStack(fields.item):get_name()
+						local staticdata = node.name .. ";" .. itemname
+						local e = minetest.add_entity(epos, "itemframes:item", staticdata)
+						if e and node.name == "itemframes:frame" then
+							local yaw = math.pi * 2 - (node.param2 or 0) * math.pi / 2
+							e:set_yaw(yaw)
+							lf("deserialize", "Set entity yaw to " .. tostring(yaw))
+						end
+					else
+						lf("deserialize", "itemframes:item already present, not adding")
+					end
+				else
+					lf("deserialize", "Condition for itemframe entity placement not met for node at " .. minetest.pos_to_string({x=entry.x, y=entry.y, z=entry.z}))
+				end
 			end
 		end
 	end

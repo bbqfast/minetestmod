@@ -42,6 +42,16 @@ minetest.register_tool("lottarmor:helmet_tin", {
 	wear = 0,
 })
 
+-- ,,lthelmet
+minetest.register_tool("lottarmor:helmet_ltee", {
+	description = "LT Helmet",
+	inventory_image = "lottarmor_inv_helmet_ltee.png",
+	-- groups = {armor_head=5, armor_heal=0, armor_use=1500, armor_healing=0},
+	-- groups = {armor_head=10, armor_heal=6, armor_use=250, armor_healing=0, physics_speed=-0.05},
+	groups = {armor_head=12, armor_heal=12, armor_use=250, armor_healing=0, physics_speed=-0.1},
+	wear = 0,
+})
+
 minetest.register_tool("lottarmor:chestplate_tin", {
 	description = "Tin Chestplate",
 	inventory_image = "lottarmor_inv_chestplate_tin.png",
@@ -234,7 +244,7 @@ minetest.register_tool("lottarmor:leggings_galvorn", {
 minetest.register_tool("lottarmor:boots_galvorn", {
 	description = "Galvorn Boots",
 	inventory_image = "lottarmor_inv_boots_galvorn.png",
-	groups = {armor_feet=15, armor_heal=12, armor_use=100, armor_healing=0, physics_speed=-0.1, forbidden=1},
+	groups = {armor_feet=15, armor_heal=12, awrmor_use=100, armor_healing=0, physics_speed=-0.1, forbidden=1},
 	wear = 0,
 })
 

@@ -17,6 +17,8 @@ ctrl-D to open
 'mods/lottclasses/init.lua'
 'mods/lottclasses/allies.lua'
 
+snacks
+'mods\basic_snacks\crafts.lua'
 
 'mods/lottmapgen/worldedit.lua'
 

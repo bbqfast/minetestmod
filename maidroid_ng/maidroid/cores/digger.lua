@@ -45,35 +45,20 @@ if minetest.get_modpath("lottfarming") then
     lottfarming_on=true
 end
 
-local ll = function(msg)
-	local pre="**************************************************"
-	local pre="++++++++++++++++++++++++++++++++++++++++++++++++++"
-	-- local pre="llllllllllllllllllllllllllllllllll "
-	if msg == nil then
-		msg = "null"
-	end
-
-	minetest.log("warning", pre..msg)
-end
-
 local lf = function(func, msg)
-	local pre="**************************************************"
-	local pre="++++++++++++++++++++++++++++++++++++++++++++++++++"
-	if msg == nil then
-		msg = "null"
-	end
+	local pre = "++++++++++++++++++++++++++++++++++++++++++++++++++"
+	if func == nil then func = "unknown" end
+	if msg == nil then msg = "null" end
 
-	black_list={}
-	-- black_list["mow"]=true
-	black_list["select_seed"]=true
-	black_list["mow"]=true
+	local black_list = {}
+	black_list["select_seed"] = true
+	black_list["mow"] = true
 
-	if (black_list[func] == nil) then
-		-- ll("LF mow: "..msg)
-		ll(func.."(): "..msg)
-		-- ll(func.."(): "..msg)
+	if black_list[func] == nil then
+		minetest.log("warning", pre .. func .. "(): " .. msg )
 	end
 end
+
 
 local ld = function(msg, dest)
 	if (dest ~= nil) then
@@ -158,27 +143,70 @@ local move_up_one = function(self)
 end
 
 
-
-local dig_block_below = function(self)
+-- ,,db
+local dig_block_in_direction = function(self, direction, except_nodes)
+	-- lf("digger:dig_block_in_direction", "direction: " .. minetest.pos_to_string(direction))
 	local pos = self:get_pos()
+
 	if not pos then
+		lf("digger:dig_block_in_direction", "No position available for maidroid.")
+		return
+	end
+	if not direction then
+		lf("digger:dig_block_in_direction", "No direction given.")
 		return
 	end
 
-	local below = vector.add(pos, { x = 0, y = -1, z = 0 })
-	if minetest.is_protected(below, self.owner) then
+	local target_pos = vector.add(pos, direction)
+	-- lf("digger:dig_block_in_direction", "Current pos: " .. minetest.pos_to_string(pos) .. ", Target pos: " .. minetest.pos_to_string(target_pos))
+
+	if minetest.is_protected(target_pos, self.owner) then
+		lf("digger:dig_block_in_direction", "Target position is protected: " .. minetest.pos_to_string(target_pos))
 		return
 	end
 
-	local node = minetest.get_node(below)
-	if not node or node.name == "air" then
+	local node = minetest.get_node(target_pos)
+	if not node then
+		lf("digger:dig_block_in_direction", "No node at target position: " .. minetest.pos_to_string(target_pos))
+		return
+	end
+
+	-- lf("digger:dig_block_in_direction", "Node to dig: " .. tostring(node.name))
+
+	if node.name == "air" then
+		-- lf("digger:dig_block_in_direction", "Node at target position is air.")
+		return
+	end
+
+	if except_nodes and except_nodes[node.name] then
+		-- lf("digger:dig_block_in_direction", "Skipping node in except_nodes: " .. node.name)
 		return
 	end
 
 	local drops = minetest.get_node_drops(node.name)
-	minetest.remove_node(below)
+	minetest.remove_node(target_pos)
+
+	minetest.add_particlespawner({
+		amount = 12,
+		time = 0.2,
+		minpos = vector.subtract(target_pos, 0.3),
+		maxpos = vector.add(target_pos, 0.3),
+		minvel = {x = -0.5, y = 0.5, z = -0.5},
+		maxvel = {x = 0.5, y = 1.5, z = 0.5},
+		minacc = {x = 0, y = -9.8, z = 0},
+		maxacc = {x = 0, y = -9.8, z = 0},
+		minexptime = 0.3,
+		maxexptime = 0.7,
+		minsize = 1,
+		maxsize = 2,
+		texture = minetest.registered_nodes[node.name] and
+			(minetest.registered_nodes[node.name].tiles[1] or "default_dirt.png") or "default_dirt.png",
+		glow = 0,
+	})
+
 
 	move_up_one(self)
+	local skip_add = false
 	if not drops or #drops == 0 then
 		return
 	end
@@ -188,7 +216,27 @@ local dig_block_below = function(self)
 		table.insert(stacks, ItemStack(item))
 	end
 
-	if #stacks > 0 and self.add_items_to_main then
+	if self.get_inventory then
+		local inv = self:get_inventory()
+		for idx, stack in ipairs(stacks) do
+			lf("digger:dig_block_in_direction", "Processing stack index: " .. idx)
+			local name = stack:get_name()
+			lf("digger:dig_block_in_direction", "Checking add: " .. name)
+			local count = 0
+			for i, inv_stack in ipairs(inv:get_list("main")) do
+				if inv_stack:get_name() == name then
+					count = math.max(count, inv_stack:get_count())
+				end
+			end
+			if count >= 99 then
+				lf("digger:dig_block_in_direction", "Skipping add: " .. name .. " (count=" .. count .. ")")
+				skip_add = true
+				break
+			end
+		end
+	end
+
+	if #stacks > 0 and self.add_items_to_main and not skip_add then
 		self:add_items_to_main(stacks)
 	end
 end
@@ -235,13 +283,15 @@ on_step = function(self, dtime, moveresult)
 			end
 		end
 
+
 		if should_light then
 			if node.name ~= "maidroid:helper_light" then
 				if self._last_light_pos then
+					-- lf("digger:on_step", "Removing previous helper_light at " .. minetest.pos_to_string(self._last_light_pos))
 					minetest.remove_node(self._last_light_pos)
 				end
 				minetest.set_node(light_pos, {name = "maidroid:helper_light"})
-				lf("digger:on_step", "Placed helper_light at " .. minetest.pos_to_string(light_pos))
+				-- lf("digger:on_step", "Placed helper_light at " .. minetest.pos_to_string(light_pos))
 				self._last_light_pos = vector.new(light_pos)
 				self._last_light_node = node and node.name or nil
 			else
@@ -250,6 +300,7 @@ on_step = function(self, dtime, moveresult)
 			end
 		else
 			if node.name == "maidroid:helper_light" then
+				lf("digger:on_step", "Removing helper_light at " .. minetest.pos_to_string(light_pos))
 				minetest.remove_node(light_pos)
 			end
 			self._last_light_pos = nil
@@ -287,14 +338,14 @@ on_step = function(self, dtime, moveresult)
 	self._digger_accum = 0
 
 	player = minetest.get_player_by_name(self.owner)
-	lf("digger:on_step", "Checking teleport: player=" .. tostring(player and player:get_player_name() or "nil") ..
-		", wielded=" .. tostring(player and player:get_wielded_item():get_name() or "nil"))
+	-- lf("digger:on_step", "Checking teleport: player=" .. tostring(player and player:get_player_name() or "nil") ..
+	-- 	", wielded=" .. tostring(player and player:get_wielded_item():get_name() or "nil"))
 	if player then
 		local inv = self:get_inventory()
 		local first_stack = inv and inv:get_stack("main", 1)
 		if first_stack and player:get_wielded_item():get_name() == first_stack:get_name() then
 			local self_pos = self:get_pos()
-			lf("digger:on_step", "Teleport trigger: self_pos=" .. minetest.pos_to_string(self_pos or {}))
+			-- lf("digger:on_step", "Teleport trigger: self_pos=" .. minetest.pos_to_string(self_pos or {}))
 			if self_pos then
 				player:set_pos({x = self_pos.x, y = self_pos.y + 5, z = self_pos.z})
 				minetest.chat_send_player(player:get_player_name(), "Teleported to your maidroid!")
@@ -344,23 +395,23 @@ on_step = function(self, dtime, moveresult)
 		self:set_animation(maidroid.animation.MINE)
 		local pos = self:get_pos()
 		local below = vector.add(pos, { x = 0, y = -1, z = 0 })
-		minetest.add_particlespawner({
-			amount = 16,
-			time = 0.2,
-			minpos = vector.subtract(below, 0.3),
-			maxpos = vector.add(below, 0.3),
-			minvel = {x = -0.5, y = 0.5, z = -0.5},
-			maxvel = {x = 0.5, y = 1.5, z = 0.5},
-			minacc = {x = 0, y = -9.8, z = 0},
-			maxacc = {x = 0, y = -9.8, z = 0},
-			minexptime = 0.3,
-			maxexptime = 0.7,
-			minsize = 1,
-			maxsize = 2,
-			texture = minetest.registered_nodes[minetest.get_node(below).name] and
-				(minetest.registered_nodes[minetest.get_node(below).name].tiles[1] or "default_dirt.png") or "default_dirt.png",
-			glow = 0,
-		})
+		-- minetest.add_particlespawner({
+		-- 	amount = 16,
+		-- 	time = 0.2,
+		-- 	minpos = vector.subtract(below, 0.3),
+		-- 	maxpos = vector.add(below, 0.3),
+		-- 	minvel = {x = -0.5, y = 0.5, z = -0.5},
+		-- 	maxvel = {x = 0.5, y = 1.5, z = 0.5},
+		-- 	minacc = {x = 0, y = -9.8, z = 0},
+		-- 	maxacc = {x = 0, y = -9.8, z = 0},
+		-- 	minexptime = 0.3,
+		-- 	maxexptime = 0.7,
+		-- 	minsize = 1,
+		-- 	maxsize = 2,
+		-- 	texture = minetest.registered_nodes[minetest.get_node(below).name] and
+		-- 		(minetest.registered_nodes[minetest.get_node(below).name].tiles[1] or "default_dirt.png") or "default_dirt.png",
+		-- 	glow = 0,
+		-- })
 
 		local node_below = minetest.get_node(below)
 		lf("digger", "node_below: " .. node_below.name)
@@ -407,7 +458,27 @@ on_step = function(self, dtime, moveresult)
 			return
 		end
 
-		dig_block_below(self)
+		except_nodes2 = {["default:lava_source"] = true, ["default:lava_flowing"] = true}
+
+		except_nodes1 = {
+			["default:stone"] = true,
+			["default:cobble"] = true,
+			["default:obsidian"] = true,
+			["default:dirt"] = true,
+			["lottmapgen:shire_grass"] = true,
+			["lottmapgen:lorien_grass"] = true,
+			["default:sand"] = true,
+		}
+
+		-- except_nodes1 = {}
+
+		-- ,,db
+		dig_block_in_direction(self, {x = 1, y = 0, z = 0}, except_nodes1)
+		dig_block_in_direction(self, {x = -1, y = 0, z = 0}, except_nodes1)
+		dig_block_in_direction(self, {x = 0, y = 0, z = -1}, except_nodes1)
+		dig_block_in_direction(self, {x = 0, y = 0, z = 1}, except_nodes1)
+		dig_block_in_direction(self, {x = 0, y = -1, z = 0}, except_nodes2)
+
 	end
 end
 

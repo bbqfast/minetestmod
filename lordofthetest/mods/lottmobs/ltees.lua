@@ -350,10 +350,11 @@ minetest.register_entity("lottmobs:npc", {
 							"Hi, LT!  Welcome to Middle-Earth",
 							"I'm LT angel",
 							"we're newly arrived race on the middle earth",
-							"We don't have our own territory yet",
+							"We are a peaceful race here ",
 							"! There are dangerous mobs around",
-							"I'm here to help fight off mobs",
-							"Feel free to explore around"
+							"I'm here to help fight off some mobs",
+							"Our village situated on red grassland",
+							"Feel free to explore around",
 						}
 						self.current_quote_index = 1
 						self.quote_timer = 0

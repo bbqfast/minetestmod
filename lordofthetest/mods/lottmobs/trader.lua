@@ -21,8 +21,50 @@
 -- Contact sapier a t gmx net
 -------------------------------------------------------------------------------
 
+local lf = function(func, msg)
+	local pre = "++++++++++++++++++++++++++++++++++++++++++++++++++"
+	if func == nil then func = "unknown" end
+	if msg == nil then msg = "null" end
+
+	local black_list = {}
+	black_list["select_seed"] = true
+	black_list["mow"] = true
+
+	if black_list[func] == nil then
+		minetest.log("warning", pre .. func .. "(): " .. msg )
+	end
+end
+
+-- ,,allow
 function lottmobs.allow_move(inv, from_list, from_index, to_list, to_index, count, player)
-	minetest.log("action", "Attempting to move items from " .. from_list .. " to " .. to_list .. " by player: " .. player:get_player_name())
+	-- lf("allow_move", "inv=" .. dump(inv) .. ", from_list=" .. dump(from_list) .. ", from_index=" .. dump(from_index) .. ", to_list=" .. dump(to_list) .. ", to_index=" .. dump(to_index) .. ", count=" .. dump(count) .. ", player=" .. dump(player))
+	lf("allow_move", "Attempting to move items from " .. from_list .. " to " .. to_list .. " by player: " .. player:get_player_name())
+	if (from_list == "selection" and to_list == "goods") then
+		lf("allow_move", "Allowing move from selection to goods")
+		local old_stack = inv.get_stack(inv, from_list, from_index)
+		-- Log all items in the inventory for debugging
+		for _, listname in ipairs(inv:get_lists()) do
+			local list = inv:get_list(listname)
+			if list then
+				lf("allow_move", "Inventory list '" .. listname .. "':")
+				for idx, stack in ipairs(list) do
+					if not stack:is_empty() then
+						lf("allow_move", "  Slot " .. idx .. ": " .. stack:to_string())
+					end
+				end
+			end
+		end
+
+		-- Clear the price when moving items back from selection to goods
+		inv.set_stack(inv, "price", 1, nil)
+
+		if count ~= old_stack:get_count() then
+			return 0
+		end
+		return count
+	end
+
+	
 	if to_list ~= "selection" or
 		from_list == "price" or
 		from_list == "payment" or
@@ -33,8 +75,8 @@ function lottmobs.allow_move(inv, from_list, from_index, to_list, to_index, coun
 
 	-- forbid moving of parts of stacks
 	local old_stack = inv.get_stack(inv, from_list, from_index)
-	minetest.log("action", "Inventory: " .. dump(inv))
-	minetest.log("action", "Old stack: " .. dump(old_stack:to_table()))
+	lf("allow_move", "Inventory: " .. dump(inv))
+	lf("allow_move", "Old stack: " .. dump(old_stack:to_table()))
 	if count ~= old_stack.get_count(old_stack) then
 		return 0;
 	end
@@ -49,7 +91,7 @@ function lottmobs.allow_put(inv, listname, index, stack, player)
 end
 
 function lottmobs.allow_take(inv, listname, index, stack, player)
-	minetest.log("action", "Player " .. player:get_player_name() .. " is attempting to take items from " .. listname)
+	lf("allow_take", "Player " .. player:get_player_name() .. " is attempting to take items from " .. listname)
 	if listname == "takeaway" or
 		listname == "payment" then
 		return 99
@@ -128,8 +170,10 @@ function lottmobs.check_pay(inv,paynow)
 end
 lottmobs.trader_inventories = {}
 
-function lottmobs.add_goods(entity, race)
-	minetest.log("action", "Adding goods for trader entity: " .. tostring(entity) .. ", race: " .. tostring(race))
+function lottmobs.add_goods(entity, race, same_race)
+	lf("add_goods", "Entity value: " .. dump(entity))
+
+	lf("add_goods", "Adding goods for trader entity: " .. tostring(entity) .. ", race: " .. tostring(race))
 	local goods_to_add = nil
 	for i=1,15 do
 		if same_race == true then
@@ -157,6 +201,10 @@ end
 ----
 
 function lottmobs_trader(self, clicker, entity, race, image, priv)
+	lf("lottmobs_trader", "Race: " .. dump(race))
+
+	-- lf("lottmobs_trader", "Self: " .. dump(self))
+
 	lottmobs.face_pos(self, clicker:get_pos())
 	local player = clicker:get_player_name()
 	-- if self.id == 0 then
@@ -168,7 +216,7 @@ function lottmobs_trader(self, clicker, entity, race, image, priv)
 		--self.nametag = self.game_name
 	end
 	local unique_entity_id = self.id
-	minetest.log("action", "Trader ID: " .. tostring(self.id))
+	lf("lottmobs_trader", "Trader ID: " .. tostring(self.id))
 	local is_inventory = minetest.get_inventory({type="detached", name=unique_entity_id})
 	local same_race = false
 	if minetest.get_player_privs(player)[priv] ~= nil then
@@ -179,46 +227,56 @@ function lottmobs_trader(self, clicker, entity, race, image, priv)
 		allow_put = lottmobs.allow_put,
 		allow_take = lottmobs.allow_take,
 		on_move = function(inventory, from_list, from_index, to_list, to_index, count, player)
-		minetest.log("action", "Moving items from " .. from_list .. " to " .. to_list)
-		minetest.log("action", "From index: " .. from_index .. ", to index: " .. to_index)
-			if from_list == "goods" and
-			to_list == "selection" then
+			lf("lottmobs_trader.on_move", "Moving items from " .. tostring(from_list) .. " to " .. tostring(to_list))
+			lf("lottmobs_trader.on_move", "From index: " .. tostring(from_index) .. ", to index: " .. tostring(to_index))
+			lf("lottmobs_trader.on_move", "Count: " .. tostring(count))
+			if from_list == "goods" and to_list == "selection" then
+				lf("lottmobs_trader.on_move", "Condition: from_list == 'goods' and to_list == 'selection'")
 				local inv = inventory
-				local moved = inv.get_stack(inv,to_list, to_index)
+				local moved = inv.get_stack(inv, to_list, to_index)
 				local goodname = moved.get_name(moved)
 				local elements = moved.get_count(moved)
-				if( elements > count ) then
-					-- remove the surplus parts
-					inv.set_stack(inv,"selection", 1,goodname.." "..tostring( count ))
-					-- the slot we took from is now free
-					inv.set_stack(inv,"goods",from_index,
-						goodname.." "..tostring( elements - count ))
-					-- update the real amount of items in the slot now
+				lf("lottmobs_trader.on_move", "Item moved: " .. tostring(goodname) .. ", elements: " .. tostring(elements))
+				if elements > count then
+					lf("lottmobs_trader.on_move", "Condition: elements > count, splitting stack")
+					inv.set_stack(inv, "selection", 1, goodname .. " " .. tostring(count))
+					inv.set_stack(inv, "goods", from_index, goodname .. " " .. tostring(elements - count))
 					elements = count
+				else
+					lf("lottmobs_trader.on_move", "Condition: elements <= count, no split needed")
 				end
 				local good = nil
-				local good = nil
 				if same_race == true then
-					for i = 1,#race.items_race,1 do
-						local stackstring = goodname .." " .. count
+					lf("lottmobs_trader.on_move", "Condition: same_race == true")
+					for i = 1, #race.items_race, 1 do
+						local stackstring = goodname .. " " .. tostring(count)
+						lf("lottmobs_trader.on_move", "Checking items_race[" .. tostring(i) .. "]: " .. tostring(race.items_race[i][1]) .. " vs " .. stackstring)
 						if race.items_race[i][1] == stackstring then
+							lf("lottmobs_trader.on_move", "Match found in items_race at index " .. tostring(i))
 							good = race.items_race[i]
 						end
 					end
 				else
-					for i = 1,#race.items,1 do
-						local stackstring = goodname .." " .. count
+					lf("lottmobs_trader.on_move", "Condition: same_race == false")
+					for i = 1, #race.items, 1 do
+						local stackstring = goodname .. " " .. tostring(count)
+						lf("lottmobs_trader.on_move", "Checking items[" .. tostring(i) .. "]: " .. tostring(race.items[i][1]) .. " vs " .. stackstring)
 						if race.items[i][1] == stackstring then
+							lf("lottmobs_trader.on_move", "Match found in items at index " .. tostring(i))
 							good = race.items[i]
 						end
 					end
 				end
 				if good ~= nil then
-					inventory.set_stack(inventory,"price", 1, good[2])
+					lf("lottmobs_trader.on_move", "Condition: good ~= nil, setting price: " .. tostring(good[2]))
+					inventory.set_stack(inventory, "price", 1, good[2])
 				else
-					inventory.set_stack(inventory,"price", 1, nil)
+					lf("lottmobs_trader.on_move", "Condition: good == nil, clearing price")
+					inventory.set_stack(inventory, "price", 1, nil)
 				end
-			lottmobs.update_takeaway(inv)
+				lottmobs.update_takeaway(inv)
+			else
+				lf("lottmobs_trader.on_move", "Condition: Not goods -> selection, ignoring")
 			end
 		end,
 		on_put = lottmobs.on_put,
@@ -231,9 +289,26 @@ function lottmobs_trader(self, clicker, entity, race, image, priv)
 		lottmobs.trader_inventory.set_size(lottmobs.trader_inventory,"selection",1)
 		lottmobs.trader_inventory.set_size(lottmobs.trader_inventory,"price",1)
 		lottmobs.trader_inventory.set_size(lottmobs.trader_inventory,"payment",1)
-		lottmobs.add_goods(entity, race)
+		-- lf("lottmobs_trader", "Logging race: " .. dump(race))
+
+		lottmobs.add_goods(entity, race, same_race)
 	end
-	minetest.chat_send_player(player, "[NPC] <Trader " .. self.game_name .. "> Hello, " .. player .. ", have a look at my wares.")
+	if race.quotes and type(race.quotes) == "table" and #race.quotes > 0 then
+		self.current_quote_index = 1
+		minetest.chat_send_player(player, "[NPC] <Trader " .. self.game_name .. "> " .. race.quotes[self.current_quote_index])
+		local quotes_timer = minetest.get_us_time()
+		local function send_next_quote()
+			self.current_quote_index = self.current_quote_index + 1
+			if self.current_quote_index > #race.quotes then return end
+			minetest.chat_send_player(player, "[NPC] <Trader " .. self.game_name .. "> " .. race.quotes[self.current_quote_index])
+			minetest.after(2, send_next_quote)
+		end
+		minetest.after(2, send_next_quote)
+	else
+		minetest.chat_send_player(player, "[NPC] <Trader " .. self.game_name .. "> Hello, " .. player .. ", have a look at my wares.")
+	end
+
+	minetest.chat_send_player(player, "[NPC] <Trader " .. self.game_name .. "> Hello, " .. player .. ", welcome to my shop.")
 	minetest.show_formspec(player, "trade",
 		"size[8,10;]" ..
 		 "background[5,5;1,1;" .. image .. ";true]" ..

@@ -28,11 +28,13 @@ local lottmapgen_list = {
 	["Dwarf House"] =    {build="dwarfhouse",   area_owner = "Dwarf Smith",   area_name = "Dwarf House",
 		center = {x=16, y=1, z=3} },
 	["LT house"] =    {build="lthousesm",   area_owner = "LT villager", area_name = "LT House",
-	center = {x=13, y=3, z=24} },
+		center = {x=6, y=1, z=9} },
 	["LT Shop"] =    {build="ltee_shop1",   area_owner = "LT villager", area_name = "LT Shop",
-	center = {x=13, y=3, z=24} },
+		center = {x=2, y=1, z=6} },
+	["LT Shop Santa"] =    {build="lteeshop_santa",   area_owner = "LT villager",  area_name = "LT Shop",
+		center = {x=3, y=1, z=5} },
 	["LT Shop Lrg"] =    {build="lteeshop_lrg",   area_owner = "LT villager", area_name = "LT Shop",
-	center = {x=13, y=3, z=24} }
+		center = {x=9, y=3, z=15} },
 
 }
 
@@ -278,4 +280,34 @@ minetest.register_abm({
 	action = function(pos, node, active_object_count, active_object_count_wider)
 		minetest.remove_node(pos)
 	end,
+})
+
+
+minetest.register_chatcommand("load_schem", {
+    params = "<name>",
+    description = "Load a schematic from schems folder at your position",
+    func = function(name, param)
+        local schem_name = param:match("^(%S+)")
+        if not schem_name then
+            return false, "Usage: /load_schem <name>"
+        end
+        local player = minetest.get_player_by_name(name)
+        if not player then
+            return false, "Player not found."
+        end
+        local pos = vector.round(player:get_pos())
+        local mapped_name
+        for k, v in pairs(lottmapgen_list) do
+            if v.build == schem_name then
+                mapped_name = k
+                break
+            end
+        end
+        if not mapped_name then
+            return false, "Building type '" .. schem_name .. "' not found."
+        end
+        local building = lottmapgen_list[mapped_name]
+        lottmapgen.place_building(building, pos)
+        return true, "Building '" .. schem_name .. "' placed at " .. minetest.pos_to_string(pos)
+    end
 })

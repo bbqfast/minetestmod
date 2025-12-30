@@ -1,28 +1,16 @@
 farming = {}
 
-local ll = function(msg)
-	local pre="************************************************** "
-	local pre="___----____----____----____----____----____----____----____----__  "
-	if msg == nil then
-		msg = "null"
-	end
-
-	minetest.log("warning", pre..msg)
-end
-
 local lf = function(func, msg)
-	local pre="**************************************************"
-	local pre="++++++++++++++++++++++++++++++++++++++++++++++++++"
-	if msg == nil then
-		msg = "null"
-	end
+	local pre = "++++++++++++++++++++++++++++++++++++++++++++++++++"
+	if func == nil then func = "unknown" end
+	if msg == nil then msg = "null" end
 
-	black_list={}
-	black_list["add_plant"]=true
+	local black_list = {}
+	black_list["select_seed"] = true
+	black_list["mow"] = true
 
-	if (black_list[func] == nil) then
-		-- ll("LF mow: "..msg)
-		ll(func.."(): "..msg)
+	if black_list[func] == nil then
+		minetest.log("warning", pre .. func .. "(): " .. msg )
 	end
 end
 
