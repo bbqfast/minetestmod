@@ -202,3 +202,71 @@ minetest.register_globalstep(function(dtime)
 		end
 	end
 end)
+
+-- Player HP HUD
+local hp_huds = {}
+
+
+local function get_player_damage(player)
+	local item = player:get_wielded_item()
+	local def = item:get_definition() or {}
+	local caps = def.tool_capabilities or {}
+	local dmg = 0
+	if caps.damage_groups and caps.damage_groups.fleshy then
+		dmg = caps.damage_groups.fleshy
+	end
+	return dmg
+end
+
+local function get_player_armor_level(player)
+	local name = player:get_player_name()
+	if armor and armor.def and armor.def[name] and armor.def[name].level then
+		return armor.def[name].level
+	end
+	return 0
+end
+
+minetest.register_on_joinplayer(function(player)
+	local name = player:get_player_name()
+	local hp = player:get_hp()
+	local props = player:get_properties() or {}
+	local hp_max = props.hp_max or 20
+	local dmg = get_player_damage(player)
+	local arm = get_player_armor_level(player)
+
+	hp_huds[name] = player:hud_add({
+		hud_elem_type = "text",
+		position      = {x = 0.5, y = 0.02},
+		alignment     = {x = 0, y = 0},
+		scale         = {x = 100, y = 20},
+		number        = 0x00FF00,
+		text          = "HP: " .. hp .. " / " .. hp_max .. "  DMG: " .. dmg .. "  ARM: " .. arm,
+	})
+end)
+
+minetest.register_on_leaveplayer(function(player)
+	local name = player:get_player_name()
+	hp_huds[name] = nil
+end)
+
+local hp_hud_timer = 0
+minetest.register_globalstep(function(dtime)
+	hp_hud_timer = hp_hud_timer + dtime
+	if hp_hud_timer < 1 then
+		return
+	end
+	hp_hud_timer = 0
+
+	for _, player in ipairs(minetest.get_connected_players()) do
+		local name = player:get_player_name()
+		local hud_id = hp_huds[name]
+		if hud_id then
+			local hp = player:get_hp()
+			local props = player:get_properties() or {}
+			local hp_max = props.hp_max or 20
+			local dmg = get_player_damage(player)
+			local arm = get_player_armor_level(player)
+			player:hud_change(hud_id, "text", "HP: " .. hp .. " / " .. hp_max .. "  DMG: " .. dmg .. "  ARM: " .. arm)
+		end
+	end
+end)

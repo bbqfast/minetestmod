@@ -105,7 +105,22 @@ minetest.register_node("lottother:hobbitms", {
 	groups = {not_in_creative_inventory=1,dig_immediate=3},
 })
 
+
 -- LTs
+
+local function trader1_exists_near(pos, radius, entity_name)
+    local objs = minetest.get_objects_inside_radius(pos, radius or 1.5)
+    for _, obj in ipairs(objs) do
+        local ent = obj:get_luaentity()
+        if ent and ent.name == entity_name then
+			lf("trader1_exists_near", string.format("Found %s at x=%d y=%d z=%d", entity_name, pos.x, pos.y, pos.z))
+            return true
+        end
+    end
+	lf("trader1_exists_near", string.format("Not found %s at x=%d y=%d z=%d", entity_name, pos.x, pos.y, pos.z))
+    return false
+end
+
 -- ,,x5
 minetest.register_node("lottother:lteems", {
 	description = "LT Mob Spawner",
@@ -134,6 +149,7 @@ thin_plate = {
 	}
 
 -- /giveme lottother:ltee_trader_1_ms
+-- ,,ms1b
 minetest.register_node("lottother:ltee_trader_1_ms", {
 	description = "LT trader 1 Spawner",
 	-- drawtype = "glasslike",
@@ -148,17 +164,18 @@ minetest.register_node("lottother:ltee_trader_1_ms", {
 	is_ground_content = false,
 	walkable = false,
 	buildable_to = true,
-	pointable = false,
+	pointable = true,
 	on_construct = function(pos, node)
+		if trader1_exists_near(pos, 1.5, "lottmobs:ltee_trader_1") then
+			return
+		end
+		lf("ltee_trader_1_ms", string.format("at x=%d y=%d z=%d", pos.x, pos.y, pos.z))
 		minetest.add_entity({x = pos.x, y = pos.y+1, z = pos.z}, "lottmobs:ltee_trader_1")
-		-- if math.random(1, 2) == 2 then
-		-- 	minetest.add_entity({x = pos.x, y = pos.y+1, z = pos.z}, "lottmobs:ltee")
-		-- end
-		-- minetest.remove_node(pos)
 	end,
 	groups = {not_in_creative_inventory=1,dig_immediate=3},
 })
 
+-- ,,ms2
 minetest.register_node("lottother:ltee_trader_2_ms", {
 	description = "LT trader 2 Spawner",
 	-- drawtype = "glasslike",
@@ -178,6 +195,10 @@ minetest.register_node("lottother:ltee_trader_2_ms", {
 	-- pointable = false,
 	pointable = true,
 	on_construct = function(pos, node)
+		if trader1_exists_near(pos, 1.5, "lottmobs:ltee_trader_2") then
+			return
+		end
+		lf("ltee_trader_2_ms", string.format("at x=%d y=%d z=%d", pos.x, pos.y, pos.z))
 		minetest.add_entity({x = pos.x, y = pos.y+1, z = pos.z}, "lottmobs:ltee_trader_2")
 		-- if math.random(1, 2) == 2 then
 		-- 	minetest.add_entity({x = pos.x, y = pos.y+1, z = pos.z}, "lottmobs:ltee")
@@ -202,6 +223,10 @@ minetest.register_node("lottother:ltee_trader_3_ms", {
 	buildable_to = true,
 	pointable = true,
 	on_construct = function(pos, node)
+		if trader1_exists_near(pos, 1.5, "lottmobs:ltee_trader_3") then
+			return
+		end
+		lf("ltee_trader_3_ms", string.format("at x=%d y=%d z=%d", pos.x, pos.y, pos.z))
 		minetest.add_entity({x = pos.x, y = pos.y+1, z = pos.z}, "lottmobs:ltee_trader_3")
 	end,
 	-- groups = {not_in_creative_inventory=1,dig_immediate=3},
@@ -222,6 +247,9 @@ minetest.register_node("lottother:ltee_trader_santa_ms", {
 	buildable_to = true,
 	pointable = true,
 	on_construct = function(pos, node)
+		if trader1_exists_near(pos, 1.5, "lottmobs:ltee_trader_santa") then
+			return
+		end
 		lf("ltee_trader_santa_ms", string.format("at x=%d y=%d z=%d", pos.x, pos.y, pos.z))
 
 		local obj = minetest.add_entity(
@@ -241,13 +269,17 @@ minetest.register_node("lottother:ltee_trader_santa_ms", {
 	groups = {dig_immediate=3},
 })
 
+
 -- ,,lbms
 minetest.register_lbm({
     name = "lottother:spawn_santa_trader",
     nodenames = {"lottother:ltee_trader_santa_ms"},
     run_at_every_load = true,
     action = function(pos, node)
-        lf("lottmobs:ltee_trader", ("LBM spawning Santa at (%d, %d, %d)"):format(pos.x, pos.y, pos.z))
+		if trader1_exists_near({x = pos.x, y = pos.y + 1, z = pos.z}, 1.5, "lottmobs:ltee_trader_santa") then
+			return
+		end
+        lf("lottmobs:spawn_santa_trader", ("LBM spawning Santa at (%d, %d, %d)"):format(pos.x, pos.y, pos.z))
 
         local obj = minetest.add_entity(
             {x = pos.x, y = pos.y + 1, z = pos.z},
@@ -263,13 +295,60 @@ minetest.register_lbm({
     name = "lottother:spawn_trader_1",
     nodenames = {"lottother:ltee_trader_1_ms"},
     run_at_every_load = true,  -- or false if you only want it once
+	action = function(pos, node)
+		
+		if trader1_exists_near({x = pos.x, y = pos.y + 1, z = pos.z}, 1.5, "lottmobs:ltee_trader_1") then
+			return
+		end
+		lf("lottmobs:spawn_trader_1",
+			("LBM spawning trader_1 at (%d, %d, %d)"):format(pos.x, pos.y, pos.z))
+		local obj = minetest.add_entity(
+			{x = pos.x, y = pos.y + 1, z = pos.z},
+			"lottmobs:ltee_trader_1"
+		)
+		if obj then
+			minetest.remove_node(pos)
+		end
+	end,
+})
+
+
+minetest.register_lbm({
+    name = "lottother:spawn_trader_2",
+    nodenames = {"lottother:ltee_trader_2_ms"},
+    run_at_every_load = true,  -- or false if you only want it once
+	action = function(pos, node)
+		
+		if trader1_exists_near({x = pos.x, y = pos.y + 1, z = pos.z}, 1.5, "lottmobs:ltee_trader_2") then
+			return
+		end
+		lf("lottmobs:spawn_trader_2",
+			("LBM spawning trader_2 at (%d, %d, %d)"):format(pos.x, pos.y, pos.z))
+		local obj = minetest.add_entity(
+			{x = pos.x, y = pos.y + 1, z = pos.z},
+			"lottmobs:ltee_trader_2"
+		)
+		if obj then
+			minetest.remove_node(pos)
+		end
+	end,
+})
+
+
+minetest.register_lbm({
+    name = "lottother:spawn_trader_3",
+    nodenames = {"lottother:ltee_trader_3_ms"},
+    run_at_every_load = true,  -- or false if you only want it once
     action = function(pos, node)
-        lf("lottmobs:ltee_trader",
-            ("LBM spawning trader_1 at (%d, %d, %d)"):format(pos.x, pos.y, pos.z))
+		if trader1_exists_near({x = pos.x, y = pos.y + 1, z = pos.z}, 1.5, "lottmobs:ltee_trader_3") then
+			return
+		end
+        lf("lottmobs:spawn_trader_3",
+            ("LBM spawning trader_3 at (%d, %d, %d)"):format(pos.x, pos.y, pos.z))
 
         local obj = minetest.add_entity(
             {x = pos.x, y = pos.y + 1, z = pos.z},
-            "lottmobs:ltee_trader_1"
+            "lottmobs:ltee_trader_3"
         )
         if obj then
             minetest.remove_node(pos)

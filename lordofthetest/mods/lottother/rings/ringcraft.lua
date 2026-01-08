@@ -1,4 +1,17 @@
 --Function for random breakages!
+local lf = function(func, msg)
+	local pre = "++++++++++++++++++++++++++++++++++++++++++++++++++"
+	if func == nil then func = "unknown" end
+	if msg == nil then msg = "null" end
+
+	local black_list = {}
+	black_list["select_seed"] = true
+	black_list["mow"] = true
+
+	if black_list[func] == nil then
+		minetest.log("warning", pre .. func .. "(): " .. msg )
+	end
+end
 
 local function random_break(pos, chance, output, src_time)
 	local inv = minetest.get_meta(pos):get_inventory()
@@ -268,6 +281,8 @@ local function check_nodes(pos)
 	for x = -1, 1 do
 	for z = -1, 1 do
 		local npos = {x = pos.x + x, y = pos.y - 1, z = pos.z + z}
+		lf("check_nodes", "Checking node at " .. minetest.pos_to_string(npos) .. ": " .. minetest.get_node(npos).name)
+        
 		if minetest.get_node(npos).name ~= "default:lava_source" then
 			return false
 		end
@@ -317,7 +332,8 @@ local function furnace_node_timer(pos, elapsed)
 	local fuel_time = meta:get_float("fuel_time") or 0
 	local src_time = meta:get_float("src_time") or 0
 	local fuel_totaltime = meta:get_float("fuel_totaltime") or 0
-	local time = 1800
+	-- local time = 1800
+	local time = 180
 
 	local inv = meta:get_inventory()
 	local fuel = inv:get_list("fuel")
@@ -365,7 +381,9 @@ local function furnace_node_timer(pos, elapsed)
 					default.explode(pos, 0, 5, 40)
 				end
 				src_time = 0
-			end
+			else
+                lf("furnace_node_timer", "src_time: " .. src_time .. ", time: " .. time)
+            end
 		end
 	else
 		-- Furnace ran out of fuel

@@ -42,6 +42,13 @@ minetest.register_tool("lottarmor:helmet_tin", {
 	wear = 0,
 })
 
+minetest.register_tool("lottarmor:helmet_tin_ltee", {
+	description = "Tin Helmet LT",
+	inventory_image = "lottarmor_inv_helmet_tin_ltee.png",
+	groups = {armor_head=5, armor_heal=0, armor_use=1500, armor_healing=0},
+	wear = 0,
+})
+
 -- ,,lthelmet
 minetest.register_tool("lottarmor:helmet_ltee", {
 	description = "LT Helmet",
@@ -55,6 +62,13 @@ minetest.register_tool("lottarmor:helmet_ltee", {
 minetest.register_tool("lottarmor:chestplate_tin", {
 	description = "Tin Chestplate",
 	inventory_image = "lottarmor_inv_chestplate_tin.png",
+	groups = {armor_torso=10, armor_heal=0, armor_use=1500, armor_healing=0},
+	wear = 0,
+})
+
+minetest.register_tool("lottarmor:chestplate_tin_ltee", {
+	description = "Tin Chestplate LT",
+	inventory_image = "lottarmor_inv_chestplate_tin_ltee.png",
 	groups = {armor_torso=10, armor_heal=0, armor_use=1500, armor_healing=0},
 	wear = 0,
 })
@@ -169,9 +183,23 @@ minetest.register_tool("lottarmor:helmet_silver", {
 	wear = 0,
 })
 
+minetest.register_tool("lottarmor:helmet_silver_ltee", {
+	description = "Silver Helmet LT",
+	inventory_image = "lottarmor_inv_helmet_silver_ltee.png",
+	groups = {armor_head=12, armor_heal=3, armor_use=300, armor_healing=0, physics_speed=-0.05},
+	wear = 0,
+})
+
 minetest.register_tool("lottarmor:chestplate_silver", {
 	description = "Silver Chestplate",
 	inventory_image = "lottarmor_inv_chestplate_silver.png",
+	groups = {armor_torso=17, armor_heal=3, armor_use=300, armor_healing=0, physics_speed=-0.05},
+	wear = 0,
+})
+
+minetest.register_tool("lottarmor:chestplate_silver_ltee", {
+	description = "Silver Chestplate LT",
+	inventory_image = "lottarmor_inv_chestplate_silver_ltee.png",
 	groups = {armor_torso=17, armor_heal=3, armor_use=300, armor_healing=0, physics_speed=-0.05},
 	wear = 0,
 })
@@ -198,11 +226,84 @@ minetest.register_tool("lottarmor:helmet_gold", {
 	wear = 0,
 })
 
+minetest.register_tool("lottarmor:helmet_gold_ltee", {
+	description = "Gold Helmet LT",
+	inventory_image = "lottarmor_inv_helmet_gold_ltee.png",
+	groups = {armor_head=10, armor_heal=6, armor_use=250, armor_healing=0, physics_speed=-0.05},
+	wear = 0,
+})
+
+
 minetest.register_tool("lottarmor:chestplate_gold", {
 	description = "Gold Chestplate",
 	inventory_image = "lottarmor_inv_chestplate_gold.png",
 	groups = {armor_torso=15, armor_heal=6, armor_use=250, armor_healing=0, physics_speed=-0.05},
 	wear = 0,
+})
+
+minetest.register_tool("lottarmor:chestplate_gold_ltee", {
+	description = "Gold Chestplate LT",
+	inventory_image = "lottarmor_inv_chestplate_gold_ltee.png",
+	groups = {armor_torso=15, armor_heal=6, armor_use=250, armor_healing=0, physics_speed=-0.05},
+	wear = 0,
+})
+
+minetest.register_tool("lottarmor:chestplate_mithril_ltee", {
+	description = "Mithril Chestplate LT",
+	inventory_image = "lottarmor_inv_chestplate_mithril_ltee.png",
+    groups = {armor_torso=20, armor_heal=12, armor_use=50, armor_healing=0, physics_speed=-0.1},
+	wear = 0,
+})
+
+-- GAS
+-- 3180027217336
+-- ,,x
+minetest.register_craft({output = "lottarmor:chestplate_gold_ltee",
+	recipe = {{"", "", ""},{"", "lottarmor:chestplate_gold", ""},{"", "", ""},},
+})
+
+minetest.register_craft({output = "lottarmor:chestplate_gold",
+	recipe = {{"", "", ""},{"", "lottarmor:chestplate_gold_ltee", ""},{"", "", ""},},
+})
+
+minetest.register_craft({output = "lottarmor:chestplate_silver_ltee",
+	recipe = {{"", "", ""},{"", "lottarmor:chestplate_silver", ""},{"", "", ""},},
+})
+
+minetest.register_craft({output = "lottarmor:chestplate_silver",
+	recipe = {{"", "", ""},{"", "lottarmor:chestplate_silver_ltee", ""},{"", "", ""},},
+})
+
+minetest.register_craft({output = "lottarmor:chestplate_mithril_ltee",
+	recipe = {{"", "", ""},{"", "lottarmor:chestplate_mithril", ""},{"", "", ""},},
+})
+
+minetest.register_craft({output = "lottarmor:chestplate_mithril",
+	recipe = {{"", "", ""},{"", "lottarmor:chestplate_mithril_ltee", ""},{"", "", ""},},
+})
+
+minetest.register_craft({output = "lottarmor:helmet_gold",
+	recipe = {{"", "", ""},{"", "lottarmor:helmet_gold_ltee", ""},{"", "", ""},},
+})
+
+minetest.register_craft({output = "lottarmor:helmet_gold_ltee",
+	recipe = {{"", "", ""},{"", "lottarmor:helmet_gold", ""},{"", "", ""},},
+})
+
+minetest.register_craft({output = "lottarmor:helmet_silver",
+	recipe = {{"", "", ""},{"", "lottarmor:helmet_silver_ltee", ""},{"", "", ""},},
+})
+
+minetest.register_craft({output = "lottarmor:helmet_silver_ltee",
+	recipe = {{"", "", ""},{"", "lottarmor:helmet_silver", ""},{"", "", ""},},
+})
+
+minetest.register_craft({output = "lottarmor:helmet_tin",
+	recipe = {{"", "", ""},{"", "lottarmor:helmet_tin_ltee", ""},{"", "", ""},},
+})
+
+minetest.register_craft({output = "lottarmor:helmet_tin_ltee",
+	recipe = {{"", "", ""},{"", "lottarmor:helmet_tin", ""},{"", "", ""},},
 })
 
 minetest.register_tool("lottarmor:leggings_gold", {

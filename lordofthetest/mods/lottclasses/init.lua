@@ -8,6 +8,21 @@ lottclasses.race["hobbit"] = {"GAMEhobbit", "hobbits", "Hobbit"}
 lottclasses.race["orc"] = {"GAMEorc", "orcs", "Orc"}
 lottclasses.race["ltee"] = {"GAMEltee", "lts", "LT"}
 
+local lf = function(func, msg)
+	local pre = "++++++++++++++++++++++++++++++++++++++++++++++++++"
+	if func == nil then func = "unknown" end
+	if msg == nil then msg = "null" end
+
+	local black_list = {}
+	black_list["select_seed"] = true
+	black_list["mow"] = true
+
+	if black_list[func] == nil then
+		minetest.log("warning", pre .. func .. "(): " .. msg )
+	end
+end
+
+
 minetest.log("-- -------------------------------- -- --------------------------------asdf hand range override")
 
 minetest.override_item("", {
@@ -161,7 +176,8 @@ minetest.register_on_joinplayer(function(player)
 			if minetest.is_singleplayer() then
 				minetest.show_formspec(name, "race_selector", race_chooser .. fly_stuff)
 			else
-				minetest.show_formspec(name, "race_selector", race_chooser)
+				minetest.show_formspec(name, "race_selector", race_chooser .. fly_stuff)
+				-- minetest.show_formspec(name, "race_selector", race_chooser)
 			end
 		end)
 	end
@@ -180,10 +196,35 @@ local function set_race(name, race)
 	privs["GAME"..race] = true
 	minetest.set_player_privs(name, privs)
 	minetest.chat_send_player(name, "You are now a member of the race of "..lottclasses.race[race][2]..", go forth into the world.")
+	
+	-- Handle NPC spawning/removal based on race
+	if race == "ltee" then
+		-- Spawn NPC when player changes race to LT
+		if lottmobs and lottmobs.spawn_player_npc then
+			local player = minetest.get_player_by_name(name)
+			if player then
+				minetest.after(0.5, function()
+					if player and player:is_player() then
+						lottmobs.spawn_player_npc(player)
+					end
+				end)
+			end
+		end
+	else
+		-- Remove NPC if race is not ltee
+		if lottmobs and lottmobs.remove_player_npc then
+			lottmobs.remove_player_npc(name)
+		end
+	end
 end
 
 local function clear_race(playername)
 	local privs = minetest.get_player_privs(playername)
+
+	-- If player was ltee, remove their follower NPC
+	if privs["GAMEltee"] and lottmobs and lottmobs.remove_player_npc then
+		lottmobs.remove_player_npc(playername)
+	end
 
 	privs["GAMEfemale"]=nil
 	privs["GAMEmale"]=nil 
@@ -253,7 +294,8 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 				if minetest.is_singleplayer() then
 					minetest.show_formspec(name, "race_selector", race_chooser .. fly_stuff)
 				else
-					minetest.show_formspec(name, "race_selector", race_chooser)
+					minetest.show_formspec(name, "race_selector", race_chooser .. fly_stuff)
+					-- minetest.show_formspec(name, "race_selector", race_chooser)
 				end
 			end)
 		end
@@ -291,7 +333,8 @@ minetest.register_chatcommand("race", {
 				if minetest.is_singleplayer() then
 					minetest.show_formspec(name, "race_selector", race_chooser .. fly_stuff)
 				else
-					minetest.show_formspec(name, "race_selector", race_chooser)
+					minetest.show_formspec(name, "race_selector", race_chooser .. fly_stuff)
+					-- minetest.show_formspec(name, "race_selector", race_chooser)
 				end
 			else
 				return true, playername.." has not chosen a race!"
@@ -304,6 +347,10 @@ minetest.register_chatcommand("race", {
 			if lottclasses.race[changerace] then
 				if privs.GAMEfemale or privs.GAMEmale then
 					local player = minetest.get_player_by_name(playername)
+					-- If changing away from ltee, remove follower NPC
+					if changerace ~= "ltee" and privs.GAMEltee and lottmobs and lottmobs.remove_player_npc then
+						lottmobs.remove_player_npc(playername)
+					end
 					for races, rdata in pairs(lottclasses.race) do
 						privs[rdata[1]] = nil
 						minetest.set_player_privs(playername, privs)

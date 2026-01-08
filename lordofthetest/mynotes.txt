@@ -18,7 +18,7 @@ ctrl-D to open
 'mods/lottclasses/allies.lua'
 
 snacks
-'mods\basic_snacks\crafts.lua'
+'mods/basic_snacks/crafts.lua'
 
 'mods/lottmapgen/worldedit.lua'
 
@@ -32,7 +32,7 @@ guides
 'mods/lottblocks/guide_text/ltee_journal_1.lua'
 
 defaults
-'mods\default\functions.lua'
+'mods/default/functions.lua'
 
 custom buildings
 ltee_shop1.we

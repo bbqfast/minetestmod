@@ -115,6 +115,27 @@ minetest.register_craftitem("lottother:nenya", {
 	end,
 })
 
+minetest.register_craftitem("lottother:angel_ring", {
+	description = minetest.colorize("silver", "Ring of Angel") ..
+		minetest.get_background_escape_sequence("lightgoldenrodyellow"),
+	inventory_image = "lottother_nenya_inv.png",
+
+	stack_max = 1,
+	groups = {forbidden=1},
+	-- on_drop = function(itemstack, dropper, pos)
+	-- 	ring_drop(itemstack, dropper, pos)
+	-- end,
+})
+
+minetest.register_craft({
+	output = "lottother:angel_ring",
+	recipe = {
+		{"", "", ""},
+		{"", "lottother:dwarf_ring", ""},
+		{"", "", ""}
+	},
+})
+
 local time = 0
 lottother = {}
 lottother.corrupt = {}

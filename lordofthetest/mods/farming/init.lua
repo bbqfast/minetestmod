@@ -594,7 +594,7 @@ minetest.register_abm({
 			-- 	--minetest.log("action", "++++++++++ [farming] light too low (<=7), no growth")
 			-- 	ll("[farming] light too low (<=7), no growth")
 			-- end
-			_maybe_grow_wheat(pos, node, cotton_group)
+			_maybe_grow_cotton(pos, node, cotton_group)
 		end
 	})
 

@@ -1,4 +1,164 @@
-function lottmobs.register_ltee(n, hpmin, hpmax, textures, wv, rv, damg, arm, drops, price)
+local lf = function(func, msg)
+	local pre = "++++++++++++++++++++++++++++++++++++++++++++++++++"
+	if func == nil then func = "unknown" end
+	if msg == nil then msg = "null" end
+
+	local black_list = {}
+	black_list["select_seed"] = true
+	black_list["mow"] = true
+
+	if black_list[func] == nil then
+		minetest.log("warning", pre .. func .. "(): " .. msg )
+	end
+end
+
+local function clear_ltee_hud(self)
+	-- Clear all multi-player HUDs
+	if self.hud_ids then
+		for name, id in pairs(self.hud_ids) do
+			local player = minetest.get_player_by_name(name)
+			if player and player.is_player and player:is_player() then
+				player:hud_remove(id)
+			end
+		end
+	end
+
+	-- Clear single HUD if present
+	if self.hud_id and self.hud_player then
+		local player = self.hud_player
+		if player and player.is_player and player:is_player() then
+			player:hud_remove(self.hud_id)
+		end
+	end
+
+	self.hud_ids = nil
+	self.hud_players = nil
+	self.hud_id = nil
+	self.hud_player = nil
+end
+
+-- Per-player HUDs (for lottmobs:ltee)
+local function handle_player_hud(self, player, dtime, pos, target_pos, quotes, min_dist, color, hud_pos)
+	hud_pos = hud_pos or {x = 0.5, y = 0.8}
+	local dist = vector.distance(pos, target_pos)
+
+	self.hud_ids = self.hud_ids or {}
+	self.hud_players = self.hud_players or {}
+
+	local name = player:get_player_name()
+	if not name then return end
+
+	-- 10 bright random colors
+	local bright_colors = {
+		0xFF0000, -- Red
+		0x00FF00, -- Green
+		0x00FFFF, -- Cyan
+		0xFFFF00, -- Yellow
+		0xFF00FF, -- Magenta
+		0xFFA500, -- Orange
+		0x00FF7F, -- Spring Green
+		0xFF69B4, -- Hot Pink
+		0x7FFF00, -- Chartreuse
+		0x1E90FF, -- Dodger Blue
+	}
+
+	if dist < min_dist then
+		-- Initialize shared quote state once
+		if not self.quotes then
+			self.quotes = quotes
+			self.current_quote_index = 1
+			self.quote_timer = 0
+		end
+
+		-- Create HUD for this specific player if missing
+		if not self.hud_ids[name] then
+			-- Pick a random bright color
+			local random_color = bright_colors[math.random(1, #bright_colors)]
+			local text_elem = {
+					hud_elem_type = "text",
+					text = self.quotes[self.current_quote_index],
+					position = hud_pos,
+					--scale = {x=2,y=2},
+					number = random_color,
+					size = {x = 2},
+					alignment = {x = 0, y = 0},
+					style = 1,
+			}
+			local id = player:hud_add(text_elem)
+			self.hud_ids[name] = id
+			self.hud_players[name] = true
+		else
+			-- Advance quote timer and update text for this player
+			self.quote_timer = (self.quote_timer or 0) + 1
+			if self.quote_timer >= 3 and #self.quotes > 0 then
+				self.quote_timer = 0
+				self.current_quote_index = self.current_quote_index % #self.quotes + 1
+				local id = self.hud_ids[name]
+				if id then
+					player:hud_change(id, "text", self.quotes[self.current_quote_index])
+				end
+			end
+		end
+	else
+		-- Player moved out of range: clear only their HUD
+		local id = self.hud_ids[name]
+		if id then
+			player:hud_remove(id)
+			self.hud_ids[name] = nil
+			self.hud_players[name] = nil
+		end
+	end
+end
+
+-- Single-player HUD (for follower NPC)
+local function handle_single_player_hud(self, player, dtime, pos, target_pos, quotes, min_dist, color, hud_pos)
+	hud_pos = hud_pos or {x = 0.5, y = 0.8}
+	local dist = vector.distance(pos, target_pos)
+
+	if dist < min_dist then
+		if not self.hud_id then
+			-- initialize quotes from parameter and reset state
+			self.quotes = quotes
+			self.current_quote_index = 1
+			self.quote_timer = 0
+			self.hud_player = player
+
+			local text_elem = {
+					hud_elem_type = "text",
+					text = self.quotes[self.current_quote_index],
+					position = hud_pos,
+					--scale = {x=2,y=2},
+					number = color or 0xFFFFFF,
+					size = {x = 2},
+					alignment = {x = 0, y = 0},
+					style = 1,
+			}
+			self.hud_id = player:hud_add(text_elem)
+		else
+			self.quote_timer = (self.quote_timer or 0) + 1
+			if self.quote_timer >= 3 then
+				self.quote_timer = 0
+				self.current_quote_index = self.current_quote_index % #self.quotes + 1
+				local hud_player = self.hud_player or player
+				if hud_player then
+					hud_player:hud_change(self.hud_id, "text", self.quotes[self.current_quote_index])
+					self.hud_player = hud_player
+				end
+			end
+		end
+	else
+		if self.hud_id then
+			local hud_player = self.hud_player or player
+			if hud_player then
+				hud_player:hud_remove(self.hud_id)
+			end
+			self.hud_id = nil
+			self.hud_player = nil
+		end
+	end
+end
+
+function lottmobs.register_ltee(n, hpmin, hpmax, textures, wv, rv, damg, arm, drops, price, race_quotes)
 	mobs:register_mob("lottmobs:ltee" .. n, {
 		type = "npc",
                 race = "GAMEelf",
@@ -10,7 +170,6 @@ function lottmobs.register_ltee(n, hpmin, hpmax, textures, wv, rv, damg, arm, dr
 		visual_size = {x=0.95, y=1.15},
 		-- mesh = "lottarmor_character.b3d",
 		mesh       = "character.b3d",
-		textures   = {"character_Mary_LT_mt.png"},
 		view_range = 20,
 		makes_footstep_sound = true,
 		walk_velocity = wv,
@@ -36,6 +195,8 @@ function lottmobs.register_ltee(n, hpmin, hpmax, textures, wv, rv, damg, arm, dr
 			run_end = 187,
 			punch_start = 189,
 			punch_end = 198,
+			sit_start = 81,
+			sit_end = 160,
 		},
 		sounds = {
 			war_cry = "mobs_die_yell",
@@ -43,6 +204,7 @@ function lottmobs.register_ltee(n, hpmin, hpmax, textures, wv, rv, damg, arm, dr
 			attack = "mobs_slash_attack",
 		},
 		attacks_monsters = true,
+		ltee_quotes = quotes,
 		-- on_rightclick = function(self, clicker)
 		-- 	lottmobs.guard(self, clicker, "default:gold_ingot", "Elf", "elf", price)
 		-- end,
@@ -51,12 +213,64 @@ function lottmobs.register_ltee(n, hpmin, hpmax, textures, wv, rv, damg, arm, dr
 			-- error("Debugging error: NPC right-clicked")
 
 			lottmobs_trader(self, clicker, entity, lottmobs.elf, "gui_elfbg.png", "GAMEelf")
-		end,		
-		do_custom = lottmobs.do_custom_guard,
+		end,
+        -- ,,quo
+        do_custom = function(self, dtime)
+            -- your per-tick logic here
+            -- return false to stop the normal mob AI for this step
+
+            -- Check for nearby players and display HUD with cycling quotes
+
+            self.timer = self.timer + dtime
+            if self.timer < 1 then return end
+            
+            lottmobs.do_custom_guard(self, dtime)
+
+            local pos = self.object:get_pos()
+            if not pos then 
+                lf("ltee", "do_custom: no position found")
+                return false 
+            end
+            
+            -- Assign ltee_quotes from the quotes parameter passed to register_ltee
+            self.ltee_quotes = self.ltee_quotes or race_quotes
+            
+            for _, player in ipairs(minetest.get_connected_players()) do
+                local target_pos = player:get_pos()
+                local dist = vector.distance(pos, target_pos)
+                -- lf("ltee", "Player distance: " .. dist)
+
+                local quotes = self.ltee_quotes or {
+                    "I prefer to remain silent."
+                }
+
+                local hud_color
+                if n == 1 then
+                    hud_color = 0xFFFF00 -- yellow for ltee1
+                elseif n == 2 then
+                    hud_color = 0x0000FF -- blue for ltee2
+                else
+                    hud_color = nil -- default (white)
+                end
+
+                local hud_pos = {x = 0.5, y = 0.75}
+                handle_player_hud(self, player, dtime, pos, target_pos, quotes, 10, hud_color, hud_pos)
+            end
+            
+            
+            return false
+            
+        end,        
+		-- do_custom = lottmobs.do_custom_guard,
 		peaceful = true,
 		group_attack = true,
 		step = 1,
-		on_die = lottmobs.guard_die,
+		on_die = function(self, killer)
+			clear_ltee_hud(self)
+			if lottmobs.guard_die then
+				lottmobs.guard_die(self, killer)
+			end
+		end,
 	})
 	mobs:register_spawn("lottmobs:ltee" .. n, {"lottmapgen:ltee_grass"}, 20, 0, 18000, 3, 31000)
 	lottmobs.register_guard_craftitem("lottmobs:ltee"..n, "Elven Guard", "lottmobs_elven_guard"..n.."_inv.png")
@@ -64,12 +278,7 @@ end
 
 --Basic elves
 
-local textures1 = {
-    {"lottmobs_lorien_elf_1.png", "lottarmor_trans.png", "lottarmor_trans.png", "lottarmor_trans.png"},
-    {"lottmobs_lorien_elf_2.png", "lottarmor_trans.png", "lottarmor_trans.png", "lottarmor_trans.png"},
-    {"lottmobs_lorien_elf_3.png", "lottarmor_trans.png", "lottarmor_trans.png", "lottarmor_trans.png"},
-}
-
+local textures1 = {"character_Mary_LT_mt.png"}
 local drops1 = {
 	{name = "lottplants:mallornsapling",
 	chance = 5,
@@ -113,14 +322,31 @@ local drops1 = {
 	max = 2,},
 }
 
-lottmobs.register_ltee("", 20, 35, textures1, 2.5, 5, 4, 200, drops1, 30)
+local ltee_quotes_basic = {
+    "Welcome to our village, traveler!",
+    "The stars shine bright tonight.",
+    "Have you seen the ancient forests?",
+    "Beware of the shadows in the east.",
+    "Our people value peace above all.",
+    "May your journey be safe and swift.",
+}
+
+local ltee_quotes_basic2 = {
+    "Middle earth can be unforgiving.",
+    "Gold is our currency.",
+    "We LTs are peaceful, but we can defend ourselves.",
+    "Rings are the most powerful items in Middle-earth.",
+    "Have you explored Middle-Earth yet?",
+    "Watch out for orcs and other dangers!",
+    "The elves have been kind to us newcomers.",
+}
+
+lottmobs.register_ltee(1, 20, 35, textures1, 2.5, 5, 4, 200, drops1, 30, ltee_quotes_basic)
 
 --Elves in full armor
 
 local textures2 = {
-    {"lottmobs_lorien_elf_1.png", "lottarmor_chestplate_galvorn.png^lottarmor_leggings_galvorn.png^lottarmor_helmet_galvorn.png^lottarmor_boots_galvorn.png", "lottores_galvornsword.png", "lottarmor_trans.png"},
-    {"lottmobs_lorien_elf_2.png", "lottarmor_chestplate_steel.png^lottarmor_leggings_steel.png^lottarmor_helmet_steel.png^lottarmor_boots_steel.png^lottarmor_shield_steel.png", "lottweapons_steel_battleaxe.png", "lottarmor_trans.png"},
-    {"lottmobs_lorien_elf_3.png", "lottarmor_chestplate_silver.png^lottarmor_leggings_silver.png^lottarmor_helmet_silver.png^lottarmor_boots_silver.png^lottarmor_shield_silver.png", "lottores_silversword.png", "lottarmor_trans.png"},
+    {"character_player_peters_lt_pat_mt.png"},
 }
 
 local drops2 = {
@@ -166,14 +392,12 @@ local drops2 = {
 	max = 2,},
 }
 
-lottmobs.register_ltee(1, 20, 35, textures2, 2, 4.5, 6, 100, drops2, 50)
+lottmobs.register_ltee(2, 20, 35, textures2, 2, 4.5, 6, 100, drops2, 50, ltee_quotes_basic2)
 
 --Elves with chestplates and powerful weapons!
 
 local textures3 = {
-    {"lottmobs_lorien_elf_1.png", "lottarmor_chestplate_galvorn.png", "lottweapons_elven_sword.png", "lottarmor_trans.png"},
-    {"lottmobs_lorien_elf_2.png", "lottarmor_chestplate_gold.png^lottarmor_shield_gold.png", "lottweapons_gold_spear.png", "lottarmor_trans.png"},
-    {"lottmobs_lorien_elf_3.png", "lottarmor_shield_steel.png", "lottweapons_steel_warhammer.png", "lottarmor_trans.png"},
+    {"character_Dave_Lt_mt.png"},
 }
 
 local drops3 = {
@@ -219,7 +443,7 @@ local drops3 = {
 	max = 2,},
 }
 
-lottmobs.register_ltee(2, 20, 35, textures3, 2.25, 4.75, 8, 150, drops3, 50)
+lottmobs.register_ltee(3, 20, 35, textures3, 2.25, 4.75, 8, 150, drops3, 50, ltee_quotes_basic)
 
 local hostile_mobs = {
     ["lottmobs:orc"] = true,
@@ -243,7 +467,74 @@ local function is_hostile_mob(name)
 end
 
 
+
 local player_npcs = {}
+
+local function count_player_npcs()
+	local c = 0
+	for _ in pairs(player_npcs) do
+		c = c + 1
+	end
+	return c
+end
+
+
+
+-- Helper: remove the NPC that follows a given player
+function lottmobs.remove_player_npc(playername)
+    if not playername then return end
+    local npc = player_npcs[playername]
+	lf("remove_player_npc", "Total player NPCs: " .. tostring(count_player_npcs()))
+    
+    if npc and npc:get_luaentity() then
+        minetest.log("action", "Removing NPC follower for player " .. playername)
+        npc:remove()
+    else
+        minetest.log("warning", "No NPC follower found for player " .. playername)
+    end
+    player_npcs[playername] = nil
+end
+
+-- Helper: spawn an NPC follower for a player, if they are ltee and don't already have one
+function lottmobs.spawn_player_npc(player)
+    if not player or not player:is_player() then return end
+    local name = player:get_player_name()
+    if not name then return end
+
+    -- Only ltee race players (GAMEltee) should get a follower NPC
+    local privs = minetest.get_player_privs(name)
+    if not privs.GAMEltee then
+        return
+    end
+
+    -- Don't spawn a duplicate NPC if one already exists and is valid
+    local existing = player_npcs[name]
+    if existing and existing:get_luaentity() then
+        return
+    end
+
+    local pos = vector.add(player:get_pos(), {x = 1, y = 0, z = 0})
+    local npc = minetest.add_entity(pos, "lottmobs:npc")
+    if npc then
+        local lua = npc:get_luaentity()
+        if lua then
+            lua.player_name = name
+            lua.base_nametag = name .. "'s angel"
+            npc:set_properties({nametag = lua.base_nametag})
+            player_npcs[name] = npc
+            minetest.chat_send_player(name, "Follower NPC spawned for you.")
+            lf("spawn_player_npc", "Total player NPCs: " .. tostring(count_player_npcs()))
+
+        else
+            minetest.chat_send_player(name, "NPC entity missing Lua object.")
+        end
+    else
+        minetest.chat_send_player(name, "NPC failed to spawn.")
+    end
+end
+
+
+
 minetest.register_entity("lottmobs:npc", {
     initial_properties = {
         physical = false,
@@ -255,8 +546,11 @@ minetest.register_entity("lottmobs:npc", {
 		mesh       = "character.b3d",
 		-- textures   = {"character_Mary_LT_mt.png"},
 		textures   = {"lt_angel_2_mt.png"},
+        nametag = "",
+        nametag_color = {r = 255, g = 255, b = 255, a = 255},
         static_save = false,
 		drawtype = "front",
+        immortal = true,
 		animation = {
 			speed_normal = 15,
 			speed_run = 20,
@@ -268,6 +562,8 @@ minetest.register_entity("lottmobs:npc", {
 			run_end = 187,
 			punch_start = 189,
 			punch_end = 198,
+			sit_start = 81,
+			sit_end = 160,
 		},		
     },
 
@@ -284,36 +580,90 @@ minetest.register_entity("lottmobs:npc", {
             self.object:set_animation({x = anim_def.run_start, y = anim_def.run_end}, anim_def.speed_run, 0)
         elseif name == "punch" then
             self.object:set_animation({x = anim_def.punch_start, y = anim_def.punch_end}, anim_def.speed_normal, 0)
+        elseif name == "sit" then
+            self.object:set_animation({x = anim_def.sit_start, y = anim_def.sit_end}, anim_def.speed_normal, 0)
         end
     end,
-
+    update_hp_tag = function(self)
+        if not self.hp_max then return end
+        local hp = self.hp or self.hp_max
+        local base = self.base_nametag or "NPC"
+        self.object:set_properties({
+            nametag = base .. " [" .. hp .. "/" .. self.hp_max .. "]"
+        })
+    end,
     on_activate = function(self)
+		self.type = "npc"
+		self.race = "GAMEltee"
+		self.view_range = 10
+
+		local props = self.object:get_properties()
+		self.hp_max = 20
+		self.hp = self.hp_max
+		self.base_nametag = self.base_nametag or "NPC"
+		self.object:set_hp(self.hp_max)
+		self.is_disabled = false
+
+         -- prevent engine damage
+		self.object:set_armor_groups({immortal = 1})
+
         self.timer = 0
 		self.spin_timer = 0
         self.say = true
-    end,	
 
-    on_punch = function(self, hitter)
-        -- Optional: Code to run when the NPC is punched
-    end,
-    on_deactivate = function(self)
-        minetest.log("action", "NPC '" .. (self.player_name or "unknown") .. "' has been deactivated.")
-		if self.player_name then
-			local player = minetest.get_player_by_name(self.player_name)
-			if player then
-				local pos = vector.add(player:get_pos(), {x = 2, y = 0, z = 0})
-				local npc = minetest.add_entity(pos, "lottmobs:npc")
-				if npc then
-					local lua = npc:get_luaentity()
-					if lua then
-						lua.player_name = self.player_name
-						minetest.log("action", "NPC '" .. self.player_name .. "' reactivated near the player.")
-					end
-				end
-			end
-		end		
-    end,	
+		self:update_hp_tag()
+	end,	
+
+    on_punch = function(self, hitter, time_from_last_punch, tool_capabilities, dir, time_from_last_punch, tool_capabilities, dir, damage)
+        lf("on_punch", "time_from_last_punch: " .. tostring(time_from_last_punch) .. ", dir: " .. minetest.pos_to_string(dir or {x=0,y=0,z=0}) .. ", damage: " .. tostring(damage))
+        -- lf("on_punch", "tool_capabilities: " .. dump(tool_capabilities))
+        
+        local dmg =  1
+
+        -- reduce our custom HP
+        self.hp = (self.hp or self.hp_max) - dmg
+
+        if self.hp <= 0 then
+            -- clamp at 0 and “knock out” instead of dying
+            self.hp = 0
+            self.is_disabled = true
+
+            -- optional: set animation / log
+            self:set_animation("sit")
+            lf("on_punch", "NPC knocked out, HP = 0")
+        else
+            lf("on_punch", "HP: " .. self.hp .. "/" .. self.hp_max)
+        end
+
+        		-- keep engine HP > 0 so it never triggers real death
+		self:update_hp_tag()
+		self.object:set_hp(self.hp_max)
+	end,	
+	on_deactivate = function(self)
+		clear_ltee_hud(self)
+		minetest.log("action", "NPC '" .. (self.player_name or "unknown") .. "' has been deactivated.")
+		-- if self.player_name then
+		-- 	local player = minetest.get_player_by_name(self.player_name)
+		-- 	if player then
+		-- 		local pos = vector.add(player:get_pos(), {x = 2, y = 0, z = 0})
+		-- 		local npc = minetest.add_entity(pos, "lottmobs:npc")
+		-- 		if npc then
+		-- 			local lua = npc:get_luaentity()
+		-- 			if lua then
+		-- 				-- lua.player_name = self.player_name
+		-- 				lua.player_name = self.player_name
+		-- 				lua.base_nametag = self.player_name .. "'s angel"
+		-- 				npc:set_properties({nametag = lua.base_nametag})
+		-- 				-- Track the re-created NPC so remove_player_npc can find it later
+		-- 				player_npcs[self.player_name] = npc
+		-- 				minetest.log("action", "NPC '" .. self.player_name .. "' reactivated near the player.")
+		-- 			end
+		-- 		end
+		-- 	end
+		-- end		
+	end,	
 	on_die = function(self, killer)
+		clear_ltee_hud(self)
 		minetest.log("action", "NPC '" .. (self.player_name or "unknown") .. "' has died.")
 	end,
 	on_rightclick = function(self, clicker)
@@ -323,12 +673,58 @@ minetest.register_entity("lottmobs:npc", {
 		-- lottmobs_trader(self, clicker, entity, lottmobs.ltee, "gui_gondorbg.png", "GAMEltee")
 		lottmobs_trader(self, clicker, entity, lottmobs.ltee_angel, "gui_gondorbg.png", "GAMEltee")
 		-- lottmobs_trader(self, clicker, entity, lottmobs.elf, "gui_elfbg.png", "GAMEelf")
-	end, 		
+	end,	
     on_step = function(self, dtime)
+        -- Check if player has angel ring in inventory
+        local player_has_angel_ring = false
+        if self.player_name then
+            local player = minetest.get_player_by_name(self.player_name)
+            if player then
+                local inv = player:get_inventory()
+                if inv then
+                    for i = 1, 9 do
+                        local stack = inv:get_stack("main", i)
+                        if stack:get_name() == "lottother:angel_ring" then
+                            player_has_angel_ring = true
+                            break
+                        end
+                    end
+                end
+            end
+        end
+
+
+        if player_has_angel_ring then
+            self.hp_max = 40000
+            regen_timer = 1
+            regen_amount = 10
+        else
+            regen_timer = 5
+            regen_amount = 1
+            self.hp_max = 20
+            if self.hp > 20 then
+                self.hp = 20
+            end
+        end
+        
+        -- HP regeneration 
+        self.hp_regen_timer = (self.hp_regen_timer or 0) + dtime
+        if self.hp_regen_timer >= 5 then
+            self.hp_regen_timer = 0
+            if self.hp and self.hp < self.hp_max then
+                self.hp = self.hp + regen_amount
+                if self.hp >= self.hp_max then
+                    self.hp = self.hp_max
+                    self.is_disabled = false
+                    self:set_animation("stand")
+                end
+            end
+            self:update_hp_tag()
+        end
 		-- minetest.log("warning", "NPC step")
         self.timer = self.timer + dtime
-		self.spin_timer = self.spin_timer + dtime
         if self.timer < 1 then return end
+		self.spin_timer = self.spin_timer + dtime
         self.timer = 0
 		-- minetest.log("warning", "NPC step")
         if self.player_name then
@@ -340,109 +736,75 @@ minetest.register_entity("lottmobs:npc", {
 			end
 			
             if player then
-                local pos = self.object:get_pos()
-                local target_pos = player:get_pos()
+				local pos = self.object:get_pos()
+				local target_pos = player:get_pos()
 
-				if vector.distance(pos, target_pos) < 5 then
-					if not self.hud_id then
-						-- Define the quotes
-						self.quotes = {
-							"Hi, LT!  Welcome to Middle-Earth",
-							"I'm LT angel",
-							"we're newly arrived race on the middle earth",
-							"We are a peaceful race here ",
-							"! There are dangerous mobs around",
-							"I'm here to help fight off some mobs",
-							"Our village situated on red grassland",
-							"Feel free to explore around",
-						}
-						self.current_quote_index = 1
-						self.quote_timer = 0
-				
-						local text_elem={
-							hud_elem_type="text",
-							text=self.quotes[self.current_quote_index],
-							position={x=0.5,y=0.8},
-							--scale={x=2,y=2},
-							number=0xFFFFFF,
-							size={x=2},
-							alignment={x=0,y=0},
-							style=1,
-						}
-						self.hud_id=player:hud_add(text_elem)
-					
-						-- Add the initial HUD
-						-- self.hud_id = player:hud_add({
-						-- 	hud_elem_type = "text",
-						-- 	position = {x = 0.5, y = 0.8}, -- Bottom center of the screen
-						-- 	offset = {x = 0, y = 0},
-						-- 	text = self.quotes[self.current_quote_index],
-						-- 	alignment = {x = 0, y = 1}, -- Center alignment
-						-- 	scale = {x = 1700, y = 1700}, -- Larger text
-						-- 	number = 0xFFFFFF, -- White color
-						-- })
-					else
-						-- Cycle through quotes every 3 seconds
-						self.quote_timer = (self.quote_timer or 0) + dtime
-						-- if self.quote_timer >= 3 then
-						if self.quote_timer >= 1 then
-							self.quote_timer = 0
-							self.current_quote_index = self.current_quote_index % #self.quotes + 1
-							player:hud_change(self.hud_id, "text", self.quotes[self.current_quote_index])
-						end
-					end
-				else
-					if self.hud_id then
-						player:hud_remove(self.hud_id)
-						self.hud_id = nil
-					end
-				end
+				local quotes = {
+					"Hi, LT!  Welcome to Middle-Earth",
+					"I'm LT angel",
+					"we're newly arrived race on the middle earth",
+					"We are a peaceful race here ",
+					"! There are dangerous mobs around",
+					"I'm here to help fight off some mobs",
+					"Our village situated on red grassland",
+					"Feel free to explore around",
+				}
+
+				local hud_pos = {x = 0.5, y = 0.8}
+				handle_single_player_hud(self, player, dtime, pos, target_pos, quotes, 3, 0xFFFFFF, hud_pos)
 
 				-- new code
 				-- Step 1: Check for nearby hostiles
-				local hostiles = minetest.get_objects_inside_radius(pos, 10)
-				for _, obj in ipairs(hostiles) do
-					local lua = obj:get_luaentity()
-					-- if lua and lua.name and lua.name:match("^mobs:") and lua.owner ~= self.player_name then
-					if lua and lua.name and is_hostile_mob(lua.name) then
-					-- if lua and lua.name and not lua.name:match("npc") and lua.owner ~= self.player_name then
-						minetest.log("warning", "Hostile mob found: " .. lua.name)
-						-- Found a hostile mob, attack it!
-						local mob_pos = obj:get_pos()
-						local dir = vector.direction(pos, mob_pos)
-						self.object:set_velocity(vector.multiply(dir, 2))
+				hostile_radius = 10
+				run_dist = 10
+				local hostiles = minetest.get_objects_inside_radius(pos, hostile_radius)
+                if not self.is_disabled then
+                    for _, obj in ipairs(hostiles) do
+                        local lua = obj:get_luaentity()
+                        -- if lua and lua.name and lua.name:match("^mobs:") and lua.owner ~= self.player_name then
+                        if lua and lua.name and is_hostile_mob(lua.name) then
+                        -- if lua and lua.name and not lua.name:match("npc") and lua.owner ~= self.player_name then
+                            minetest.log("warning", "Hostile mob found: " .. lua.name)
+                            -- Found a hostile mob, attack it!
+                            local mob_pos = obj:get_pos()
+                            local dir = vector.direction(pos, mob_pos)
+                            self.object:set_velocity(vector.multiply(dir, 2))
 
-						local yaw = math.atan2(dir.z, dir.x) + math.pi * 1.5
-						self.object:set_yaw(yaw)
-						self:set_animation("walk")
+                            local yaw = math.atan2(dir.z, dir.x) + math.pi * 1.5
+                            self.object:set_yaw(yaw)
+                            self:set_animation("walk")
 
-						-- Optional: hit mob if close
-						if vector.distance(pos, mob_pos) < 2 then
-							if obj.punch then
-								obj:punch(self.object, 1.0, {
-									full_punch_interval = 1.0,
-									damage_groups = {fleshy = 2}
-								}, nil)
-								minetest.log("action", "Hostile mob '" .. lua.name .. "' punched")
-							end							
-							if lua.health then
-								lua.health = lua.health - 2
-								minetest.log("action", "Hostile mob '" .. lua.name .. "' health reduced to " .. lua.health)
-								if lua.health <= 0 then
-									obj:remove()
-								end
-							-- elseif obj.punch then
-							-- 	obj:punch(self.object, 1.0, {
-							-- 		full_punch_interval = 1.0,
-							-- 		damage_groups = {fleshy = 2}
-							-- 	}, nil)
-							-- 	minetest.log("action", "Hostile mob '" .. lua.name .. "' punched")
-							end
-						end
+                            dmg=2
+                            -- Optional: hit mob if close
+                            if vector.distance(pos, mob_pos) < 2 then
+                                if obj.punch then
+                                    obj:punch(self.object, 1.0, {
+                                        full_punch_interval = 1.0,
+                                        damage_groups = {fleshy = dmg}
+                                    }, nil)
+                                    lf("lottmobs:ltee", "Hostile mob '" .. lua.name .. "' punched")
+                                end							
+                                if lua.health then
+                                    lua.health = lua.health - dmg
+                                    lf("lottmobs:ltee", "Hostile mob '" .. lua.name .. "' health reduced to " .. lua.health)
+                                    if lua.health <= 0 then
+                                        obj:remove()
+                                    end
+                                -- elseif obj.punch then
+                                -- 	obj:punch(self.object, 1.0, {
+                                -- 		full_punch_interval = 1.0,
+                                -- 		damage_groups = {fleshy = 2}
+                                -- 	}, nil)
+                                -- 	minetest.log("action", "Hostile mob '" .. lua.name .. "' punched")
+                                end
+                            end
 
-						return -- Only attack one mob per step
-					end
-				end				
+                            return -- Only attack one mob per step
+                        end
+                    end				
+                else
+                    lf("lottmobs:ltee", "NPC is disabled")
+                end
 
 
                 local dir = vector.direction(pos, target_pos)
@@ -463,7 +825,7 @@ minetest.register_entity("lottmobs:npc", {
 					return
 				end
 
-                if dist > 10 then
+                if dist > run_dist then
 					local yaw = math.atan2(dir.z, dir.x) + math.pi / 2
 					yaw = yaw + math.pi
 					self.object:set_yaw(yaw)
@@ -479,53 +841,71 @@ minetest.register_entity("lottmobs:npc", {
                 else
 					-- minetest.log("warning", "NPC reached player, stopping")
                     self.object:set_velocity({x=0, y=0, z=0})
-                    self:set_animation("stand")
+                    if self.is_disabled then
+                        self:set_animation("sit")
+                    else
+                        self:set_animation("stand")
+                    end
                 end
             end
         end
     end,
 })
-
-
-
--- Spawn NPC next to the player when they join
--- minetest.register_on_joinplayer(function(player)
---     local pos = player:get_pos()
---     pos.x = pos.x + 1 -- Adjust position to spawn NPC next to the player
---     minetest.add_entity(pos, "lottmobs:npc")
--- end)
-
 minetest.register_on_joinplayer(function(player)
     local name = player:get_player_name()
     minetest.after(1, function()  -- give the world time to load
         if not player or not player:is_player() then return end
-        local pos = vector.add(player:get_pos(), {x = 1, y = 0, z = 0})
-        local npc = minetest.add_entity(pos, "lottmobs:npc")
-        if npc then
-            local lua = npc:get_luaentity()
-            if lua then
-                lua.player_name = name
-                player_npcs[name] = npc
-                minetest.chat_send_player(name, "Follower NPC spawned for you.")
-            else
-                minetest.chat_send_player(name, "NPC entity missing Lua object.")
-            end
-        else
-            minetest.chat_send_player(name, "NPC failed to spawn.")
+
+        -- Only auto-spawn follower NPCs for ltee race players
+        local privs = minetest.get_player_privs(name)
+        if not privs.GAMEltee then
+            return
+        end
+
+        if lottmobs and lottmobs.spawn_player_npc then
+            lottmobs.spawn_player_npc(player)
         end
     end)
 end)
 
 minetest.register_on_leaveplayer(function(player)
     local name = player:get_player_name()
-    local npc = player_npcs[name]
-    if npc and npc:get_luaentity() then
-		minetest.log("warning", "NPC removed")
-        npc:remove()
+    if not name then return end
+    if lottmobs and lottmobs.remove_player_npc then
+        lottmobs.remove_player_npc(name)
+    else
+        local npc = player_npcs[name]
+        if npc and npc:get_luaentity() then
+            lf("on_leaveplayer", "NPC removed")
+            npc:remove()
+        end
+        player_npcs[name] = nil
     end
-    player_npcs[name] = nil
 end)
 
+minetest.register_on_punchplayer(function(player, hitter, time_from_last_punch, tool_capabilities, dir, damage)
+	if not player or not player:is_player() then
+        return
+    end
+	local name = player:get_player_name()
+	local npc = player_npcs[name]
+	if not npc then
+		return
+	end
+	local lua = npc:get_luaentity()
+	if not lua then
+		return
+	end
+	local player_pos = player:get_pos()
+	if not player_pos then
+		return
+	end
+	local target_pos = vector.add(player_pos, {x = 1, y = 0, z = 0})
+	npc:set_pos(target_pos)
+	lf("npc:on_punch:set_pos", "teleported to: " .. minetest.pos_to_string(target_pos))
+	npc:set_velocity({x = 0, y = 0, z = 0})
+	lua:set_animation("stand")
+end)
 
 minetest.register_chatcommand("list_npcs", {
     description = "List all NPCs near you",
@@ -561,17 +941,20 @@ minetest.register_chatcommand("spawn_npc", {
         local player = minetest.get_player_by_name(name)
         if not player then return false, "Player not found" end
         local pos = vector.add(player:get_pos(), {x = 2, y = 0, z = 0})
-        local npc = minetest.add_entity(pos, "lottmobs:npc")
-        if npc then
-            local lua = npc:get_luaentity()
-            if lua then
-                lua.player_name = name
-            end
-            return true, "NPC spawned."
-        else
-            return false, "NPC failed to spawn."
-        end
-    end
+        		local npc = minetest.add_entity(pos, "lottmobs:npc")
+		if npc then
+			local lua = npc:get_luaentity()
+			if lua then
+				-- lua.player_name = name
+				lua.player_name = name
+				lua.base_nametag = name .. "'s angel"
+				npc:set_properties({nametag = lua.base_nametag})
+			end
+			return true, "NPC spawned."
+		else
+			return false, "NPC failed to spawn."
+		end
+	end
 })
 
 

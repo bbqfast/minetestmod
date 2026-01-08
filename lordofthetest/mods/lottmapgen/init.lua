@@ -68,7 +68,8 @@ local PLANT11 = 2000
 local PLANT12 = 5000
 local PLANT13 = 10000
 local PLANT14 = 35000
-local PLANT15 = 500000
+local PLANT15 = 70000
+local PLANT16 = 500000
 
 -- 2D noise for temperature
 
@@ -434,7 +435,7 @@ minetest.register_on_generated(function(minp, maxp, seed)
 										end
 									elseif biome == 2 then
 										data[vi] = c_snowblock
-										if math.random(PLANT14) == 12 then
+										if math.random(PLANT15) == 12 then
 											myenqueue("LT Shop Santa", {x=x, y=y, z=z})
 										end
 
@@ -448,8 +449,6 @@ minetest.register_on_generated(function(minp, maxp, seed)
 											lottmapgen_pinetree(x, y, z, area, data)
 										elseif math.random(TREE3) == 4 then
 											lottmapgen_firtree(x, y, z, area, data)
-										-- elseif math.random(PLANT6) == 12 then
-										-- 	myenqueue("LT Shop Santa", {x=x, y=y, z=z})
 										end
 									elseif biome == 4 then
 										if math.random(TREE5) == 2 then
@@ -648,6 +647,8 @@ minetest.register_on_generated(function(minp, maxp, seed)
 											myenqueue("LT Shop", {x=x, y=y, z=z})
 										elseif math.random(PLANT13) == 13 then
 											myenqueue("LT house", {x=x, y=y, z=z})
+										elseif math.random(PLANT14) == 14 then
+											myenqueue("LT Shop Lrg", {x=x, y=y, z=z})
 											-- lottmapgen.enqueue_building("LT house", {x=x, y=y, z=z})
 	
 											-- lottmapgen.enqueue_building("Hobbit Hole", {x=x, y=y, z=z})
