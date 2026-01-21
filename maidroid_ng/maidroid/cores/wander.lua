@@ -48,7 +48,7 @@ on_step = function(self, dtime, moveresult, task, criterion, check_inside)
 		self.timers.change_dir = self.timers.change_dir + dtime
 		if task then
 			task(self, dtime, moveresult)
-		elseif math.random(8) == 1 and self:is_on_ground() then
+		elseif (not (self.core and self.core.no_jump)) and math.random(8) == 1 and self:is_on_ground() then
 			self.object:set_velocity(vector.add(self.object:get_velocity(),vector.new(0,math.random(20,32)/10,0)))
 		end
 	-- Time to change dir
@@ -65,9 +65,9 @@ on_step = function(self, dtime, moveresult, task, criterion, check_inside)
 		if self.timers.wander_skip > 0.5 then
 			if math.sqrt(velocity.x^2 + velocity.z^2) < speed_min
 				or self:is_blocked(criterion, check_inside) then
-				self:change_direction(true)
+				self:strong_change_direction()
 				self.timers.change_dir = 0
-			elseif math.random(5) == 1 and self:is_on_ground() then
+			elseif (not (self.core and self.core.no_jump)) and math.random(5) == 1 and self:is_on_ground() then
 				velocity.y = maidroid.jump_velocity
 				self.object:set_velocity(velocity)
 			end

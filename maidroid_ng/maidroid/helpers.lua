@@ -99,9 +99,19 @@ end
 
 maidroid.helpers.is_fence = function(name)
 	return minetest.get_item_group(name, "fence") > 0
-			or name:gsub(1,7) == "xpanes:"
-			or name:gsub(1,6) == "doors:"
+			or name == "lottblocks:fence_wood"
+			or name == "lottblocks:fence_alder"
+			or name == "lottblocks:fence_birch"
+			or name == "lottblocks:fence_junglewood"
+			or name == "lottblocks:fence_lebethron"
+			or name:sub(1,7) == "xpanes:"
+			or name:sub(1,6) == "doors:"
 end
+
+-- maidroid.helpers.is_plant_like = function(name)
+-- 	return minetest.get_item_group(name, "plant") > 0
+-- 		or minetest.get_item_group(name, "flora") > 0
+-- end
 
 maidroid.helpers.is_walkable = function(name)
 	return name ~= "air" and minetest.registered_nodes[name]

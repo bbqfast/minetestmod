@@ -51,32 +51,7 @@ local ll = function(msg)
 	minetest.log("warning", pre..msg)
 end
 
-local lf = function(func, msg)
-	local pre="**************************************************"
-	local pre="++++++++++++++++++++++++++++++++++++++++++++++++++"
-	if msg == nil then
-		msg = "null"
-	end
-
-	black_list={}
-	-- black_list["mow"]=true
-	black_list["select_seed"]=true
-	black_list["mow"]=true
-
-	if (black_list[func] == nil) then
-		-- ll("LF mow: "..msg)
-		ll(func.."(): "..msg.." | lottfarming_on="..tostring(lottfarming_on))
-		-- ll(func.."(): "..msg)
-	end
-end
-
-local ld = function(msg, dest)
-	if (dest ~= nil) then
-		local destnode = minetest.get_node(dest)
-		-- ll(msg.." "..destnode.name)
-	end
-	
-end
+local lf = maidroid.lf
 
 -- ,,x1
 local function extract_before_underscore(str)
@@ -91,6 +66,7 @@ mature_plants["farming:pepper_7"] = {chance=1, crop="farming:pepper_1"}
 mature_plants["farming:pepper_6"] = {chance=3, crop="farming:pepper_1"}
 mature_plants["farming:pepper_5"] = {chance=9, crop="farming:pepper_1"}
 if farming_redo then
+	lf("[maidroid:farming]", "Detected farming redo, using registered_plants")
 	local mature, crop
 	for _, v in pairs(farming.registered_plants) do
 		if v.steps then -- happens with mods like: "resources crops"
@@ -116,20 +92,14 @@ if farming_redo then
 		maidroid.register_tool_rotation("farming:scythe_mithril", vector.new(-75,45,-45))
 	end
 else
+	lf("[maidroid:farming]", "Using default farming (not redo)")
 	local plant_list = { "cotton", "wheat" }
 	local crop
 	for _, plantname in ipairs(plant_list) do
 			crop = "farming:" .. plantname .. "_1"
 			mature_plants["farming:" .. plantname .. "_8"] = {chance=1,crop=crop}
 			seeds["farming:seed_" .. plantname] = crop
-			-- Debug: log mature_plants contents using ll
-			local _count = 0
-			for k, v in pairs(mature_plants) do
-				_count = _count + 1
-				ll("[maidroid:farming] mature_plants[" .. tostring(k) .. "] = chance=" .. tostring(v and v.chance) .. " crop=" .. tostring(v and v.crop))
-			end
-			ll("[maidroid:farming] mature_plants total: " .. tostring(_count))
-			-- ll("init:  - - - - - - - farming:seed_" .. plantname)
+			lf("[maidroid:farming]", "Added " .. plantname .. "_8 to mature_plants")
 	end
 
 	if maidroid.mods.better_farming then
@@ -166,6 +136,11 @@ if lottfarming_on then
 	mature_plants["lottfarming:pipeweed_4"] = {chance=1, crop="lottfarming:pipeweed_1"}	
 end
 
+lf("[maidroid:farming]", "Registered mature plants:")
+for plant_name, plant_def in pairs(mature_plants) do
+	lf("[maidroid:farming]", "  " .. plant_name .. " -> " .. plant_def.crop)
+end
+-- raise_error("maidroid:farming")
 
 local ethereal_plants={}
 if maidroid.mods.ethereal then
@@ -243,24 +218,40 @@ is_weed = function(name)
 		end
 		local weed = weed_plants[trim_name]
 		if weed ~= nil then
-			lf("is_weed", "weed found: "..trim_name)
+			-- lf("is_weed", "weed found: "..trim_name)
 			-- ll(weed)
 			return true
-		else
-			lf("is_weed", "weed not found: "..trim_name)
 		end		
 	else
-		lf("is_weed", "Error extracting node name:"..name)
+		-- lf("is_weed", "Error extracting node name:"..name)
 	end
 	return false
 
 end
 
--- is_mowable reports whether maidroid can mow.,,mo
+-- is_mowable reports whether maidroid can mow
 is_mowable = function(pos, name)
-	return true
+	if minetest.is_protected(pos, name) then
+		return false
+	end
+	
+	local node = minetest.get_node(pos)
+	local desc = mature_plants[node.name]
+	local is_weed = is_weed(node.name)
+	
+	-- Return true only if this is a mature plant or weed
+	return desc ~= nil or is_weed
 end
 
+is_seed = function(name)
+	if name == nil then
+		return false
+	end
+	if seeds[name] ~= nil then
+		return true
+	end
+	return false
+end
 
 -- 	if minetest.is_protected(pos, name) then
 -- 		return false
@@ -435,11 +426,18 @@ local position_ok = function(pos, to)
 end
 
 task_base = function(self, action, destination)
-	if not destination then return end
+	if not destination then 
+		lf("[maidroid:farming]", "task_base: no destination")
+		return 
+	end
 
+	-- lf("[maidroid:farming]", "task_base: destination=" .. minetest.pos_to_string(destination) .. " action=" .. tostring(action))
 	local pos = self:get_pos()
+	-- lf("[maidroid:farming]", "task_base: current pos=" .. minetest.pos_to_string(pos))
+	
 	-- Is this droid able to make an action
 	if position_ok(pos, destination) then
+		-- lf("[maidroid:farming]", "task_base: position ok, setting action")
 		self.destination = destination
 		self.action = action
 		to_action(self)
@@ -447,10 +445,14 @@ task_base = function(self, action, destination)
 	end
 
 	-- Or does the droid have to follow a path
+	-- lf("[maidroid:farming]", "task_base: finding path from " .. minetest.pos_to_string(pos) .. " to " .. minetest.pos_to_string(destination))
 	local path = minetest.find_path(pos, destination, 8, 1, 1, "A*_noprefetch")
 	if path ~= nil then
+		-- lf("[maidroid:farming]", "task_base: path found with " .. #path .. " nodes")
 		core_path.to_follow_path(self, path, destination, to_action, action)
 		return true
+	else
+		lf("[maidroid:farming]", "task_base: NO PATH FOUND")
 	end
 end
 
@@ -577,8 +579,6 @@ end
 		local dest = search(pos, is_plantable, self.owner)
 		if dest then
 			-- local destnode = minetest.get_node(dest)
-			-- ll("task::isdest = "..destnode.name)
-			-- ld("task::isdest", dest)
 			if not ( self.selected_seed and							-- Is there already a selected seed
 				inv:contains_item("main", self.selected_seed)) then -- in inventory
 				if not select_seed(self) then						-- Try to find a seed in inventory
@@ -593,8 +593,13 @@ end
 		end
 
 		-- Harvesting
+		lf("[maidroid:farming]", "Searching for mowable plants near " .. minetest.pos_to_string(pos))
 		dest = search(pos, is_mowable, self.owner)
-		ld("task() task::mow section", dest)
+		if dest then
+			lf("[maidroid:farming]", "Found mowable plant at " .. minetest.pos_to_string(dest))
+		else
+			lf("[maidroid:farming]", "No mowable plants found")
+		end
 		if task_base(self, mow, dest) then
 			return
 		end
@@ -790,6 +795,7 @@ plant = function(self, dtime)
 end
 
 mow = function(self, dtime)
+	lf("[maidroid:farming]", "mow() called at destination " .. minetest.pos_to_string(self.destination))
 	-- Skip until timer is ok
 	-- ,,xx,,cc
 	-- if update_action_timers(self, dtime, self.selected_tool) then return end
@@ -797,12 +803,16 @@ mow = function(self, dtime)
 
 	local destnode = minetest.get_node(self.destination)
 	local mature = destnode.name
-	lf("mow2", "destination node = " .. tostring(mature))
+	lf("mow2", "destination node = " .. tostring(mature) .. " at pos " .. minetest.pos_to_string(self.destination))
 
 	local in_mature_list = mature_plants[mature] ~= nil
 	local is_weed_here = is_weed(mature)
-	lf("mow", "condition mature_plants[mature] ~= nil = " .. tostring(in_mature_list))
-	lf("mow", "condition is_weed(mature) = " .. tostring(is_weed_here))
+	lf("mow", "condition mature_plants[" .. tostring(mature) .. "] ~= nil = " .. tostring(in_mature_list))
+	lf("mow", "condition is_weed(" .. tostring(mature) .. ") = " .. tostring(is_weed_here))
+	
+	if in_mature_list then
+		lf("mow", "Found mature plant: " .. tostring(mature) .. " -> crop: " .. tostring(mature_plants[mature].crop))
+	end
 
 	if not in_mature_list and not is_weed_here then
 		lf("mow", "early return (not mature and not weed)")
@@ -944,23 +954,105 @@ plant_papyrus = function(self, dtime)
 	self:set_tool(self.selected_tool)
 end
 
+-- Check for fence detection failures
+local check_fence_detection = function(self)
+	local front = self:get_front()
+	local below1 = vector.add(front, {x = 0, y = -1, z = 0})
+	local below2 = vector.add(front, {x = 0, y = -2, z = 0})
+	local pos_here = vector.round(self:get_pos())
+	local pos_here_below = vector.add(pos_here, {x = 0, y = -1, z = 0})
+	local n_front = minetest.get_node(front).name
+	local n_below1 = minetest.get_node(below1).name
+	local n_below2 = minetest.get_node(below2).name
+	local n_here = minetest.get_node(pos_here).name
+	local n_here_below = minetest.get_node(pos_here_below).name
+	local has_fence = maidroid.helpers.is_fence(n_front)
+		or maidroid.helpers.is_fence(n_below1)
+		or maidroid.helpers.is_fence(n_below2)
+		or maidroid.helpers.is_fence(n_here)
+		or maidroid.helpers.is_fence(n_here_below)
+	if has_fence and not self:is_blocked(maidroid.helpers.is_fence, true) then
+		local pos = vector.round(self:get_pos())
+		minetest.log("warning",
+			"[maidroid fence debug] FAILED blocked detection (farming); self=" .. minetest.pos_to_string(pos) ..
+			" front=" .. minetest.pos_to_string(front) ..
+			" below1=" .. minetest.pos_to_string(below1) ..
+			" below2=" .. minetest.pos_to_string(below2) ..
+			" n_front=" .. n_front ..
+			" n_below1=" .. n_below1 ..
+			" n_below2=" .. n_below2 ..
+			" n_here=" .. n_here ..
+			" n_here_below=" .. n_here_below)
+		if not self.pause and self.core and self.core.on_pause then
+			self.core.on_pause(self)
+			self.pause = true
+		end
+	end
+end
+
 on_step = function(self, dtime, moveresult)
+	-- Pause if too far from home (more than 20 blocks)
+	if self.home then
+		local distance = vector.distance(self:get_pos(), self.home)
+		if distance > 20 then
+			if not self.pause then
+				self.pause = true
+				self._distance_paused = true
+				if self.core and self.core.on_pause then
+					self.core.on_pause(self)
+				end
+				minetest.log("warning", "farming maidroid paused: too far from home (" .. string.format("%.1f", distance) .. " blocks)")
+			end
+		else
+			-- Resume if within range and currently paused for distance
+			if self.pause and self._distance_paused then
+				self.pause = false
+				self._distance_paused = nil
+				if self.core and self.core.on_resume then
+					self.core.on_resume(self)
+				end
+				minetest.log("warning", "farming maidroid resumed: within range of home")
+			end
+		end
+	end
+
+	if self.pause then
+		return
+	end
 	-- When owner offline mode disabled and if owner didn't login, the maidroid does nothing.
 	if maidroid.settings.farming_offline == false
 		and not minetest.get_player_by_name(self.owner) then
 		return
 	end
 
+	-- Remember previous Y position for locking movement to a single plane
+	local pos = self:get_pos()
+	self._farming_prev_y = self._farming_prev_y or pos.y
+
 	-- Pickup surrounding items
 	self:pickup_item()
 
-	if self.state == maidroid.states.WANDER then
-		wander_core.on_step(self, dtime, moveresult, task, maidroid.helpers.is_fence, true)
-	elseif self.state == maidroid.states.PATH then
+    wander_core.on_step(self, dtime, moveresult, task, maidroid.helpers.is_fence, true)
+    -- Check for fence detection failures
+    check_fence_detection(self)
+	if self.state == maidroid.states.PATH then
 		maidroid.cores.path.on_step(self, dtime, moveresult)
 	elseif self.state == maidroid.states.ACT then
+        -- lf("farming", "ACT state")
 		self.action(self, dtime)
 	end
+
+	-- After movement has been processed, enforce Y-axis lock for farmers
+	-- pos = self:get_pos()
+	-- if pos.y ~= self._farming_prev_y then
+	-- 	pos.y = self._farming_prev_y
+	-- 	self.object:set_pos(pos)
+	-- 	local v = self.object:get_velocity()
+	-- 	if v then
+	-- 		v.y = 0
+	-- 		self.object:set_velocity(v)
+	-- 	end
+	-- end
 end
 
 is_scythe = function(name)
@@ -970,7 +1062,7 @@ end
 
 is_tool = function(stack)
 	local name = stack:get_name()
-	ll("stack  "..name)
+	lf("[maidroid:farming]", "stack  "..name)
 	local istool = minetest.get_item_group(name, "hoe") > 0
 		or is_scythe(name)
 
@@ -1016,10 +1108,10 @@ maidroid.register_core("farming", {
 	on_stop		= on_stop,
 	on_resume	= on_resume,
 	on_pause	= on_pause,
-	on_step		= on_step,
+	on_step	= on_step,
 	is_tool		= is_tool,
 	alt_tool	= select_seed,
-	toggle_jump = true,
+	no_jump		= true,
 	walk_max = 2.5 * timers.walk_max,
 	hat = hat,
 	can_sell = true,

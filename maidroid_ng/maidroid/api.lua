@@ -104,6 +104,14 @@ function maidroid.is_maidroid(name)
 	return maidroid.registered_maidroids[name] == true
 end
 
+function maidroid.strong_change_direction(self)
+	strong_change_direction(self)
+end
+
+function maidroid.update_infotext(self)
+	update_infotext(self)
+end
+
 ---------------------------------------------------------------------
 
 -- get_inventory returns a inventory of a maidroid.
@@ -491,6 +499,19 @@ local change_direction = function(self, invert)
 	self.object:set_yaw(yaw)
 end
 
+-- strong_change_direction: force at least 90-degree turn to bypass obstacles
+local strong_change_direction = function(self)
+	local base = self.object:get_yaw()
+	local left = base + math.pi/2
+	local right = base - math.pi/2
+	-- Add some randomness so it’s not exactly 90 degrees every time
+	local yaw = math.random() > 0.5 and (left + math.random(-30,30)/100) or (right + math.random(-30,30)/100)
+	local direction = vector.multiply(minetest.yaw_to_dir(yaw),
+		maidroid.settings.speed * ( 1 + math.random(0,10)/20 ))
+	self.object:set_velocity(direction)
+	self.object:set_yaw(yaw)
+end
+
 -- update_infotext updates the infotext of the maidroid.
 local update_infotext = function(self)
 	local description
@@ -512,7 +533,7 @@ local update_infotext = function(self)
 	self.object:set_properties({infotext = infotext})
 end
 
-local is_blocked = function(self, criterion, check_inside)
+local is_blocked_orig = function(self, criterion, check_inside)
 	if criterion == nil then
 		return false
 	end
@@ -541,6 +562,154 @@ local is_blocked = function(self, criterion, check_inside)
 		node = minetest.get_node(vector.add(front,vector.new(0, 0, dir.z)))
 	end
 	return criterion(node.name)
+end
+
+local is_blocked = function(self, criterion, check_inside)
+	-- Helper to add a distinct position to the history (max 3)
+	local function add_prev_pos(pos)
+		if not self._prev_pos then
+			self._prev_pos = {}
+		end
+		-- local rounded = vector.round(pos)
+		local rounded = pos
+		-- Only add if different from the most recent position
+		if #self._prev_pos == 0 or not vector.equals(rounded, self._prev_pos[#self._prev_pos]) then
+			table.insert(self._prev_pos, rounded)
+			-- Keep only the last 3
+			if #self._prev_pos > 3 then
+				table.remove(self._prev_pos, 1)
+			end
+		end
+		-- Debug: dump position list
+		local pos_str = {}
+		for i, p in ipairs(self._prev_pos) do
+			pos_str[i] = string.format("(%.2f,%.2f,%.2f)", p.x, p.y, p.z)
+		end
+		lf("is_blocked", "pos_list: [" .. table.concat(pos_str, ", ") .. "]")
+	end
+	local function on_blocked(node_name, msg)
+		local pos = self:get_pos()
+		-- lf("is_blocked", "blocked by node=" .. node_name .. " (" .. msg .. ") at pos=" .. minetest.pos_to_string(vector.round(pos)))
+		return true
+	end
+	local function on_not_blocked(msg)
+		add_prev_pos(self:get_pos())
+		lf("is_blocked", "not blocked (" .. msg .. ")")
+		return false
+	end
+	-- Use previous positions from last calls; update at the end
+	local prev_pos = self._prev_pos and self._prev_pos[#self._prev_pos]
+	local prev_prev_pos = self._prev_pos and #self._prev_pos >= 2 and self._prev_pos[#self._prev_pos - 1]
+	-- Log if stuck (same as last position)
+	-- if prev_pos and vector.equals(vector.round(self:get_pos()), vector.round(prev_pos)) then
+	-- 	lf("is_blocked", "stuck: prev_pos same as current pos " .. minetest.pos_to_string(vector.round(self:get_pos())))
+	-- end
+	if criterion == nil then
+		return on_not_blocked("criterion nil")
+	end
+
+	local pos = self:get_pos()
+	local node
+	local dir
+
+	if check_inside then
+		dir = vector.multiply(self:get_look_direction(), 0.1875)
+		node = minetest.get_node(vector.add(pos, dir))
+		if criterion(node.name) then
+			return on_blocked(node.name, "inside")
+		end
+
+		-- Extra case for fences: also treat a fence directly under the maidroid as blocking.
+		if criterion == maidroid.helpers.is_fence then
+			local here = vector.round(pos)
+			local here_below = vector.add(here, vector.new(0, -1, 0))
+			local node_here_below = minetest.get_node(here_below)
+			local is_fence_result = criterion(node_here_below.name)
+			if is_fence_result then
+				lf("is_blocked", "fence directly under at " .. minetest.pos_to_string(here) .. " node=" .. node_here_below.name)
+				-- If check_inside, teleport back to previous-previous position to avoid stepping onto fence
+                -- if prev_pos and vector.equals(vector.round(self:get_pos()), vector.round(prev_pos)) then
+                if prev_prev_pos and not vector.equals(vector.round(self:get_pos()), vector.round(prev_prev_pos)) then
+                    if prev_prev_pos then
+                        self.object:set_pos(prev_prev_pos)
+                        lf("is_blocked", "teleported back to prev_prev_pos " .. minetest.pos_to_string(prev_prev_pos))
+                    end
+                else 
+                    lf("is_blocked", "stuck: prev_pos same as current pos " .. minetest.pos_to_string(vector.round(self:get_pos())))
+                end
+
+				return on_blocked(node_here_below.name, "fence under")
+			end
+		end
+	end
+
+	local front = self:get_front()
+	local front_below = vector.add(front, vector.new(0, -1, 0))
+	dir = vector.subtract(front, vector.round(self:get_pos()))
+	if dir.x == 0 or dir.z == 0 then
+		-- Straight ahead: check maidroid position, then node in front, then one node below the front.
+		local here = vector.round(pos)
+		local node_here = minetest.get_node(here)
+		if criterion(node_here.name) then
+			return on_blocked(node_here.name, "here")
+		end
+		local here_below = vector.add(here, vector.new(0, -1, 0))
+		local node_here_below = minetest.get_node(here_below)
+		if criterion(node_here_below.name) then
+			return on_blocked(node_here_below.name, "here_below")
+		end
+		node = minetest.get_node(front)
+		if criterion(node.name) then
+			return on_blocked(node.name, "front")
+		end
+		node = minetest.get_node(front_below)
+		if criterion(node.name) then
+			return on_blocked(node.name, "front_below")
+		end
+		return on_not_blocked("straight")
+	else
+		-- Diagonal: check maidroid position, front itself, then both possible front edges and their nodes one below.
+		local here = vector.round(pos)
+		local node_here = minetest.get_node(here)
+		if criterion(node_here.name) then
+			return on_blocked(node_here.name, "diag_here")
+		end
+		local here_below = vector.add(here, vector.new(0, -1, 0))
+		local node_here_below = minetest.get_node(here_below)
+		if criterion(node_here_below.name) then
+			return on_blocked(node_here_below.name, "diag_here_below")
+		end
+		node = minetest.get_node(front)
+		if criterion(node.name) then
+			return on_blocked(node.name, "diag_front")
+		end
+		node = minetest.get_node(front_below)
+		if criterion(node.name) then
+			return on_blocked(node.name, "diag_front_below")
+		end
+		local pos1 = vector.add(front, vector.new(dir.x, 0, 0))
+		node = minetest.get_node(pos1)
+		if criterion(node.name) then
+			return on_blocked(node.name, "diag1")
+		end
+		local pos1_below = vector.add(pos1, vector.new(0, -1, 0))
+		node = minetest.get_node(pos1_below)
+		if criterion(node.name) then
+			return on_blocked(node.name, "diag1_below")
+		end
+
+		local pos2 = vector.add(front, vector.new(0, 0, dir.z))
+		node = minetest.get_node(pos2)
+		if criterion(node.name) then
+			return on_blocked(node.name, "diag2")
+		end
+		local pos2_below = vector.add(pos2, vector.new(0, -1, 0))
+		node = minetest.get_node(pos2_below)
+		if criterion(node.name) then
+			return on_blocked(node.name, "diag2_below")
+		end
+		return on_not_blocked("diagonal")
+	end
 end
 
 ---------------------------------------------------------------------
@@ -1375,6 +1544,7 @@ local register_maidroid = function(product_name, def)
 		is_named           = is_named,
 		has_item_in_main   = has_item_in_main,
 		change_direction   = change_direction,
+		strong_change_direction = strong_change_direction,
 		set_target_node    = set_target_node,
 		update_infotext    = update_infotext,
 		player_can_control = player_can_control,

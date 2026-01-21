@@ -10,24 +10,11 @@
 local S = maidroid.translator
 local on_start, on_pause, on_stop, on_step, is_tool
 
+local lf = maidroid.lf
+
 local timers = maidroid.timers
 local follow = maidroid.cores.follow.on_step
 local wander = maidroid.cores.wander.on_step
-
-
-local lf = function(func, msg)
-	local pre = "++++++++++++++++++++++++++++++++++++++++++++++++++"
-	if func == nil then func = "unknown" end
-	if msg == nil then msg = "null" end
-
-	local black_list = {}
-	black_list["select_seed"] = true
-	black_list["mow"] = true
-
-	if black_list[func] == nil then
-		minetest.log("warning", pre .. func .. "(): " .. msg )
-	end
-end
 
 maidroid.register_tool_rotation("default:torch", vector.new(15, 0, 0))
 

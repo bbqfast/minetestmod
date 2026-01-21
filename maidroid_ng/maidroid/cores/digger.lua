@@ -9,6 +9,8 @@
 
 local S = maidroid.translator
 
+local lf = maidroid.lf
+
 local timers = maidroid.timers
 
 local DIG_BELOW_INTERVAL = 0.5
@@ -44,21 +46,6 @@ local lottfarming_on = false
 if minetest.get_modpath("lottfarming") then
     lottfarming_on=true
 end
-
-local lf = function(func, msg)
-	local pre = "++++++++++++++++++++++++++++++++++++++++++++++++++"
-	if func == nil then func = "unknown" end
-	if msg == nil then msg = "null" end
-
-	local black_list = {}
-	black_list["select_seed"] = true
-	black_list["mow"] = true
-
-	if black_list[func] == nil then
-		minetest.log("warning", pre .. func .. "(): " .. msg )
-	end
-end
-
 
 local ld = function(msg, dest)
 	if (dest ~= nil) then

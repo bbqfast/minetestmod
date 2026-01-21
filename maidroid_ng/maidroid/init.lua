@@ -18,22 +18,28 @@ do
 
 end
 
-local lf = function(func, msg)
-	local pre = "++++++++++++++++++++++++++++++++++++++++++++++++++"
+maidroid = maidroid or {}
+
+maidroid.lf = function(func, msg)
+	local pre = "++++++++++++++++++++++++"
 	if func == nil then func = "unknown" end
 	if msg == nil then msg = "null" end
 
 	local black_list = {}
 	black_list["select_seed"] = true
 	black_list["mow"] = true
+	black_list["follow:on_step"] = true
+	black_list["maidroid.globalstep"] = true
 
 	if black_list[func] == nil then
 		minetest.log("warning", pre .. func .. "(): " .. msg )
 	end
 end
 
+local lf = maidroid.lf
 
-maidroid = {}
+
+maidroid = maidroid or {}
 
 maidroid.helpers = {} -- helpers functions
 maidroid.modname = minetest.get_current_modname()
@@ -222,6 +228,7 @@ end
 
 
 minetest.register_globalstep(function(dtime)
+    local func_name = "maidroid.globalstep"
     timer = timer + dtime
     if timer < 10 then return end
     timer = 0
@@ -233,38 +240,38 @@ minetest.register_globalstep(function(dtime)
         for _, obj in ipairs(objs) do
             local ent = obj:get_luaentity()
             if ent and maidroid.is_maidroid(ent.name) then
-                -- “inactive” example: paused or IDLE state
-                lf("globalstep", "[maidroid] ACTIVE maidroid far from players: " .. tostring(ent.nametag or ent.name) .. " at " .. minetest.pos_to_string(obj:get_pos()))
-                lf("globalstep", "Checking maidroid nametag for storage: nametag=" .. tostring(ent.nametag))
+                -- "inactive" example: paused or IDLE state
+                lf(func_name, "[maidroid] ACTIVE maidroid far from players: " .. tostring(ent.nametag or ent.name) .. " at " .. minetest.pos_to_string(obj:get_pos()))
+                lf(func_name, "Checking maidroid nametag for storage: nametag=" .. tostring(ent.nametag))
                 if ent.nametag and ent.nametag ~= "" then
-                    lf("globalstep", "nametag is present: " .. ent.nametag)
+                    lf(func_name, "nametag is present: " .. ent.nametag)
                     local pos = vector.round(obj:get_pos())
                     local pos_str = minetest.pos_to_string(pos)
                     local stored = false
                     -- Prefer mod storage when available
                     if minetest.get_mod_storage then
-                        lf("globalstep", "get_mod_storage available")
+                        lf(func_name, "get_mod_storage available")
                         local storage = minetest.get_mod_storage()
                         if storage then
-                            lf("globalstep", "mod storage obtained")
-                            lf("globalstep", "Saving position for " .. ent.nametag .. " in mod storage: " .. pos_str)
+                            lf(func_name, "mod storage obtained")
+                            lf(func_name, "Saving position for " .. ent.nametag .. " in mod storage: " .. pos_str)
                             storage:set_string("maidroid_pos_" .. ent.nametag, pos_str)
                             stored = true
                         else
-                            lf("globalstep", "mod storage unavailable (nil)")
+                            lf(func_name, "mod storage unavailable (nil)")
                         end
                     else
-                        lf("globalstep", "get_mod_storage not available")
+                        lf(func_name, "get_mod_storage not available")
                     end
                     -- Fallback: write to text file if mod storage failed
                     if (not stored) and maidroid_pos_file then
 
                         local ok, err = pcall(save_maidroid_pos_fallback, ent.nametag, pos_str)
                         if not ok then
-                            lf("globalstep", "Error writing fallback file: " .. tostring(err))
+                            lf(func_name, "Error writing fallback file: " .. tostring(err))
                         end
                     end
-                    -- lf("globalstep", "nametag missing or empty")
+                    -- lf(func_name, "nametag missing or empty")
                 end
 
                 local inactive = ent.pause or ent.state == maidroid.states.IDLE

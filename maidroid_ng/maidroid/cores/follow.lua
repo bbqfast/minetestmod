@@ -5,19 +5,7 @@
 -- https://gitlab.com/mazes_80/maidroid
 ------------------------------------------------------------
 
-local lf = function(func, msg)
-	local pre = "++++++++++++++++++++++++++++++++++++++++++++++++++"
-	if func == nil then func = "unknown" end
-	if msg == nil then msg = "null" end
-
-	local black_list = {}
-	black_list["select_seed"] = true
-	black_list["mow"] = true
-
-	if black_list[func] == nil then
-		minetest.log("warning", pre .. func .. "(): " .. msg .. " | lottfarming_on=" .. tostring(lottfarming_on))
-	end
-end
+local lf = maidroid.lf
 
 local on_step
 
