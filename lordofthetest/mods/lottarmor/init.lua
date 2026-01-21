@@ -290,6 +290,15 @@ minetest.register_craft({output = "lottarmor:helmet_gold_ltee",
 	recipe = {{"", "", ""},{"", "lottarmor:helmet_gold", ""},{"", "", ""},},
 })
 
+minetest.register_craft({output = "lottarmor:helmet_mithril",
+	recipe = {{"", "", ""},{"", "lottarmor:helmet_mithril_ltee", ""},{"", "", ""},},
+})
+
+minetest.register_craft({output = "lottarmor:helmet_mithril_ltee",
+	recipe = {{"", "", ""},{"", "lottarmor:helmet_mithril", ""},{"", "", ""},},
+})
+
+
 minetest.register_craft({output = "lottarmor:helmet_silver",
 	recipe = {{"", "", ""},{"", "lottarmor:helmet_silver_ltee", ""},{"", "", ""},},
 })
@@ -353,6 +362,13 @@ minetest.register_tool("lottarmor:boots_galvorn", {
 minetest.register_tool("lottarmor:helmet_mithril", {
 	description = "Mithril Helmet",
 	inventory_image = "lottarmor_inv_helmet_mithril.png",
+	groups = {armor_head=15, armor_heal=12, armor_use=50, armor_healing=0, physics_speed=-0.1},
+	wear = 0,
+})
+
+minetest.register_tool("lottarmor:helmet_mithril_ltee", {
+	description = "Mithril Helmet LT",
+	inventory_image = "lottarmor_inv_helmet_mithril_ltee.png",
 	groups = {armor_head=15, armor_heal=12, armor_use=50, armor_healing=0, physics_speed=-0.1},
 	wear = 0,
 })

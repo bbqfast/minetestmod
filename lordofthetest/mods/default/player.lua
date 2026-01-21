@@ -233,14 +233,31 @@ minetest.register_on_joinplayer(function(player)
 	local hp_max = props.hp_max or 20
 	local dmg = get_player_damage(player)
 	local arm = get_player_armor_level(player)
+	local buff_text = ""
+	if snacks then
+		if snacks.get_damage_multiplier then
+			local mult = snacks.get_damage_multiplier(player)
+			if mult and mult > 1 then
+				dmg = dmg * mult
+				buff_text = buff_text .. string.format("  DMG BUFF: %.1fx", mult)
+			end
+		end
+		if snacks.get_defense_multiplier then
+			local def_mult = snacks.get_defense_multiplier(player)
+			if def_mult and def_mult < 1 then
+				local pct = math.floor((1 - def_mult) * 100 + 0.5)
+				buff_text = buff_text .. string.format("  DEF BUFF: -%d%%", pct)
+			end
+		end
+	end
 
 	hp_huds[name] = player:hud_add({
 		hud_elem_type = "text",
-		position      = {x = 0.5, y = 0.02},
-		alignment     = {x = 0, y = 0},
+		position      = {x = 0.9, y = 0.02},
+		alignment     = {x = -1, y = 0},
 		scale         = {x = 100, y = 20},
 		number        = 0x00FF00,
-		text          = "HP: " .. hp .. " / " .. hp_max .. "  DMG: " .. dmg .. "  ARM: " .. arm,
+		text          = "HP: " .. hp .. " / " .. hp_max .. "  DMG: " .. dmg .. "  ARM: " .. arm .. buff_text,
 	})
 end)
 
@@ -266,7 +283,24 @@ minetest.register_globalstep(function(dtime)
 			local hp_max = props.hp_max or 20
 			local dmg = get_player_damage(player)
 			local arm = get_player_armor_level(player)
-			player:hud_change(hud_id, "text", "HP: " .. hp .. " / " .. hp_max .. "  DMG: " .. dmg .. "  ARM: " .. arm)
+			local buff_text = ""
+			if snacks then
+				if snacks.get_damage_multiplier then
+					local mult = snacks.get_damage_multiplier(player)
+					if mult and mult > 1 then
+						dmg = dmg * mult
+						buff_text = buff_text .. string.format("  DMG BUFF: %.1fx", mult)
+					end
+				end
+				if snacks.get_defense_multiplier then
+					local def_mult = snacks.get_defense_multiplier(player)
+					if def_mult and def_mult < 1 then
+						local pct = math.floor((1 - def_mult) * 100 + 0.5)
+						buff_text = buff_text .. string.format("  DEF BUFF: -%d%%", pct)
+					end
+				end
+			end
+			player:hud_change(hud_id, "text", "HP: " .. hp .. " / " .. hp_max .. "  DMG: " .. dmg .. "  ARM: " .. arm .. buff_text)
 		end
 	end
 end)

@@ -4,19 +4,33 @@
 -- https://forum.minetest.net/viewtopic.php?f=11&t=6099
 -- https://github.com/minetest/minetest_game/blob/master/mods/default/torch.lua
 
-local lf = function(func, msg)
-	local pre = "++++++++++++++++++++++++++++++++++++++++++++++++++"
-	if func == nil then func = "unknown" end
-	if msg == nil then msg = "null" end
+minetest.log("warning", "[lf-init] default/torches.lua loaded, lf=" .. tostring(_G.lf))
 
-	local black_list = {}
-	black_list["select_seed"] = true
-	black_list["mow"] = true
+if not rawget(_G, "lf") then
+	_G.lf = function(func, msg)
+		local pre = ".............."
+		if func == nil then func = "unknown" end
+		if msg == nil then msg = "null" end
 
-	if black_list[func] == nil then
-		minetest.log("warning", pre .. func .. "(): " .. msg )
+		local black_list = {}
+		black_list["select_seed"] = true
+		black_list["mow"] = true
+		black_list["deserialize"] = true
+		black_list["npc_attack"] = true
+
+
+        -- TEMP DEBUG
+        -- minetest.log("warning", "[lf-debug] func=" .. tostring(func)
+        --     .. " black_list[func]=" .. tostring(black_list[func]))
+            
+            
+		if black_list[func] == nil then
+			minetest.log("warning", pre .. func .. "(): " .. msg)
+		end
 	end
 end
+
+local lf = assert(_G.lf, "global lf not initialized")
 
 
 local function on_flood(pos, oldnode, newnode)

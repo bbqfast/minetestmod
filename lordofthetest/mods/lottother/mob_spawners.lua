@@ -1,19 +1,7 @@
 -- Mobs spawners for buildings
 -- Mordor
 
-local lf = function(func, msg)
-	local pre = "++++++++++++++++++++++++++++++++++++++++++++++++++"
-	if func == nil then func = "unknown" end
-	if msg == nil then msg = "null" end
-
-	local black_list = {}
-	black_list["select_seed"] = true
-	black_list["mow"] = true
-
-	if black_list[func] == nil then
-		minetest.log("warning", pre .. func .. "(): " .. msg )
-	end
-end
+local lf = assert(_G.lf, "global lf not initialized")
 
 minetest.register_node("lottother:mordorms", {
 	description = "Mordor Mob Spawner",
@@ -107,17 +95,17 @@ minetest.register_node("lottother:hobbitms", {
 
 
 -- LTs
-
-local function trader1_exists_near(pos, radius, entity_name)
+-- detects if a trader is already spawned near spawner, then don't spawn extra trader
+local function trader_exists_near(pos, radius, entity_name)
     local objs = minetest.get_objects_inside_radius(pos, radius or 1.5)
     for _, obj in ipairs(objs) do
         local ent = obj:get_luaentity()
         if ent and ent.name == entity_name then
-			lf("trader1_exists_near", string.format("Found %s at x=%d y=%d z=%d", entity_name, pos.x, pos.y, pos.z))
+			lf("trader_exists_near", string.format("Found %s at x=%d y=%d z=%d", entity_name, pos.x, pos.y, pos.z))
             return true
         end
     end
-	lf("trader1_exists_near", string.format("Not found %s at x=%d y=%d z=%d", entity_name, pos.x, pos.y, pos.z))
+	lf("trader_exists_near", string.format("Not found %s at x=%d y=%d z=%d", entity_name, pos.x, pos.y, pos.z))
     return false
 end
 
@@ -166,7 +154,7 @@ minetest.register_node("lottother:ltee_trader_1_ms", {
 	buildable_to = true,
 	pointable = true,
 	on_construct = function(pos, node)
-		if trader1_exists_near(pos, 1.5, "lottmobs:ltee_trader_1") then
+		if trader_exists_near(pos, 1.5, "lottmobs:ltee_trader_1") then
 			return
 		end
 		lf("ltee_trader_1_ms", string.format("at x=%d y=%d z=%d", pos.x, pos.y, pos.z))
@@ -195,7 +183,7 @@ minetest.register_node("lottother:ltee_trader_2_ms", {
 	-- pointable = false,
 	pointable = true,
 	on_construct = function(pos, node)
-		if trader1_exists_near(pos, 1.5, "lottmobs:ltee_trader_2") then
+		if trader_exists_near(pos, 1.5, "lottmobs:ltee_trader_2") then
 			return
 		end
 		lf("ltee_trader_2_ms", string.format("at x=%d y=%d z=%d", pos.x, pos.y, pos.z))
@@ -223,7 +211,7 @@ minetest.register_node("lottother:ltee_trader_3_ms", {
 	buildable_to = true,
 	pointable = true,
 	on_construct = function(pos, node)
-		if trader1_exists_near(pos, 1.5, "lottmobs:ltee_trader_3") then
+		if trader_exists_near(pos, 1.5, "lottmobs:ltee_trader_3") then
 			return
 		end
 		lf("ltee_trader_3_ms", string.format("at x=%d y=%d z=%d", pos.x, pos.y, pos.z))
@@ -247,7 +235,7 @@ minetest.register_node("lottother:ltee_trader_santa_ms", {
 	buildable_to = true,
 	pointable = true,
 	on_construct = function(pos, node)
-		if trader1_exists_near(pos, 1.5, "lottmobs:ltee_trader_santa") then
+		if trader_exists_near(pos, 1.5, "lottmobs:ltee_trader_santa") then
 			return
 		end
 		lf("ltee_trader_santa_ms", string.format("at x=%d y=%d z=%d", pos.x, pos.y, pos.z))
@@ -276,7 +264,7 @@ minetest.register_lbm({
     nodenames = {"lottother:ltee_trader_santa_ms"},
     run_at_every_load = true,
     action = function(pos, node)
-		if trader1_exists_near({x = pos.x, y = pos.y + 1, z = pos.z}, 1.5, "lottmobs:ltee_trader_santa") then
+		if trader_exists_near({x = pos.x, y = pos.y + 1, z = pos.z}, 1.5, "lottmobs:ltee_trader_santa") then
 			return
 		end
         lf("lottmobs:spawn_santa_trader", ("LBM spawning Santa at (%d, %d, %d)"):format(pos.x, pos.y, pos.z))
@@ -297,7 +285,7 @@ minetest.register_lbm({
     run_at_every_load = true,  -- or false if you only want it once
 	action = function(pos, node)
 		
-		if trader1_exists_near({x = pos.x, y = pos.y + 1, z = pos.z}, 1.5, "lottmobs:ltee_trader_1") then
+		if trader_exists_near({x = pos.x, y = pos.y + 1, z = pos.z}, 1.5, "lottmobs:ltee_trader_1") then
 			return
 		end
 		lf("lottmobs:spawn_trader_1",
@@ -319,7 +307,7 @@ minetest.register_lbm({
     run_at_every_load = true,  -- or false if you only want it once
 	action = function(pos, node)
 		
-		if trader1_exists_near({x = pos.x, y = pos.y + 1, z = pos.z}, 1.5, "lottmobs:ltee_trader_2") then
+		if trader_exists_near({x = pos.x, y = pos.y + 1, z = pos.z}, 1.5, "lottmobs:ltee_trader_2") then
 			return
 		end
 		lf("lottmobs:spawn_trader_2",
@@ -340,7 +328,7 @@ minetest.register_lbm({
     nodenames = {"lottother:ltee_trader_3_ms"},
     run_at_every_load = true,  -- or false if you only want it once
     action = function(pos, node)
-		if trader1_exists_near({x = pos.x, y = pos.y + 1, z = pos.z}, 1.5, "lottmobs:ltee_trader_3") then
+		if trader_exists_near({x = pos.x, y = pos.y + 1, z = pos.z}, 1.5, "lottmobs:ltee_trader_3") then
 			return
 		end
         lf("lottmobs:spawn_trader_3",

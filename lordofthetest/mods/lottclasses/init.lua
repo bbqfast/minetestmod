@@ -8,19 +8,10 @@ lottclasses.race["hobbit"] = {"GAMEhobbit", "hobbits", "Hobbit"}
 lottclasses.race["orc"] = {"GAMEorc", "orcs", "Orc"}
 lottclasses.race["ltee"] = {"GAMEltee", "lts", "LT"}
 
-local lf = function(func, msg)
-	local pre = "++++++++++++++++++++++++++++++++++++++++++++++++++"
-	if func == nil then func = "unknown" end
-	if msg == nil then msg = "null" end
+lottclasses.race["orc"] = {"GAMEorc", "orcs", "Orc"}
+lottclasses.race["ltee"] = {"GAMEltee", "lts", "LT"}
 
-	local black_list = {}
-	black_list["select_seed"] = true
-	black_list["mow"] = true
-
-	if black_list[func] == nil then
-		minetest.log("warning", pre .. func .. "(): " .. msg )
-	end
-end
+local lf = assert(_G.lf, "global lf not initialized")
 
 
 minetest.log("-- -------------------------------- -- --------------------------------asdf hand range override")

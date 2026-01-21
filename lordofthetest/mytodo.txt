@@ -19,3 +19,15 @@ Game item:
 - LT handbook improvement
 - LT races lores
 
+
+- player HP armor display
+- fix duplicate trader in shops
+- clear armor for LT
+- NPC spawning/despawn base on race
+- santa shop
+- mob re-prioritize target when npc near
+- ltee citizen show quotes as HUD
+- trader appliances
+- fix trader spawn issue
+- angel ring
+

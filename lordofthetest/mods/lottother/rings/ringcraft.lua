@@ -1,17 +1,5 @@
 --Function for random breakages!
-local lf = function(func, msg)
-	local pre = "++++++++++++++++++++++++++++++++++++++++++++++++++"
-	if func == nil then func = "unknown" end
-	if msg == nil then msg = "null" end
-
-	local black_list = {}
-	black_list["select_seed"] = true
-	black_list["mow"] = true
-
-	if black_list[func] == nil then
-		minetest.log("warning", pre .. func .. "(): " .. msg )
-	end
-end
+local lf = assert(_G.lf, "global lf not initialized")
 
 local function random_break(pos, chance, output, src_time)
 	local inv = minetest.get_meta(pos):get_inventory()

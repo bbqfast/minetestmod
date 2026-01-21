@@ -1,16 +1,4 @@
-local lf = function(func, msg)
-	local pre = "++++++++++++++++++++++++++++++++++++++++++++++++++"
-	if func == nil then func = "unknown" end
-	if msg == nil then msg = "null" end
-
-	local black_list = {}
-	black_list["select_seed"] = true
-	black_list["mow"] = true
-
-	if black_list[func] == nil then
-		minetest.log("warning", pre .. func .. "(): " .. msg )
-	end
-end
+local lf = assert(_G.lf, "global lf not initialized")
 
 local function clear_ltee_hud(self)
 	-- Clear all multi-player HUDs
@@ -514,7 +502,7 @@ function lottmobs.spawn_player_npc(player)
     end
 
     local pos = vector.add(player:get_pos(), {x = 1, y = 0, z = 0})
-    local npc = minetest.add_entity(pos, "lottmobs:npc")
+    local npc = minetest.add_entity(pos, "lottmobs:ltangel")
     if npc then
         local lua = npc:get_luaentity()
         if lua then
@@ -535,7 +523,7 @@ end
 
 
 
-minetest.register_entity("lottmobs:npc", {
+minetest.register_entity("lottmobs:ltangel", {
     initial_properties = {
         physical = false,
         collide_with_objects = false,
@@ -603,6 +591,8 @@ minetest.register_entity("lottmobs:npc", {
 		self.base_nametag = self.base_nametag or "NPC"
 		self.object:set_hp(self.hp_max)
 		self.is_disabled = false
+		self.combat_timer = 0
+		self.in_combat = false
 
          -- prevent engine damage
 		self.object:set_armor_groups({immortal = 1})
@@ -614,14 +604,43 @@ minetest.register_entity("lottmobs:npc", {
 		self:update_hp_tag()
 	end,	
 
-    on_punch = function(self, hitter, time_from_last_punch, tool_capabilities, dir, time_from_last_punch, tool_capabilities, dir, damage)
-        lf("on_punch", "time_from_last_punch: " .. tostring(time_from_last_punch) .. ", dir: " .. minetest.pos_to_string(dir or {x=0,y=0,z=0}) .. ", damage: " .. tostring(damage))
+    on_punch = function(self, hitter, time_from_last_punch, tool_capabilities, dir, damage)
+        local hitter_name = ""
+        if hitter and hitter:is_player() then
+            hitter_name = hitter:get_player_name() or ""
+        else
+            local lua = hitter and hitter:get_luaentity()
+            hitter_name = lua and lua.name or "<non-player>"
+        end
+
+        lf("ltangel on_punch", "hitter: " .. hitter:get_player_name())
+        lf("ltangel on_punch", "time_from_last_punch: " .. tostring(time_from_last_punch) .. ", dir: " .. minetest.pos_to_string(dir or {x=0,y=0,z=0}) .. ", damage: " .. tostring(damage))
         -- lf("on_punch", "tool_capabilities: " .. dump(tool_capabilities))
         
-        local dmg =  1
+        local dmg = damage or 0
+
+        -- If engine damage is 0 (typical for mob vs mob), try mob’s own damage field
+        if (not dmg or dmg == 0) and hitter and hitter.get_luaentity then
+            local lua = hitter:get_luaentity()
+            if lua and lua.damage then
+                if type(lua.damage) == "number" then
+                    dmg = lua.damage
+                elseif type(lua.damage) == "table" then
+                    -- mobs_redo often stores per-attack damage in a table
+                    dmg = lua.damage.fleshy or lua.damage[1] or 1
+                end
+            end
+        end
+
+        if not dmg or dmg <= 0 then
+            dmg = 1  -- final fallback
+        end
 
         -- reduce our custom HP
         self.hp = (self.hp or self.hp_max) - dmg
+        -- reduce our custom HP by actual damage value (or 1 if nil)
+        -- self.hp = (self.hp or self.hp_max) - dmg
+
 
         if self.hp <= 0 then
             -- clamp at 0 and “knock out” instead of dying
@@ -630,15 +649,19 @@ minetest.register_entity("lottmobs:npc", {
 
             -- optional: set animation / log
             self:set_animation("sit")
-            lf("on_punch", "NPC knocked out, HP = 0")
+            lf("ltangel on_punch", "NPC knocked out, HP = 0")
         else
-            lf("on_punch", "HP: " .. self.hp .. "/" .. self.hp_max)
+            lf("ltangel on_punch", "HP: " .. self.hp .. "/" .. self.hp_max)
         end
 
-        		-- keep engine HP > 0 so it never triggers real death
-		self:update_hp_tag()
-		self.object:set_hp(self.hp_max)
-	end,	
+        -- keep engine HP > 0 so it never triggers real death
+        self:update_hp_tag()
+        self.object:set_hp(self.hp_max)
+
+        -- mark as in combat whenever we take damage
+        self.in_combat = true
+        self.combat_timer = 0
+    end,	
 	on_deactivate = function(self)
 		clear_ltee_hud(self)
 		minetest.log("action", "NPC '" .. (self.player_name or "unknown") .. "' has been deactivated.")
@@ -646,7 +669,7 @@ minetest.register_entity("lottmobs:npc", {
 		-- 	local player = minetest.get_player_by_name(self.player_name)
 		-- 	if player then
 		-- 		local pos = vector.add(player:get_pos(), {x = 2, y = 0, z = 0})
-		-- 		local npc = minetest.add_entity(pos, "lottmobs:npc")
+		-- 		local npc = minetest.add_entity(pos, "lottmobs:ltangel")
 		-- 		if npc then
 		-- 			local lua = npc:get_luaentity()
 		-- 			if lua then
@@ -695,69 +718,102 @@ minetest.register_entity("lottmobs:npc", {
 
 
         if player_has_angel_ring then
-            self.hp_max = 40000
+            self.hp_max = 2000
             regen_timer = 1
-            regen_amount = 10
+            regen_amount = math.ceil(self.hp_max * 0.05)
+            -- 200% more attack damage (total 3x base) when owner has angel ring
+            -- if self.hp > self.hp_max then
+            --     self.hp = self.hp_max
+            -- end            
+            self.attack_damage_multiplier = 3
         else
             regen_timer = 5
-            regen_amount = 1
             self.hp_max = 20
-            if self.hp > 20 then
-                self.hp = 20
-            end
+            regen_amount = math.ceil(self.hp_max * 0.05)
+            -- if self.hp > self.hp_max then
+            --     self.hp = self.hp_max
+            -- end
+            self.attack_damage_multiplier = 1
         end
-        
-        -- HP regeneration 
-        self.hp_regen_timer = (self.hp_regen_timer or 0) + dtime
-        if self.hp_regen_timer >= 5 then
-            self.hp_regen_timer = 0
-            if self.hp and self.hp < self.hp_max then
-                self.hp = self.hp + regen_amount
-                if self.hp >= self.hp_max then
-                    self.hp = self.hp_max
-                    self.is_disabled = false
-                    self:set_animation("stand")
+
+        -- if HP is 0 or below, immediately mark disabled and sit
+        if self.hp and self.hp <= 0 then
+            self.hp = 0
+            self.is_disabled = true
+            self:set_animation("sit")
+        end
+
+        -- combat idle timer
+        self.combat_timer = (self.combat_timer or 0) + dtime
+        if self.in_combat and self.combat_timer >= 30 then
+            self.in_combat = false
+        end
+
+        -- HP regeneration (only when out of combat for at least 30 seconds)
+        if not self.in_combat then
+            self.hp_regen_timer = (self.hp_regen_timer or 0) + dtime
+            if self.hp_regen_timer >= 5 then
+                self.hp_regen_timer = 0
+                if self.hp and self.hp < self.hp_max then
+                    self.hp = self.hp + regen_amount
+                    if self.hp > self.hp_max then
+                        self.hp = self.hp_max
+                    end
+                    if self.hp >= self.hp_max or self.hp > self.hp_max * 0.25 then
+                        self.is_disabled = false
+                        self:set_animation("stand")
+                    end
                 end
+                self:update_hp_tag()
             end
-            self:update_hp_tag()
         end
-		-- minetest.log("warning", "NPC step")
+        self:update_hp_tag()
+        -- minetest.log("warning", "NPC step")
         self.timer = self.timer + dtime
         if self.timer < 1 then return end
-		self.spin_timer = self.spin_timer + dtime
+        -- minetest.log("warning", "NPC step")
+        self.spin_timer = self.spin_timer + dtime
         self.timer = 0
-		-- minetest.log("warning", "NPC step")
+        -- minetest.log("warning", "NPC step")
         if self.player_name then
             local player = minetest.get_player_by_name(self.player_name)
-			if not player then
-				-- Player is gone (exit to menu or disconnected), remove NPC
-				self.object:remove()
-				return
-			end
-			
+            if not player then
+                -- Player is gone (exit to menu or disconnected), remove NPC
+                self.object:remove()
+                return
+            end
+            
             if player then
-				local pos = self.object:get_pos()
-				local target_pos = player:get_pos()
+                local pos = self.object:get_pos()
+                -- Follow a point slightly behind the player, based on their look direction
+                local player_pos = player:get_pos()
+                local look_dir = player:get_look_dir() or {x = 0, y = 0, z = 1}
+                local follow_distance = 2
+                local target_pos = {
+                    x = player_pos.x - look_dir.x * follow_distance,
+                    y = player_pos.y,
+                    z = player_pos.z - look_dir.z * follow_distance,
+                }
 
-				local quotes = {
-					"Hi, LT!  Welcome to Middle-Earth",
-					"I'm LT angel",
-					"we're newly arrived race on the middle earth",
-					"We are a peaceful race here ",
-					"! There are dangerous mobs around",
-					"I'm here to help fight off some mobs",
-					"Our village situated on red grassland",
-					"Feel free to explore around",
-				}
+                local quotes = {
+                    "Hi, LT!  Welcome to Middle-Earth",
+                    "I'm LT angel",
+                    "we're newly arrived race on the middle earth",
+                    "We are a peaceful race here ",
+                    "! There are dangerous mobs around",
+                    "I'm here to help fight off some mobs",
+                    "Our village situated on red grassland",
+                    "Feel free to explore around",
+                }
 
-				local hud_pos = {x = 0.5, y = 0.8}
-				handle_single_player_hud(self, player, dtime, pos, target_pos, quotes, 3, 0xFFFFFF, hud_pos)
+                local hud_pos = {x = 0.5, y = 0.8}
+                handle_single_player_hud(self, player, dtime, pos, target_pos, quotes, 3, 0xFFFFFF, hud_pos)
 
-				-- new code
-				-- Step 1: Check for nearby hostiles
-				hostile_radius = 10
-				run_dist = 10
-				local hostiles = minetest.get_objects_inside_radius(pos, hostile_radius)
+                -- new code
+                -- Step 1: Check for nearby hostiles
+                hostile_radius = 12
+                run_dist = 12
+                local hostiles = minetest.get_objects_inside_radius(pos, hostile_radius)
                 if not self.is_disabled then
                     for _, obj in ipairs(hostiles) do
                         local lua = obj:get_luaentity()
@@ -774,7 +830,8 @@ minetest.register_entity("lottmobs:npc", {
                             self.object:set_yaw(yaw)
                             self:set_animation("walk")
 
-                            dmg=2
+                            local dmg_mult = self.attack_damage_multiplier or 1
+                            local dmg = 2 * dmg_mult
                             -- Optional: hit mob if close
                             if vector.distance(pos, mob_pos) < 2 then
                                 if obj.punch then
@@ -783,7 +840,7 @@ minetest.register_entity("lottmobs:npc", {
                                         damage_groups = {fleshy = dmg}
                                     }, nil)
                                     lf("lottmobs:ltee", "Hostile mob '" .. lua.name .. "' punched")
-                                end							
+                                end						
                                 if lua.health then
                                     lua.health = lua.health - dmg
                                     lf("lottmobs:ltee", "Hostile mob '" .. lua.name .. "' health reduced to " .. lua.health)
@@ -838,15 +895,21 @@ minetest.register_entity("lottmobs:npc", {
 					
                     -- self.object:set_velocity(vector.multiply(dir, 2))
                     self:set_animation("walk")
-                else
+                elseif dist > 2 then
+					local yaw = math.atan2(dir.z, dir.x) + math.pi / 2
+					yaw = yaw + math.pi
+					self.object:set_yaw(yaw)
+					self.object:set_velocity(vector.multiply(dir, .2))
+					self:set_animation("walk")
+				else
 					-- minetest.log("warning", "NPC reached player, stopping")
-                    self.object:set_velocity({x=0, y=0, z=0})
-                    if self.is_disabled then
-                        self:set_animation("sit")
-                    else
-                        self:set_animation("stand")
-                    end
-                end
+					self.object:set_velocity({x=0, y=0, z=0})
+					if self.is_disabled then
+						self:set_animation("sit")
+					else
+						self:set_animation("stand")
+					end
+				end
             end
         end
     end,
@@ -941,7 +1004,7 @@ minetest.register_chatcommand("spawn_npc", {
         local player = minetest.get_player_by_name(name)
         if not player then return false, "Player not found" end
         local pos = vector.add(player:get_pos(), {x = 2, y = 0, z = 0})
-        		local npc = minetest.add_entity(pos, "lottmobs:npc")
+        		local npc = minetest.add_entity(pos, "lottmobs:ltangel")
 		if npc then
 			local lua = npc:get_luaentity()
 			if lua then

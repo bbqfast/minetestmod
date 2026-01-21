@@ -21,19 +21,7 @@
 -- Contact sapier a t gmx net
 -------------------------------------------------------------------------------
 
-local lf = function(func, msg)
-	local pre = "++++++++++++++++++++++++++++++++++++++++++++++++++"
-	if func == nil then func = "unknown" end
-	if msg == nil then msg = "null" end
-
-	local black_list = {}
-	black_list["select_seed"] = true
-	black_list["mow"] = true
-
-	if black_list[func] == nil then
-		minetest.log("warning", pre .. func .. "(): " .. msg )
-	end
-end
+local lf = assert(_G.lf, "global lf not initialized")
 
 -- ,,allow
 function lottmobs.allow_move(inv, from_list, from_index, to_list, to_index, count, player)

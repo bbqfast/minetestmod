@@ -82,13 +82,24 @@ minetest.register_craft( {
 minetest.register_craftitem("snacks:oreo_donut", {
 	description = ("cookies n' cream donut"),
 	inventory_image = "snack_oreo_donut.png",
-	on_use = minetest.item_eat(15),
+	on_use = function(itemstack, user, pointed_thing)
+		if user and user:is_player() and snacks and snacks.apply_damage_buff then
+			snacks.apply_damage_buff(user, 1.9, 60)
+		end
+		return minetest.item_eat(15)(itemstack, user, pointed_thing)
+	end,
 })
 
 minetest.register_craftitem("snacks:vanilla_donut", {
 	description = ("vanilla donut"),
 	inventory_image = "snack_vanilla_donut.png",
-	on_use = minetest.item_eat(15),
+	on_use = function(itemstack, user, pointed_thing)
+		if user and user:is_player() and snacks and snacks.apply_defense_buff then
+			-- 3 minutes (180 seconds) of reduced incoming damage
+			snacks.apply_defense_buff(user, 0.8, 180)
+		end
+		return minetest.item_eat(15)(itemstack, user, pointed_thing)
+	end,
 })
 
 minetest.register_craft( {

@@ -4,19 +4,9 @@
 -- License: GNU Affero General Public License
 worldedit2 = {}
 
-local lf = function(func, msg)
-	local pre = "++++++++++++++++++++++++++++++++++++++++++++++++++"
-	if func == nil then func = "unknown" end
-	if msg == nil then msg = "null" end
+worldedit2 = {}
 
-	local black_list = {}
-	black_list["select_seed"] = true
-	black_list["deserialize"] = true
-
-	if black_list[func] == nil then
-		minetest.log("warning", pre .. func .. "(): " .. msg )
-	end
-end
+local lf = assert(_G.lf, "global lf not initialized")
 
 function worldedit2.keep_loaded(pos1, pos2)
 	local manip = minetest.get_voxel_manip()

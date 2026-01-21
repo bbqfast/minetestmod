@@ -29,6 +29,7 @@ dofile(minetest.get_modpath("lottmobs").."/functions.lua")
 dofile(minetest.get_modpath("lottmobs").."/craftitems.lua")
 dofile(minetest.get_modpath("lottmobs").."/elves.lua")
 dofile(minetest.get_modpath("lottmobs").."/ltees.lua")
+dofile(minetest.get_modpath("lottmobs").."/riddler.lua")
 dofile(minetest.get_modpath("lottmobs").."/dwarves.lua")
 dofile(minetest.get_modpath("lottmobs").."/hobbits.lua")
 dofile(minetest.get_modpath("lottmobs").."/horse.lua")
@@ -1395,7 +1396,10 @@ mobs:register_mob("lottmobs:balrog", {
 		attack = "mobs_stone_death",
 	},
 	attacks_monsters = true,
-	peaceful = true,
+	-- peaceful = true,
+    attack_players = true,
+    attack_npcs = true,
+    peaceful = false,    
 	group_attack = true,
 	step = 1,
 	on_die = lottmobs.guard_die,

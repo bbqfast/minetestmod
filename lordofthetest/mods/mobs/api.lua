@@ -1,3 +1,6 @@
+local lf = assert(_G.lf, "global lf not initialized")
+
+
 
 -- Intllib and CMI support check
 local MP = minetest.get_modpath(minetest.get_current_modname())
@@ -2809,6 +2812,14 @@ function mob_class:on_punch(hitter, tflp, tool_capabilities, dir, damage)
 		end
 	end
 
+	if hitter and hitter:is_player() and snacks and snacks.get_damage_multiplier then
+		local mult = snacks.get_damage_multiplier(hitter)
+		if mult and mult > 0 then
+			damage = damage * mult
+            lf("on_punch", "damage multiplier: " .. mult .. " damage: " .. damage)
+		end
+	end
+
 	-- check for tool immunity or special damage
 	for n = 1, #self.immune_to do
 
@@ -2835,6 +2846,21 @@ function mob_class:on_punch(hitter, tflp, tool_capabilities, dir, damage)
 	and cmi.notify_punch(
 			self.object, hitter, tflp, tool_capabilities, dir, damage) then
 		return
+	end
+
+	-- Retaliate when punched by ltangel follower entity
+	-- ltangel is a plain minetest entity (not a mobs mob), but we still
+	-- want mobs that can attack NPCs to fight back against it.
+	if hitter and not hitter:is_player() then
+		local lua = hitter:get_luaentity()
+		if lua and lua.name == "lottmobs:ltangel" then
+			-- Only retaliate if this mob is allowed to attack NPC-type targets
+			lf("on_punch", " ................. Retaliating against ltangel")
+			if self.attack_npcs ~= false then
+				self.state = ""
+				self:do_attack(hitter)
+			end
+		end
 	end
 
 	-- add weapon wear
