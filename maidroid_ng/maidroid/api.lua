@@ -213,7 +213,9 @@ end
 
 -- set_tool set wield tool image and attach.
 local group_rotation = {}
-group_rotation.hoe    = vector.new(-75, 45, -45)
+-- group_rotation.hoe    = vector.new(-75, 45, -45)
+-- group_rotation.hoe    = vector.new(-75, 45, -45)
+group_rotation.hoe    = vector.new(-75, -90, 90)
 group_rotation.shovel = group_rotation.hoe
 group_rotation.sword  = group_rotation.hoe
 if maidroid.mods.sickles then
@@ -235,8 +237,14 @@ local set_tool = function(self, name)
 		end
 	end
 
+    -- local r = vector.new(-45, -90, 90)
+    -- local r = vector.new(-75, -90, 90)
+    -- local p = vector.new(0.375, 3.5, -1.75)
+    local p = vector.new(0.375, 3.5, 1.5)
+    
 	self.wield_item:set_properties({ wield_item = name })
-	self.wield_item:set_attach(self.object, "Arm_R", p, r)
+	-- self.wield_item:set_attach(self.object, "Arm_R", p, r)
+	self.wield_item:set_attach(self.object, "Arm_Right", p, r)
 end
 
 -- get_pos get the position of maidroid object
