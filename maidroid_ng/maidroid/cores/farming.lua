@@ -465,9 +465,11 @@ is_valid_soil = function(name)
 		return true
 	end
 	-- Also accept any node whose name contains "soil"
-	if string.find(name, "soil") then
+	if string.find(name, "soil") or string.match(name, "_grass$") then
 		return true
 	end
+		
+
 	return false
 end
 	task = function(self)
@@ -489,6 +491,8 @@ end
 			lf("task", "Convert dirt to soil at "..minetest.pos_to_string(lpos))
 			lf("task", "Before: "..cnode.name)
 			minetest.set_node(lpos, { name = "farming:soil" })
+        else
+            lf("task", "cannot CONVERT: "..lnode.name)
 		end
 
 
@@ -797,8 +801,7 @@ end
 mow = function(self, dtime)
 	lf("[maidroid:farming]", "mow() called at destination " .. minetest.pos_to_string(self.destination))
 	-- Skip until timer is ok
-	-- ,,xx,,cc
-	-- if update_action_timers(self, dtime, self.selected_tool) then return end
+	if update_action_timers(self, dtime, self.selected_tool) then return end
 	lf("mow", "start")
 
 	local destnode = minetest.get_node(self.destination)
@@ -1032,9 +1035,14 @@ on_step = function(self, dtime, moveresult)
 	-- Pickup surrounding items
 	self:pickup_item()
 
-    wander_core.on_step(self, dtime, moveresult, task, maidroid.helpers.is_fence, true)
-    -- Check for fence detection failures
-    check_fence_detection(self)
+	-- Let wander core handle movement and task selection only
+	-- when not currently performing an explicit action.
+    -- this fixes the issue where the maidroid would not move when it was performing an action
+	if self.state ~= maidroid.states.ACT then
+		wander_core.on_step(self, dtime, moveresult, task, maidroid.helpers.is_fence, true)
+		-- Check for fence detection failures
+		check_fence_detection(self)
+	end
 	if self.state == maidroid.states.PATH then
 		maidroid.cores.path.on_step(self, dtime, moveresult)
 	elseif self.state == maidroid.states.ACT then

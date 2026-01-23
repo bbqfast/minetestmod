@@ -593,7 +593,7 @@ local is_blocked = function(self, criterion, check_inside)
 		for i, p in ipairs(self._prev_pos) do
 			pos_str[i] = string.format("(%.2f,%.2f,%.2f)", p.x, p.y, p.z)
 		end
-		lf("is_blocked", "pos_list: [" .. table.concat(pos_str, ", ") .. "]")
+		-- lf("is_blocked", "pos_list: [" .. table.concat(pos_str, ", ") .. "]")
 	end
 	local function on_blocked(node_name, msg)
 		local pos = self:get_pos()
@@ -602,7 +602,7 @@ local is_blocked = function(self, criterion, check_inside)
 	end
 	local function on_not_blocked(msg)
 		add_prev_pos(self:get_pos())
-		lf("is_blocked", "not blocked (" .. msg .. ")")
+		-- lf("is_blocked", "not blocked (" .. msg .. ")")
 		return false
 	end
 	-- Use previous positions from last calls; update at the end
