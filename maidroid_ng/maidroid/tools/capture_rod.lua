@@ -78,6 +78,13 @@ minetest.register_tool("maidroid:capture_rod", {
 		local stack = ItemStack("maidroid_tool:captured_" .. maidroid_name .. "_egg")
 		-- #,,x1
 
+		-- Use the maidroid's display name (nametag) as the captured egg's description
+		local display_name = luaentity.nametag
+		if display_name and display_name ~= "" then
+			local meta = stack:get_meta()
+			meta:set_string("description", display_name)
+		end
+
 		local eeee = luaentity.object:get_properties()
 		-- minetest.log("warning", "====================== capture_rod2:"..dump(eeee))
 		mydump("capture_rod2", eeee)

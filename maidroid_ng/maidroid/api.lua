@@ -1290,6 +1290,62 @@ local get_staticdata = function(self, captured)
 	return minetest.serialize(data)
 end
 
+-- Chat command to restore a maidroid from a staticdata dump file in the world folder.
+-- Usage: /maidroid_load_static Eve_623
+-- This will look for: <worldpath>/maidroid_staticdata_Eve_623.txt
+minetest.register_chatcommand("maidroid_load_static", {
+	params = "<id>",
+	description = S("Load a maidroid from maidroid_staticdata_<id>.txt in this world"),
+	privs = { maidroid = true },
+	func = function(name, param)
+		param = (param or ""):gsub("^%s+", ""):gsub("%s+$", "")
+		if param == "" then
+			return false, "Usage: /maidroid_load_static <id> (e.g. Eve_623)"
+		end
+
+		local player = minetest.get_player_by_name(name)
+		if not player then
+			return false, "Player not found"
+		end
+
+		local worldpath = minetest.get_worldpath() or "."
+		local filename = "maidroid_staticdata_" .. param .. ".txt"
+		local filepath = worldpath .. "/" .. filename
+
+		local ok_read, content = safe_read_file(filepath)
+		if not ok_read or not content or content == "" then
+			return false, "Failed to read staticdata file: " .. filename
+		end
+
+		-- The dump file contains a Lua-like table (output of dump(data)).
+		-- Safely evaluate it to reconstruct the data table.
+		local ok_parse, data = pcall(function()
+			local chunk, err = loadstring("return " .. content)
+			if not chunk then
+				error(err or "invalid staticdata dump")
+			end
+			return chunk()
+		end)
+		if not ok_parse or type(data) ~= "table" then
+			return false, "Failed to parse staticdata in file: " .. filename
+		end
+
+		-- Spawn the maidroid near the player and initialize it using the existing on_activate logic.
+		local pos = vector.add(player:get_pos(), { x = 0, y = 0.5, z = 0 })
+		local obj = minetest.add_entity(pos, "maidroid:maidroid")
+		if not obj then
+			return false, "Failed to spawn maidroid entity"
+		end
+
+		local lua = obj:get_luaentity()
+		if lua and lua.on_activate then
+			lua:on_activate(minetest.serialize(data))
+		end
+
+		return true, "Maidroid loaded from " .. filename
+	end,
+})
+
 -- pickup_item pickup collect all stacks from world in radius
 local pickup_item = function(self, radius)
 	local pos = self:get_pos()
@@ -1610,7 +1666,7 @@ local register_maidroid = function(product_name, def)
 				end
 				local chosen = names[math.random(#names)]
 				-- append a short random number to reduce chance of collisions
-				local display_name = chosen .. " " .. tostring(math.random(100,999))
+				local display_name = chosen .. "_" .. tostring(math.random(100,999))
 
 				-- set on the luaentity and on the object so the nametag is visible immediately
 				local lua = new_maidroid:get_luaentity()
