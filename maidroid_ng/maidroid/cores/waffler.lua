@@ -9,12 +9,15 @@ local S = maidroid.translator
 local on_start, on_pause, on_resume, on_stop, on_step, is_tool
 local act, task, to_action, to_wander
 local is_water_source
+local take_wheat_from_chest, try_get_wheat_from_nearby_chest
 
 local wander = maidroid.cores.wander
 local states = maidroid.states
 local farming_redo = farming and farming.mod and farming.mod == "redo"
 local maker_dist = 2.5
 maidroid.register_tool_rotation("maidroid:spatula", vector.new(-75,45,-45))
+
+local lf = maidroid.lf
 
 on_start = function(droid)
 	wander.on_start(droid)
@@ -43,6 +46,31 @@ local actions = {
 	fill = "waffles:waffle_batter",
 	collect = "maidroid:spatula",
 }
+
+take_wheat_from_chest = function(droid, chest_pos, max_count)
+	if not chest_pos then
+		return false
+	end
+	lf("waffler", "take_wheat_from_chest: chest_pos=" .. minetest.pos_to_string(chest_pos))
+	local meta = minetest.get_meta(chest_pos)
+	local owner = meta:get_string("owner")
+	if owner and owner ~= "" and owner ~= droid.owner then
+		lf("waffler", "take_wheat_from_chest: chest owned by '" .. owner .. "', not droid owner '" .. tostring(droid.owner) .. "'")
+		return false
+	end
+	local chest_inv = meta:get_inventory()
+	local inv = droid:get_inventory()
+	local needed = max_count or 5
+	local stack = chest_inv:remove_item("main", "farming:wheat " .. needed)
+	local got = stack:get_count()
+	if got == 0 then
+		lf("waffler", "take_wheat_from_chest: no wheat found in chest")
+		return false
+	end
+	lf("waffler", "take_wheat_from_chest: got " .. tostring(got) .. " wheat from chest")
+	inv:add_item("main", stack)
+	return true
+end
 
 to_action = function(droid)
 	droid:halt()
@@ -95,6 +123,7 @@ is_water_source = function(pos, name)
 			count = count + 1
 		end
 	end
+    lf("waffler", "is_water_source: count=" .. tostring(count))
 	return count >= 1
 end
 
@@ -133,6 +162,15 @@ act = function(droid, dtime)
 		return
 	end
 
+	if droid.action == "take_wheat" then
+		lf("waffler", "act: handling take_wheat action")
+		if droid._chest_pos_for_wheat then
+			take_wheat_from_chest(droid, droid._chest_pos_for_wheat, 5)
+			droid._chest_pos_for_wheat = nil
+		end
+		return to_wander(droid)
+	end
+
 	if droid.action:sub(1,6) == "craft_" then
 		droid.action = droid.action:sub(7)
 		local inv = droid:get_inventory()
@@ -151,7 +189,8 @@ act = function(droid, dtime)
 			( can_craft_batter(inv, "bucket:bucket_empty") or
 			(  inv:contains_item("main", "bucket:bucket_empty")
 			and can_craft_flour(inv, 2) ) ) then
-			minetest.remove_node(droid.destination)
+			-- not need remove source
+            -- minetest.remove_node(droid.destination)
 			inv:remove_item("main", "bucket:bucket_empty")
 			return to_wander(droid, { "bucket:bucket_water" })
 		end
@@ -226,6 +265,15 @@ task = function(droid)
 	end
 
 	local inv = droid:get_inventory()
+
+	if not inv:contains_item("main", "farming:wheat 5") then
+		lf("waffler", "task: low on wheat, trying nearby chest")
+		if try_get_wheat_from_nearby_chest(droid, pos) then
+			lf("waffler", "task: scheduled path or took wheat from nearby chest")
+			return
+		end
+	end
+
 	target = minetest.find_node_near(pos, 10, "waffles:waffle_maker_open")
 	if target then
 		local l_action
@@ -294,6 +342,28 @@ task = function(droid)
 	if previous then
 		maidroid.cores.path.to_follow_path(droid, previous.path, previous.target, to_action, previous.action)
 	end
+end
+
+try_get_wheat_from_nearby_chest = function(droid, pos)
+	local chest_pos = minetest.find_node_near(pos, 5, {"default:chest", "default:chest_locked"})
+	if not chest_pos then
+		return false
+	end
+
+	local distance = vector.distance(pos, chest_pos)
+	if distance <= maker_dist then
+		return take_wheat_from_chest(droid, chest_pos, 5)
+	end
+
+	local target = vector.add(chest_pos, {x=0, y=1, z=0})
+	local path = minetest.find_path(pos, target, 2, 1, 1)
+	if not path then
+		return false
+	end
+
+	droid._chest_pos_for_wheat = chest_pos
+	maidroid.cores.path.to_follow_path(droid, path, target, to_action, "take_wheat")
+	return true
 end
 
 on_step = function(droid, dtime, moveresult)
