@@ -15,3 +15,9 @@ DONE:
 
 
 "cores/follow.lueea"
+
+
+
+- command shorthand
+- list maidroid files
+- farming dump inventory item to nearby chest

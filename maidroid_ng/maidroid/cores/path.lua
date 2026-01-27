@@ -9,6 +9,7 @@ local on_step, to_follow_path
 
 local timers = maidroid.timers
 local wander_core = maidroid.cores.wander
+local lf = maidroid.lf
 
 local is_near = function(self, pos, distance)
 	local p = self:get_pos()
@@ -17,12 +18,13 @@ end
 
 on_step = function(self, dtime, moveresult)
 	if is_near(self, self.destination, 1.5) then
+		lf("path", "Reached destination (near); finishing path at " .. minetest.pos_to_string(self.destination))
 		self.finalize(self, dtime, moveresult)
 		return
 	end
-
+	
 	if self.timers.walk >= timers.walk_max then -- time over.
-		wander_core.to_wander(self)
+		wander_core.to_wander(self, "path:on_step_timeout")
 		return true
 	end
 
@@ -33,7 +35,7 @@ on_step = function(self, dtime, moveresult)
 		self.timers.find_path = 0
 		local path = minetest.find_path(self:get_pos(), self.destination, 10, 1, 1, "A*")
 		if path == nil then
-			wander_core.to_wander(self)
+			wander_core.to_wander(self, "path:on_step_find_path_failed")
 			return
 		end
 		self.path = path
@@ -44,6 +46,7 @@ on_step = function(self, dtime, moveresult)
 		table.remove(self.path, 1)
 
 		if #self.path == 0 then -- end of path
+			lf("path", "Path list empty; finishing path at " .. minetest.pos_to_string(self.destination))
 			self.finalize(self, dtime, moveresult)
 		else -- else next step, follow next path.
 			self:set_target_node(self.path[1])
@@ -51,6 +54,7 @@ on_step = function(self, dtime, moveresult)
 	end
 end
 
+-- ,,follow
 to_follow_path = function(self, path, destination, finalize, action)
 	self.state = maidroid.states.PATH
 	self.path = path

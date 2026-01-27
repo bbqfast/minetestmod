@@ -572,6 +572,7 @@ local is_blocked_orig = function(self, criterion, check_inside)
 	return criterion(node.name)
 end
 
+-- ,,isb,,blocked
 local is_blocked = function(self, criterion, check_inside)
 	-- Helper to add a distinct position to the history (max 3)
 	local function add_prev_pos(pos)
@@ -1291,16 +1292,16 @@ local get_staticdata = function(self, captured)
 end
 
 -- Chat command to restore a maidroid from a staticdata dump file in the world folder.
--- Usage: /maidroid_load_static Eve_623
+-- Usage: /maidroid_load Eve_623
 -- This will look for: <worldpath>/maidroid_staticdata_Eve_623.txt
-minetest.register_chatcommand("maidroid_load_static", {
+minetest.register_chatcommand("maidroid_load", {
 	params = "<id>",
 	description = S("Load a maidroid from maidroid_staticdata_<id>.txt in this world"),
 	privs = { maidroid = true },
 	func = function(name, param)
 		param = (param or ""):gsub("^%s+", ""):gsub("%s+$", "")
 		if param == "" then
-			return false, "Usage: /maidroid_load_static <id> (e.g. Eve_623)"
+			return false, "Usage: /maidroid_load <id> (e.g. Eve_623)"
 		end
 
 		local player = minetest.get_player_by_name(name)
@@ -1343,6 +1344,31 @@ minetest.register_chatcommand("maidroid_load_static", {
 		end
 
 		return true, "Maidroid loaded from " .. filename
+	end,
+})
+
+minetest.register_chatcommand("maidroid_ls", {
+	params = "",
+	description = S("List all maidroid_staticdata_*.txt files in this world"),
+	privs = { maidroid = true },
+	func = function(name, param)
+		local worldpath = minetest.get_worldpath() or "."
+		local files = minetest.get_dir_list(worldpath, false) or {}
+		local ids = {}
+		for _, fname in ipairs(files) do
+			-- match files like maidroid_staticdata_<id>.txt
+			local id = fname:match("^maidroid_staticdata_(.+)%.txt$")
+			if id then
+				table.insert(ids, id)
+			end
+		end
+
+		if #ids == 0 then
+			return true, "No maidroid_staticdata_*.txt files found in this world."
+		end
+
+		table.sort(ids)
+		return true, "Saved maidroids (" .. #ids .. "):\n" .. table.concat(ids, ", ")
 	end,
 })
 

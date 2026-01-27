@@ -39,7 +39,7 @@ end
 local lf = maidroid.lf
 
 
-maidroid = maidroid or {}
+-- maidroid = maidroid or {}
 
 maidroid.helpers = {} -- helpers functions
 maidroid.modname = minetest.get_current_modname()

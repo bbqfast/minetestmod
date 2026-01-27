@@ -1,0 +1,24 @@
+
+1. One‑shot clean (what you already used)
+[IO.File]::WriteAllText('.\debug_clean.txt', -join (Get-Content .\debug.txt -Encoding Byte | Where-Object { $_ -ne 0 } | ForEach-Object { [char]$_ }))
+
+
+2. Stream tail → clean → file (live, tail‑like)
+Get-Content .\debug.txt -Encoding Byte -Wait | Where-Object { $_ -ne 0 } | ForEach-Object { [char]$_ } | Out-File .\debug_clean_stream.txt -Encoding utf8 -NoNewline
+
+3. Stream tail → clean → screen
+Get-Content .\debug.txt -Encoding Byte -Wait | Where-Object { $_ -ne 0 } | ForEach-Object { [char]$_ } | Write-Host -NoNewline
+
+
+- one line tail but from begining
+
+Get-Content .\debug.txt -Encoding Byte -Wait | Where-Object { $_ -ne 0 } | ForEach-Object { [char]$_ } | Tee-Object -FilePath .\debug_clean_stream.txt | Write-Host -NoNewline
+
+
+
+One‑liner: only updates, cleaned, with copy to file
+Get-Content .\debug.txt -Encoding Byte -Tail 0 -Wait | Where-Object { $_ -ne 0 } | ForEach-Object { [char]$_ } | Tee-Object -FilePath .\debug_clean_stream.txt | Write-Host -NoNewline
+
+
+tail -n0 -F debug.txt | tr -d '\000' | tee debug_clean_stream.txt
+tail -n0 -F debug.txt | tr -d '\000'

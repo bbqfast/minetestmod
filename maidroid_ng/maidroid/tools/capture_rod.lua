@@ -27,7 +27,7 @@ mydump = function(lbl, obj)
 	end
 
 	-- minetest.log("warning", pre..msg)
-	minetest.log("warning", "====================== "..lbl..":"..dump(obj))
+	-- minetest.log("warning", "====================== "..lbl..":"..dump(obj))
 	
 	
 end
@@ -39,7 +39,7 @@ mylog = function(msg)
 		msg = "null"
 	end
 
-	minetest.log("warning", pre..msg)
+	-- minetest.log("warning", pre..msg)
 end
 
 minetest.register_tool("maidroid:capture_rod", {

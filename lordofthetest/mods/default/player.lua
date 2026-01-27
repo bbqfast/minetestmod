@@ -256,7 +256,7 @@ minetest.register_on_joinplayer(function(player)
 		position      = {x = 0.9, y = 0.02},
 		alignment     = {x = -1, y = 0},
 		scale         = {x = 100, y = 20},
-		number        = 0x00FF00,
+		number        = 0xFFFF00,
 		text          = "HP: " .. hp .. " / " .. hp_max .. "  DMG: " .. dmg .. "  ARM: " .. arm .. buff_text,
 	})
 end)

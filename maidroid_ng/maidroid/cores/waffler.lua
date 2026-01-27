@@ -75,7 +75,7 @@ to_wander = function(droid, itemset)
 	end
 
 	droid:set_tool("maidroid:spatula")
-	wander.to_wander(droid)
+	wander.to_wander(droid, "waffler:to_wander")
 end
 
 local is_water = function(pos)
@@ -95,7 +95,7 @@ is_water_source = function(pos, name)
 			count = count + 1
 		end
 	end
-	return count > 1
+	return count >= 1
 end
 
 local can_craft_batter = function(inv, item)

@@ -16,6 +16,7 @@ local on_start, on_pause, on_resume, on_stop, on_step, is_tool
 
 -- Core extra functions
 local plant, mow, collect_papyrus, plant_papyrus, to_action
+local dump_inventory_to_chest, dump_inventory_to_chest_direct, dump_at_chest, maybe_dump_to_nearby_chest
 local craft_seeds, select_seed, task, task_base
 local is_seed, is_plantable, is_papyrus, is_papyrus_soil, is_mowable, is_scythe
 
@@ -24,6 +25,15 @@ local to_wander = wander_core.to_wander
 local core_path = maidroid.cores.path
 
 local search = maidroid.helpers.search_surrounding
+
+-- Treat chests as blocking for farming movement, similar to fences,
+-- so the maidroid does not walk past chests while pathing or wandering.
+local function is_fence_or_chest(name)
+	if maidroid.helpers.is_fence(name) then
+		return true
+	end
+	return name == "default:chest" or name == "default:chest_locked"
+end
 
 local mature_plants = {}
 local weed_plants = {}
@@ -111,6 +121,142 @@ else
 			mature_plants[mature] = {chance=1, crop=crop}
 			seeds[seed] = crop
 		end
+	end
+end
+
+local position_ok = function(pos, to)
+	local dist = vector.distance(pos, to)
+	if dist < 1 then return to end -- Always good
+
+	local from = vector.round(vector.copy(pos))
+	-- Node directly under must be pumpkin or watermelon
+	if to.x == from.x and to.z == from.z and to.y == from.y - 1 then
+		return to
+	end
+
+	-- Skip when inside block
+	local node = minetest.get_node(from)
+	node = minetest.registered_nodes[node]
+	if  node and node.buildable_to and
+		( ( from.y == to.y and dist < 1.41 ) or
+		( from.y ~= to.y and dist < 1.73 ) ) then
+		return to
+	end
+end
+
+-- local update_action_timers_special = function(self, dtime, tool)
+-- 	-- Reuse the generic action timer for consistency with other actions
+-- 	if self.action_timer then
+-- 		self.action_timer = self.action_timer - dtime
+-- 		if self.action_timer <= 0 then
+-- 			self.action_timer = nil
+-- 			return true
+-- 		end
+-- 	end
+-- 	return false
+-- end
+
+maybe_dump_to_nearby_chest = function(self, inv, pos)
+	-- Only occasionally trigger this behavior to keep it lightweight
+	if math.random(1, 3) ~= 1 then
+		return false
+	end
+
+    lf("farming:dump", "maybe_dump_to_nearby_chest: checking inventory at " .. minetest.pos_to_string(pos))
+
+	-- Check if we even have an oversized stack to dump
+	local main = inv:get_list("main") or {}
+	local has_big_stack = false
+	for _, stack in ipairs(main) do
+		if not stack:is_empty() and stack:get_count() > 90 then
+			has_big_stack = true
+			break
+		end
+	end
+	if not has_big_stack then
+		return false
+	end
+
+	-- Look for a nearby default chest within radius 10
+	lf("farming:dump", "Looking for chest near " .. minetest.pos_to_string(pos))
+	local chest_pos = minetest.find_node_near(pos, 5, {"default:chest", "default:chest_locked"})
+	if not chest_pos then
+		return false
+	end
+
+	-- Respect chest ownership like the normal dumping logic
+	local meta = minetest.get_meta(chest_pos)
+	local owner = meta:get_string("owner")
+	if owner and owner ~= "" and owner ~= self.owner then
+		return false
+	end
+
+	-- We want to stand on top of the chest so dump_inventory_to_chest
+	-- can see it as the node below the maidroid.
+	local dest = vector.add(chest_pos, { x = 0, y = 1, z = 0 })
+
+	-- Remember where we started from so we can teleport back after dumping.
+	self._dump_return_pos = vector.round(self:get_pos())
+	-- Remember the exact chest position for direct dumping once path is finished.
+	self._dump_chest_pos = vector.new(chest_pos)
+	-- Show bucket while walking to chest
+	self:set_tool("bucket:bucket_empty")
+	lf("farming:dump", "Calling task_base for chest at dest=" .. minetest.pos_to_string(dest) ..
+		", return_pos=" .. minetest.pos_to_string(self._dump_return_pos))
+	-- Delegate movement + action scheduling to the existing task_base,
+	-- so behavior matches planting/mowing/etc.
+	if task_base(self, dump_at_chest, dest) then
+		lf("farming:dump", "Scheduled path/task to chest at " .. minetest.pos_to_string(dest) .. ", state=" .. tostring(self.state))
+		return true
+	end
+
+	lf("farming:dump", "No path to nearby chest (task_base failed)")
+	return false
+end
+
+-- Action executed once the maidroid has reached the chest destination.
+-- It dumps one >90 stack into the chest (if possible) and then resumes wandering.
+-- ,,dump2
+dump_at_chest = function(self, dtime)
+	local pos = self:get_pos()
+	local inv = self:get_inventory()
+	-- When returning from a chest path, we know the exact chest position;
+	-- use the direct variant to avoid relying on front/below detection.
+	if self._dump_chest_pos then
+        lf("farming:dump", "Dumping to chest at " .. minetest.pos_to_string(self._dump_chest_pos))
+		dump_inventory_to_chest_direct(self, self._dump_chest_pos, inv)
+		self._dump_chest_pos = nil
+	else
+		-- Fallback to positional detection if for some reason chest pos is missing.	minetest.log("error", "[maidroid:farming] dump_at_chest: No chest position stored, cannot dump inventory")
+		error("[maidroid:farming] dump_at_chest: No chest position stored, cannot dump inventory")
+        
+
+        lf("farming:dump", "Dumping to chest at " .. minetest.pos_to_string(pos))
+		dump_inventory_to_chest(self, pos, inv)
+        self._dump_chest_pos = nil
+	end
+	-- Do not pause here; we want to immediately resume normal farming
+	-- behavior (wander + task) so that is_blocked continues to be called
+	-- via wander_core.on_step after returning from dumping.
+	-- Any long-term pausing should be managed by the core itself
+	-- (for example, distance-from-home logic in on_step).
+	lf("farming:dump", "Finished dumping; returning to normal behavior without pausing")
+	   
+	-- If we saved a return position when starting the chest path,
+	-- teleport back there after dumping.
+	if self._dump_return_pos then
+		lf("farming:dump", "Teleporting back to return_pos=" .. minetest.pos_to_string(self._dump_return_pos))
+		self.object:set_pos(self._dump_return_pos)
+		self._dump_return_pos = nil
+	end
+
+	-- Go back to normal farming behavior
+	-- to_wander(self, 0, timers.change_dir_max)
+	to_wander(self, "farming:dump_at_chest")
+	self:set_tool(self.selected_tool)
+	-- Ensure the very next wander step runs the blocking check
+	if self.timers then
+		self.timers.wander_skip = 1
 	end
 end
 
@@ -382,7 +528,7 @@ select_seed = function(self)
 
 	lf("select_seed", "no suitable seed found")
 	if self.state ~= maidroid.states.WANDER then
-		to_wander(self)
+		to_wander(self, "farming:select_seed_none")
 	end
 end
 
@@ -405,39 +551,20 @@ on_pause = function(self)
 	wander_core.on_pause(self)
 end
 
-local position_ok = function(pos, to)
-	local dist = vector.distance(pos, to)
-	if dist < 1 then return to end -- Always good
-
-	local from = vector.round(vector.copy(pos))
-	-- Node directly under must be pumpkin or watermelon
-	if to.x == from.x and to.z == from.z and to.y == from.y - 1 then
-		return to
-	end
-
-	-- Skip when inside block
-	local node = minetest.get_node(from)
-	node = minetest.registered_nodes[node]
-	if  node and node.buildable_to and
-		( ( from.y == to.y and dist < 1.41 ) or
-		( from.y ~= to.y and dist < 1.73 ) ) then
-		return to
-	end
-end
-
+-- ,,task,,tb
 task_base = function(self, action, destination)
 	if not destination then 
 		lf("[maidroid:farming]", "task_base: no destination")
 		return 
 	end
 
-	-- lf("[maidroid:farming]", "task_base: destination=" .. minetest.pos_to_string(destination) .. " action=" .. tostring(action))
+	lf("[maidroid:farming]", "task_base: destination=" .. minetest.pos_to_string(destination) .. " action=" .. tostring(action) .. ", state=" .. tostring(self.state))
 	local pos = self:get_pos()
 	-- lf("[maidroid:farming]", "task_base: current pos=" .. minetest.pos_to_string(pos))
 	
 	-- Is this droid able to make an action
 	if position_ok(pos, destination) then
-		-- lf("[maidroid:farming]", "task_base: position ok, setting action")
+		lf("[maidroid:farming]", "task_base: position ok, setting action immediately")
 		self.destination = destination
 		self.action = action
 		to_action(self)
@@ -445,10 +572,10 @@ task_base = function(self, action, destination)
 	end
 
 	-- Or does the droid have to follow a path
-	-- lf("[maidroid:farming]", "task_base: finding path from " .. minetest.pos_to_string(pos) .. " to " .. minetest.pos_to_string(destination))
+	lf("[maidroid:farming]", "task_base: finding path from " .. minetest.pos_to_string(pos) .. " to " .. minetest.pos_to_string(destination))
 	local path = minetest.find_path(pos, destination, 8, 1, 1, "A*_noprefetch")
 	if path ~= nil then
-		-- lf("[maidroid:farming]", "task_base: path found with " .. #path .. " nodes")
+		lf("[maidroid:farming]", "task_base: path found with " .. #path .. " nodes; calling core_path.to_follow_path")
 		core_path.to_follow_path(self, path, destination, to_action, action)
 		return true
 	else
@@ -472,6 +599,80 @@ is_valid_soil = function(name)
 
 	return false
 end
+
+dump_inventory_to_chest = function(self, pos, inv)
+		-- If in front of or standing on a chest, move any stacks with count > 90 into that chest
+		local front_pos = self:get_front()
+		local front_node = minetest.get_node(front_pos)
+		-- lf("task", "front node: " .. front_node.name)
+		local chest_pos
+		if front_node and (front_node.name == "default:chest" or front_node.name == "default:chest_locked") then
+			chest_pos = front_pos
+		end
+		-- Also check directly under the maidroid (standing on chest)
+		local below_pos = vector.add(pos, {x = 0, y = -1, z = 0})
+		local below_node = minetest.get_node(below_pos)
+		if below_node and (below_node.name == "default:chest" or below_node.name == "default:chest_locked") then
+			chest_pos = chest_pos or below_pos
+		end
+		if chest_pos then
+			lf("task", "at chest for dumping at "..minetest.pos_to_string(chest_pos))
+			local meta = minetest.get_meta(chest_pos)
+			local owner = meta:get_string("owner")
+			if not owner or owner == "" or owner == self.owner then
+				local chest_inv = meta:get_inventory()
+				local main = inv:get_list("main") or {}
+				local changed = false
+				for idx, stack in ipairs(main) do
+					if not stack:is_empty() and stack:get_count() > 90 then
+						local leftover = chest_inv:add_item("main", stack)
+						if leftover:is_empty() then
+							main[idx] = ItemStack("")
+						else
+							main[idx] = leftover
+						end
+						changed = true
+						-- Only dump one stack > 90 per task call
+						break
+					end
+				end
+				if changed then
+					inv:set_list("main", main)
+				end
+			end
+		end
+end
+
+dump_inventory_to_chest_direct = function(self, chest_pos, inv)
+	if not chest_pos then
+		return
+	end
+	lf("task", "at chest for dumping at " .. minetest.pos_to_string(chest_pos))
+	local meta = minetest.get_meta(chest_pos)
+	local owner = meta:get_string("owner")
+	if not owner or owner == "" or owner == self.owner then
+		local chest_inv = meta:get_inventory()
+		local main = inv:get_list("main") or {}
+		local changed = false
+		for idx, stack in ipairs(main) do
+			if not stack:is_empty() and stack:get_count() > 90 then
+				local leftover = chest_inv:add_item("main", stack)
+				if leftover:is_empty() then
+					main[idx] = ItemStack("")
+				else
+					main[idx] = leftover
+				end
+				changed = true
+				-- Only dump one stack > 90 per call
+				break
+			end
+		end
+		if changed then
+			inv:set_list("main", main)
+		end
+	end
+end
+
 	task = function(self)
 		local pos = self:get_pos()
 		local inv = self:get_inventory()
@@ -492,9 +693,17 @@ end
 			lf("task", "Before: "..cnode.name)
 			minetest.set_node(lpos, { name = "farming:soil" })
         else
-            lf("task", "cannot CONVERT: "..lnode.name)
+            -- lf("task", "cannot CONVERT: "..lnode.name)
 		end
 
+		-- First, occasionally try to dump an oversized stack into a nearby chest.
+		-- This may initiate a path-following action toward a chest.
+		if maybe_dump_to_nearby_chest(self, inv, pos) then
+			return
+		end
+
+		-- Then, if already at a chest, perform the immediate dump behavior.
+		-- dump_inventory_to_chest(self, pos, inv)
 
 		-- Ensure there is water within 3 nodes horizontally on the same y as lpos; if not, try to place a water source nearby
 		-- only if LT on standing soil
@@ -597,10 +806,10 @@ end
 		end
 
 		-- Harvesting
-		lf("[maidroid:farming]", "Searching for mowable plants near " .. minetest.pos_to_string(pos))
+		-- lf("[maidroid:farming]", "Searching for mowable plants near " .. minetest.pos_to_string(pos))
 		dest = search(pos, is_mowable, self.owner)
 		if dest then
-			lf("[maidroid:farming]", "Found mowable plant at " .. minetest.pos_to_string(dest))
+			-- lf("[maidroid:farming]", "Found mowable plant at " .. minetest.pos_to_string(dest))
 		else
 			lf("[maidroid:farming]", "No mowable plants found")
 		end
@@ -726,6 +935,7 @@ local freeze_action = function(self, toolname)
 	self:set_yaw({self:get_pos(), self.destination})
 end
 
+-- ,,x1
 local update_action_timers = function(self, dtime, toolname)
 	if self.timers.action < timers.action_max then
 		if self.timers.action == 0 then
@@ -742,7 +952,7 @@ end
 plant = function(self, dtime)
 	-- Skip until timer is ok
 
-	pos = self.destination
+	local pos = self.destination
 
 	local lpos = vector.add(pos, {x = 0, y = -1, z = 0})
 	local lnode = minetest.get_node(lpos)
@@ -770,7 +980,7 @@ plant = function(self, dtime)
 	end
 
 	if	not is_plantable(self.destination, self.owner) then
-		to_wander(self, 0, timers.change_dir_max )
+		to_wander(self, "farming:plant_invalid_soil", 0, timers.change_dir_max )
 		self:set_tool(self.selected_tool)
 		return
 	end -- target node changed
@@ -794,12 +1004,12 @@ plant = function(self, dtime)
 		select_seed(self)
 	end
 
-	to_wander(self, 0, timers.change_dir_max )
+	to_wander(self, "farming:plant_done", 0, timers.change_dir_max, "plant")
 	self:set_tool(self.selected_tool)
 end
 
 mow = function(self, dtime)
-	lf("[maidroid:farming]", "mow() called at destination " .. minetest.pos_to_string(self.destination))
+	-- lf("[maidroid:farming]", "mow() called at destination " .. minetest.pos_to_string(self.destination))
 	-- Skip until timer is ok
 	if update_action_timers(self, dtime, self.selected_tool) then return end
 	lf("mow", "start")
@@ -819,7 +1029,7 @@ mow = function(self, dtime)
 
 	if not in_mature_list and not is_weed_here then
 		lf("mow", "early return (not mature and not weed)")
-		to_wander(self, 0, timers.change_dir_max )
+		to_wander(self, "farming:mow_not_mature", 0, timers.change_dir_max, "mow")
 		return
 	end -- target node changed
 
@@ -893,7 +1103,7 @@ mow = function(self, dtime)
 
 		self:add_items_to_main(stacks)
 		lf("mow", "added items to inventory (scythe mode), stacks count = " .. tostring(#stacks))
-		to_wander(self, 0, timers.change_dir_max )
+		to_wander(self, "farming:mow_scythe_done", 0, timers.change_dir_max, "mow")
 	else -- Normal mode
 		lf("mow", "normal mode (not scythe)")
 		local stacks = minetest.get_node_drops(mature)
@@ -908,7 +1118,7 @@ mow = function(self, dtime)
 		end
 		self:add_items_to_main(stacks)
 		lf("mow", "added items to inventory (normal mode), stacks count = " .. tostring(#stacks))
-		to_wander(self, 0, timers.change_dir_max )
+		to_wander(self, "farming:mow_done", 0, timers.change_dir_max, "mow")
 	end
 end
 
@@ -917,7 +1127,7 @@ collect_papyrus = function(self, dtime)
 	if update_action_timers(self, dtime, self.selected_tool) then return end
 
 	if not is_papyrus(self.destination) then
-		to_wander(self, 0, timers.change_dir_max )
+		to_wander(self, "farming:collect_papyrus_not_papyrus", 0, timers.change_dir_max, "collect_papyrus")
 		return
 	end -- target node changed
 
@@ -933,7 +1143,7 @@ collect_papyrus = function(self, dtime)
 		maidroid.helpers.emit_sound("default:papyrus", "default_dig_snappy", "dig", self.destination, 0.8)
 	end
 	self:add_items_to_main({"default:papyrus " .. count})
-	to_wander(self, 0, timers.change_dir_max )
+	to_wander(self, "farming:collect_papyrus_done", 0, timers.change_dir_max, "collect_papyrus")
 end
 
 plant_papyrus = function(self, dtime)
@@ -943,7 +1153,7 @@ plant_papyrus = function(self, dtime)
 	local inv = self:get_inventory()
 	if not inv:contains_item("main", "default:papyrus")
 		or not is_papyrus_soil(self.destination, self.owner) then
-		to_wander(self, 0, timers.change_dir_max )
+		to_wander(self, "farming:plant_papyrus_invalid", 0, timers.change_dir_max, "plant_papyrus")
 		return
 	end -- target node changed
 
@@ -953,7 +1163,7 @@ plant_papyrus = function(self, dtime)
 	end
 	inv:remove_item("main", ItemStack("default:papyrus"))
 
-	to_wander(self, 0, timers.change_dir_max )
+	to_wander(self, "farming:plant_papyrus_done", 0, timers.change_dir_max, "plant_papyrus")
 	self:set_tool(self.selected_tool)
 end
 
@@ -993,6 +1203,7 @@ local check_fence_detection = function(self)
 	end
 end
 
+-- ,,step
 on_step = function(self, dtime, moveresult)
 	-- Pause if too far from home (more than 20 blocks)
 	if self.home then
@@ -1037,16 +1248,39 @@ on_step = function(self, dtime, moveresult)
 
 	-- Let wander core handle movement and task selection only
 	-- when not currently performing an explicit action.
-    -- this fixes the issue where the maidroid would not move when it was performing an action
-	if self.state ~= maidroid.states.ACT then
-		wander_core.on_step(self, dtime, moveresult, task, maidroid.helpers.is_fence, true)
+	-- this fixes the issue where the maidroid would not move when it was performing an action
+	if self.state ~= maidroid.states.ACT and self.state ~= maidroid.states.PATH then
+	-- if self.state ~= maidroid.states.ACT  then
+		wander_core.on_step(self, dtime, moveresult, task, is_fence_or_chest, true)
 		-- Check for fence detection failures
 		check_fence_detection(self)
 	end
 	if self.state == maidroid.states.PATH then
+        local current_pos = vector.round(self:get_pos())
+        local is_on_dest = self._dump_chest_pos and vector.equals(current_pos, self._dump_chest_pos)
+		if self._dump_chest_pos then
+			lf("farming", "PATH to chest for dumping at " .. minetest.pos_to_string(self._dump_chest_pos))
+		-- Even while following a path, still respect fences and chests by using the
+		-- same is_blocked logic; this avoids unexpectedly crossing them.
+            isblocked = self:is_blocked(is_fence_or_chest, true)
+
+        elseif self:is_blocked(is_fence_or_chest, true) then
+			lf("farming", "PATH blocked by fence; cancelling path")
+			-- Cancel any pending chest-dump path state
+			self._dump_chest_pos = nil
+			self._dump_return_pos = nil
+			-- Restore normal tool instead of leaving the bucket equipped
+			if self.selected_tool then
+				self:set_tool(self.selected_tool)
+			end
+			to_wander(self, "farming:update_action_timers_timeout", 0, timers.change_dir_max, "on_step")
+			-- Ensure the very next wander step runs the blocking check
+			self.timers.wander_skip = 1
+			return
+		end
 		maidroid.cores.path.on_step(self, dtime, moveresult)
 	elseif self.state == maidroid.states.ACT then
-        -- lf("farming", "ACT state")
+        lf("farming", "ACT state")
 		self.action(self, dtime)
 	end
 
@@ -1120,7 +1354,9 @@ maidroid.register_core("farming", {
 	is_tool		= is_tool,
 	alt_tool	= select_seed,
 	no_jump		= true,
-	walk_max = 2.5 * timers.walk_max,
+	-- walk_max = 2.5 * timers.walk_max,
+    -- fence detection fails when walk timeout
+	walk_max = 4.5 * timers.walk_max,
 	hat = hat,
 	can_sell = true,
 	doc = doc,

@@ -14,14 +14,17 @@ local to_wander
 local timers = maidroid.timers
 local speed_min = maidroid.settings.speed / 2
 
+local lf = maidroid.lf
+
+
 on_start = function(self)
-	to_wander(self, 0, timers.change_dir_max )
+	to_wander(self, "on_start", 0, timers.change_dir_max )
 	self.us_time = minetest.get_us_time()
 	self:halt()
 end
 
 on_resume = function(self)
-	to_wander(self, 0, timers.change_dir_max )
+	to_wander(self, "on_resume", 0, timers.change_dir_max )
 	self:halt()
 end
 
@@ -39,6 +42,7 @@ on_pause = function(self)
 	self.timers.wander_skip = 0
 	self:set_animation(maidroid.animation.SIT)
 end
+
 
 on_step = function(self, dtime, moveresult, task, criterion, check_inside)
 	-- Walk time over do task or randomly happy jump
@@ -77,7 +81,8 @@ on_step = function(self, dtime, moveresult, task, criterion, check_inside)
 	-- TODO check for water or holes
 end
 
-to_wander = function(self, walk, change_dir)
+to_wander = function(self, caller, walk, change_dir)
+	lf("wander", "to_wander (" .. tostring(caller) .. "): walk=" .. tostring(walk) .. ", change_dir=" .. tostring(change_dir))
 	self.state = maidroid.states.WANDER
 	self.timers.walk = walk or 0
 	self.timers.change_dir = change_dir or 0
