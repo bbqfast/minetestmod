@@ -39,4 +39,9 @@ end
 if maidroid.settings.waffler then -- Use wander, (todo path)
 	dofile(maidroid.modpath .. "/cores/waffler.lua")
 end
+
+-- Generic cooker helper core (simple furnace feeder using seed_rice)
+if maidroid.settings.farming then
+	dofile(maidroid.modpath .. "/cores/generic_cooker.lua")
+end
 -- vim: ai:noet:ts=4:sw=4:fdm=indent:syntax=lua

@@ -87,7 +87,7 @@ minetest.register_craftitem("lottfarming:pipeweed", {
 	inventory_image = "lottfarming_pipeweed.png",
 })
 
-farming:add_plant("lottfarming:pipeweed_4", {"lottfarming:pipeweed_1", "lottfarming:pipeweed_2", "lottfarming:pipeweed_3"}, 50, 20, 34)
+lott_farming:add_plant("lottfarming:pipeweed_4", {"lottfarming:pipeweed_1", "lottfarming:pipeweed_2", "lottfarming:pipeweed_3"}, 50, 20, 34)
 
 minetest.register_craft({
 	type = "cooking",

@@ -89,7 +89,7 @@ minetest.register_craftitem("lottfarming:tomatoes", {
 	groups = {salad=1},
 })
 
-farming:add_plant("lottfarming:tomatoes_4", {"lottfarming:tomatoes_1", "lottfarming:tomatoes_2", "lottfarming:tomatoes_3"}, 50, 20, 10)
+lott_farming:add_plant("lottfarming:tomatoes_4", {"lottfarming:tomatoes_1", "lottfarming:tomatoes_2", "lottfarming:tomatoes_3"}, 50, 20, 10)
 
 minetest.register_craft({
 	type = "cooking",

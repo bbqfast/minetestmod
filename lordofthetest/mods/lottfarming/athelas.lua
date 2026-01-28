@@ -69,4 +69,4 @@ minetest.register_craftitem("lottfarming:athelas", {
 	inventory_image = "lottfarming_athelas.png",
 })
 
-farming:add_plant("lottfarming:athelas_3", {"lottfarming:athelas_1", "lottfarming:athelas_2"}, 50, 20, 2)
+lott_farming:add_plant("lottfarming:athelas_3", {"lottfarming:athelas_1", "lottfarming:athelas_2"}, 50, 20, 2)

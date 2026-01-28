@@ -84,7 +84,7 @@ minetest.register_node("lottfarming:cabbage", {
      on_use = minetest.item_eat(4)
 })
 
-farming:add_plant("lottfarming:cabbage_3", {"lottfarming:cabbage_1", "lottfarming:cabbage_2"}, 80, 20)
+lott_farming:add_plant("lottfarming:cabbage_3", {"lottfarming:cabbage_1", "lottfarming:cabbage_2"}, 80, 20)
 
 minetest.register_craft({
 	output = 'lottfarming:salad',

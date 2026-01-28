@@ -1,4 +1,4 @@
-farming = {}
+lott_farming = {}
 
 local lf = assert(_G.lf, "global lf not initialized")
 
@@ -66,7 +66,7 @@ function place_spore(itemstack, placer, pointed_thing, plantname, p2)
 	return itemstack
 end
 
-function farming.hoe_on_use(itemstack, user, pointed_thing, uses)
+function lott_farming.hoe_on_use(itemstack, user, pointed_thing, uses)
 	local pt = pointed_thing
 	-- check if pointing at a node
 	if not pt then
@@ -108,7 +108,7 @@ function farming.hoe_on_use(itemstack, user, pointed_thing, uses)
 	return itemstack
 end
 
-function farming:add_plant(full_grown, names, interval, chance, p2)
+function lott_farming:add_plant(full_grown, names, interval, chance, p2)
 	interval = interval / 10
 	chance = chance * 4
 

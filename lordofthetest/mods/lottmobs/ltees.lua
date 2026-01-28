@@ -789,9 +789,10 @@ minetest.register_entity("lottmobs:ltangel", {
                 local player_pos = player:get_pos()
                 local look_dir = player:get_look_dir() or {x = 0, y = 0, z = 1}
                 local follow_distance = 2
+                local vertical_factor = 2 -- match teleport vertical compensation
                 local target_pos = {
                     x = player_pos.x - look_dir.x * follow_distance,
-                    y = player_pos.y,
+                    y = player_pos.y - look_dir.y * follow_distance * vertical_factor,
                     z = player_pos.z - look_dir.z * follow_distance,
                 }
 
@@ -899,7 +900,7 @@ minetest.register_entity("lottmobs:ltangel", {
 					local yaw = math.atan2(dir.z, dir.x) + math.pi / 2
 					yaw = yaw + math.pi
 					self.object:set_yaw(yaw)
-					self.object:set_velocity(vector.multiply(dir, .2))
+					self.object:set_velocity(vector.multiply(dir, 1))
 					self:set_animation("walk")
 				else
 					-- minetest.log("warning", "NPC reached player, stopping")
@@ -963,9 +964,17 @@ minetest.register_on_punchplayer(function(player, hitter, time_from_last_punch, 
 	if not player_pos then
 		return
 	end
-	local target_pos = vector.add(player_pos, {x = 1, y = 0, z = 0})
+	-- Reposition the angel slightly *behind* the player based on look direction
+	local look_dir = player:get_look_dir() or {x = 0, y = 0, z = 1}
+	local follow_distance = 2
+	local vertical_factor = 2 -- stronger vertical compensation than horizontal
+	local target_pos = {
+		x = player_pos.x - look_dir.x * follow_distance,
+		y = player_pos.y - look_dir.y * follow_distance * vertical_factor,
+		z = player_pos.z - look_dir.z * follow_distance,
+	}
 	npc:set_pos(target_pos)
-	lf("npc:on_punch:set_pos", "teleported to: " .. minetest.pos_to_string(target_pos))
+	lf("npc:on_punch:set_pos", "teleported behind player to: " .. minetest.pos_to_string(target_pos))
 	npc:set_velocity({x = 0, y = 0, z = 0})
 	lua:set_animation("stand")
 end)

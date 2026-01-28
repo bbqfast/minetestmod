@@ -69,7 +69,7 @@ minetest.register_craftitem("lottfarming:barley", {
 	inventory_image = "lottfarming_barley_3.png",
 })
 
-farming:add_plant("lottfarming:barley_3", {"lottfarming:barley_1", "lottfarming:barley_2"}, 50, 20, 3)
+lott_farming:add_plant("lottfarming:barley_3", {"lottfarming:barley_1", "lottfarming:barley_2"}, 50, 20, 3)
 
 minetest.register_craft({
 	type = "cooking",

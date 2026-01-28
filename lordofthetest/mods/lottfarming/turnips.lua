@@ -88,7 +88,7 @@ minetest.register_craftitem("lottfarming:turnips", {
 	on_use = minetest.item_eat(2),
 })
 
-farming:add_plant("lottfarming:turnips_4", {"lottfarming:turnips_1", "lottfarming:turnips_2", "lottfarming:turnips_3"}, 50, 20, 40)
+lott_farming:add_plant("lottfarming:turnips_4", {"lottfarming:turnips_1", "lottfarming:turnips_2", "lottfarming:turnips_3"}, 50, 20, 40)
 
 minetest.register_craft({
 	type = "cooking",

@@ -74,4 +74,4 @@ minetest.register_craftitem("lottfarming:melon", {
 	on_use = minetest.item_eat(2),
 })
 
-farming:add_plant("lottfarming:melon_3", {"lottfarming:melon_1", "lottfarming:melon_2"}, 80, 20)
+lott_farming:add_plant("lottfarming:melon_3", {"lottfarming:melon_1", "lottfarming:melon_2"}, 80, 20)
