@@ -1,623 +1,819 @@
--- Minetest 0.4 mod: farming
--- See README.txt for licensing and other information.
+--[[
+	Farming Redo Mod by TenPlus1
+	NEW growing routine by prestidigitator
+	auto-refill by crabman77
+]]
 
-farming = {}
+-- Translation support
 
---
--- Soil
---
+local S = minetest.get_translator("farming")
 
-ll = function(msg)
-	local pre="**************************************************"
-	local pre="++++++++++++++++++++++++++++++++++++++++++++++++++"
-	if msg == nil then
-		msg = "null"
-	end
+-- global
 
-	-- minetest.log("warning", pre..msg)
+farming = {
+	mod = "redo",
+	version = "20240924",
+	path = minetest.get_modpath("farming"),
+	select = {type = "fixed", fixed = {-0.5, -0.5, -0.5, 0.5, -5/16, 0.5}},
+	select_final = {type = "fixed", fixed = {-0.5, -0.5, -0.5, 0.5, -2.5/16, 0.5}},
+	registered_plants = {},
+	min_light = 12, max_light = 15,
+	mapgen = minetest.get_mapgen_setting("mg_name"),
+	use_utensils = minetest.settings:get_bool("farming_use_utensils") ~= false,
+	mtg = minetest.get_modpath("default"),
+	eth = minetest.get_modpath("ethereal"),
+	mcl = minetest.get_modpath("mcl_core"),
+	mcl_hardness = 0.01,
+	translate = S
+}
+
+-- determine which sounds to use, default or mcl_sounds
+
+local function sound_helper(snd)
+
+	farming[snd] = (farming.mtg and default[snd]) or (farming.mcl and mcl_sounds[snd])
+			or function() return {} end
 end
 
+sound_helper("node_sound_defaults")
+sound_helper("node_sound_stone_defaults")
+sound_helper("node_sound_dirt_defaults")
+sound_helper("node_sound_sand_defaults")
+sound_helper("node_sound_gravel_defaults")
+sound_helper("node_sound_wood_defaults")
+sound_helper("node_sound_leaves_defaults")
+sound_helper("node_sound_ice_defaults")
+sound_helper("node_sound_metal_defaults")
+sound_helper("node_sound_water_defaults")
+sound_helper("node_sound_snow_defaults")
+sound_helper("node_sound_glass_defaults")
 
-minetest.register_node("farming:soil", {
-	description = "Soil",
-	tiles = {"farming_soil.png", "default_dirt.png"},
-	drop = "default:dirt",
-	is_ground_content = true,
-	groups = {crumbly=3, not_in_creative_inventory=1, soil=2},
-	sounds = default.node_sound_dirt_defaults(),
-})
+-- check for creative mode or priv
 
-minetest.register_node("farming:soil_wet", {
-	description = "Wet Soil",
-	tiles = {"farming_soil_wet.png", "farming_soil_wet_side.png"},
-	drop = "default:dirt",
-	is_ground_content = true,
-	groups = {crumbly=3, not_in_creative_inventory=1, soil=3},
-	sounds = default.node_sound_dirt_defaults(),
-})
+local creative_mode_cache = minetest.settings:get_bool("creative_mode")
+
+function farming.is_creative(name)
+	return creative_mode_cache or minetest.check_player_privs(name, {creative = true})
+end
+
+-- stats, locals, settings, function helper
+
+local statistics = dofile(farming.path .. "/statistics.lua")
+local random, floor = math.random, math.floor
+local time_speed = tonumber(minetest.settings:get("time_speed")) or 72
+local SECS_PER_CYCLE = (time_speed > 0 and (24 * 60 * 60) / time_speed) or 0
+local function clamp(x, min, max) return (x < min and min) or (x > max and max) or x end
+
+-- return amount of day or night that has elapsed
+-- dt is time elapsed, count_day if true counts day, otherwise night
+
+local function day_or_night_time(dt, count_day)
+
+	local t_day = minetest.get_timeofday()
+	local t1_day = t_day - dt / SECS_PER_CYCLE
+	local t1_c, t2_c  -- t1_c < t2_c and t2_c always in [0, 1)
+
+	if count_day then
+
+		if t_day < 0.25 then
+			t1_c = t1_day + 0.75  -- Relative to sunup, yesterday
+			t2_c = t_day  + 0.75
+		else
+			t1_c = t1_day - 0.25  -- Relative to sunup, today
+			t2_c = t_day  - 0.25
+		end
+	else
+		if t_day < 0.75 then
+			t1_c = t1_day + 0.25  -- Relative to sundown, yesterday
+			t2_c = t_day  + 0.25
+		else
+			t1_c = t1_day - 0.75  -- Relative to sundown, today
+			t2_c = t_day  - 0.75
+		end
+	end
+
+	local dt_c = clamp(t2_c, 0, 0.5) - clamp(t1_c, 0, 0.5)  -- this cycle
+
+	if t1_c < -0.5 then
+
+		local nc = floor(-t1_c)
+
+		t1_c = t1_c + nc
+		dt_c = dt_c + 0.5 * nc + clamp(-t1_c - 0.5, 0, 0.5)
+	end
+
+	return dt_c * SECS_PER_CYCLE
+end
+
+-- Growth Logic
+
+local STAGE_LENGTH_AVG = tonumber(minetest.settings:get("farming_stage_length")) or 200
+local STAGE_LENGTH_DEV = STAGE_LENGTH_AVG / 6
+
+-- quick start seed timer
+
+farming.start_seed_timer = function(pos)
+
+	local timer = minetest.get_node_timer(pos)
+	local grow_time = floor(random(STAGE_LENGTH_DEV, STAGE_LENGTH_AVG))
+
+	timer:start(grow_time)
+end
+
+-- return plant name and stage from node provided
+
+local function plant_name_stage(node)
+
+	local name
+
+	if type(node) == "table" then
+
+		if node.name then name = node.name
+		elseif node.x and node.y and node.z then
+			node = minetest.get_node_or_nil(node)
+			name = node and node.name
+		end
+	else
+		name = tostring(node)
+	end
+
+	if not name or name == "ignore" then return nil end
+
+	local sep_pos = name:find("_[^_]+$")
+
+	if sep_pos and sep_pos > 1 then
+
+		local stage = tonumber(name:sub(sep_pos + 1))
+
+		if stage and stage >= 0 then
+			return name:sub(1, sep_pos - 1), stage
+		end
+	end
+
+	return name, 0
+end
+
+-- Map from node name to
+-- { plant_name = ..., name = ..., stage = n, stages_left = { node_name, ... } }
+
+local plant_stages = {}
+
+farming.plant_stages = plant_stages
+
+--- Registers the stages of growth of a (possible plant) node.
+ -- @param node - Node or position table, or node name.
+ -- @return - The (possibly zero) number of stages of growth the plant will go through
+ --           before being fully grown, or nil if not a plant.
+
+-- Recursive helper
+
+local function reg_plant_stages(plant_name, stage, force_last)
+
+	local node_name = plant_name and plant_name .. "_" .. stage
+	local node_def = node_name and minetest.registered_nodes[node_name]
+
+	if not node_def then return nil end
+
+	local stages = plant_stages[node_name]
+
+	if stages then return stages end
+
+	if minetest.get_item_group(node_name, "growing") > 0 then
+
+		local ns = reg_plant_stages(plant_name, stage + 1, true)
+		local stages_left = (ns and { ns.name, unpack(ns.stages_left) }) or {}
+
+		stages = {
+			plant_name = plant_name,
+			name = node_name,
+			stage = stage,
+			stages_left = stages_left
+		}
+
+		if #stages_left > 0 then
+
+			local old_constr = node_def.on_construct
+			local old_destr  = node_def.on_destruct
+
+			minetest.override_item(node_name, {
+
+				on_construct = function(pos)
+
+					if old_constr then old_constr(pos) end
+
+					farming.handle_growth(pos)
+				end,
+
+				on_destruct = function(pos)
+
+					minetest.get_node_timer(pos):stop()
+
+					if old_destr then old_destr(pos) end
+				end,
+
+				on_timer = function(pos, elapsed)
+					return farming.plant_growth_timer(pos, elapsed, node_name)
+				end,
+			})
+		end
+
+	elseif force_last then
+
+		stages = {
+			plant_name = plant_name,
+			name = node_name,
+			stage = stage,
+			stages_left = {}
+		}
+	else
+		return nil
+	end
+
+	plant_stages[node_name] = stages
+
+	return stages
+end
+
+-- split name and stage and register crop
+
+local function register_plant_node(node)
+
+	local plant_name, stage = plant_name_stage(node)
+
+	if plant_name then
+
+		local stages = reg_plant_stages(plant_name, stage, false)
+
+		return stages and #stages.stages_left
+	end
+end
+
+-- check for further growth and set or stop timer
+
+local function set_growing(pos, stages_left)
+
+	if not stages_left then return end
+
+	local timer = minetest.get_node_timer(pos)
+
+	if stages_left > 0 then
+
+		if not timer:is_started() then
+
+			local stage_length = statistics.normal(STAGE_LENGTH_AVG, STAGE_LENGTH_DEV)
+
+			stage_length = clamp(stage_length, 0.5 * STAGE_LENGTH_AVG, 3.0 * STAGE_LENGTH_AVG)
+
+			timer:set(stage_length, -0.5 * random() * STAGE_LENGTH_AVG)
+		end
+
+	elseif timer:is_started() then
+		timer:stop()
+	end
+end
+
+-- detects a crop at given position, starting or stopping growth timer when needed
+
+function farming.handle_growth(pos, node)
+
+	if not pos then return end
+
+	local stages_left = register_plant_node(node or pos)
+
+	if stages_left then set_growing(pos, stages_left) end
+end
+
+-- register crops nodes and add timer functions
+
+minetest.after(0, function()
+
+	for _, node_def in pairs(minetest.registered_nodes) do
+		register_plant_node(node_def)
+	end
+end)
+
+-- Just in case a growing type or added node is missed (also catches existing
+-- nodes added to map before timers were incorporated).
 
 minetest.register_abm({
-	nodenames = {"farming:soil", "farming:soil_wet"},
-	interval = 15,
-	chance = 4,
+	label = "Start crop timer",
+	nodenames = {"group:growing"},
+	interval = 300,
+	chance = 1,
+	catch_up = false,
+
 	action = function(pos, node)
-		pos.y = pos.y+1
-		local nn = minetest.get_node(pos).name
-		pos.y = pos.y-1
-		if minetest.registered_nodes[nn] and
-				minetest.registered_nodes[nn].walkable and
-				minetest.get_item_group(nn, "plant") == 0
-		then
-			minetest.set_node(pos, {name="default:dirt"})
-		end
-		-- check if there is water nearby
-		if minetest.find_node_near(pos, 3, {"group:water"}) then
-			-- if it is dry soil turn it into wet soil
-			if node.name == "farming:soil" then
-				minetest.set_node(pos, {name="farming:soil_wet"})
+
+		-- skip if node timer already active
+		if minetest.get_node_timer(pos):is_started() then return end
+
+		-- check if group:growing node is a seed
+		local def = minetest.registered_nodes[node.name]
+
+		if def and def.groups and def.groups.seed then
+
+			if def.on_timer then -- start node timer if found
+
+				farming.start_seed_timer(pos)
+
+				return
+			end
+
+			local next_stage = def.next_plant
+
+			def = minetest.registered_nodes[next_stage]
+
+			if def then -- switch seed without timer to stage_1 of crop
+
+				local p2 = def.place_param2 or 1
+
+				minetest.set_node(pos, {name = next_stage, param2 = p2})
 			end
 		else
-			-- turn it back into dirt if it is already dry
-			if node.name == "farming:soil" then
-				-- only turn it back if there is no plant on top of it
-				if minetest.get_item_group(nn, "plant") == 0 then
-					minetest.set_node(pos, {name="default:dirt"})
-				end
-
-			-- if its wet turn it back into dry soil
-			elseif node.name == "farming:soil_wet" then
-				minetest.set_node(pos, {name="farming:soil"})
-			end
+			farming.handle_growth(pos, node) -- start normal crop timer
 		end
-	end,
+	end
 })
 
---
--- Hoes
---
--- turns nodes with group soil=1 into soil
-function farming.hoe_on_use(itemstack, user, pointed_thing, uses)
-	local pt = pointed_thing
-	-- check if pointing at a node
-	if not pt then
-		return
-	end
-	if pt.type ~= "node" then
-		return
-	end
+-- default check crop is on wet soil
 
-	local under = minetest.get_node(pt.under)
-	local p = {x=pt.under.x, y=pt.under.y+1, z=pt.under.z}
-	local above = minetest.get_node(p)
+farming.can_grow = function(pos)
 
-	-- return if any of the nodes is not registered
-	if not minetest.registered_nodes[under.name] then
-		return
-	end
-	if not minetest.registered_nodes[above.name] then
-		return
-	end
+	local below = minetest.get_node({x = pos.x, y = pos.y -1, z = pos.z})
 
-	-- check if the node above the pointed thing is air
-	if above.name ~= "air" then
-		return
-	end
-
-	-- check if pointing at dirt
-	if minetest.get_item_group(under.name, "soil") ~= 1 then
-		return
-	end
-
-	-- turn the node into soil, wear out item and play sound
-	minetest.set_node(pt.under, {name="farming:soil"})
-	minetest.sound_play("default_dig_crumbly", {
-		pos = pt.under,
-		gain = 0.5,
-	})
-	itemstack:add_wear(65535/(uses-1))
-	return itemstack
+	return minetest.get_item_group(below.name, "soil") >= 3
 end
 
-minetest.register_tool("farming:hoe_wood", {
-	description = "Wooden Hoe",
-	inventory_image = "farming_tool_woodhoe.png",
-	groups = {hoe = 1},
-	on_use = function(itemstack, user, pointed_thing)
-		return farming.hoe_on_use(itemstack, user, pointed_thing, 30)
-	end,
-})
+-- Plant timer function that grows plants under the right conditions.
 
-minetest.register_tool("farming:hoe_stone", {
-	description = "Stone Hoe",
-	inventory_image = "farming_tool_stonehoe.png",
-	groups = {hoe = 1},
-	on_use = function(itemstack, user, pointed_thing)
-		return farming.hoe_on_use(itemstack, user, pointed_thing, 90)
-	end,
-})
+function farming.plant_growth_timer(pos, elapsed, node_name)
 
-minetest.register_tool("farming:hoe_steel", {
-	description = "Steel Hoe",
-	inventory_image = "farming_tool_steelhoe.png",
-	groups = {hoe = 1},
-	on_use = function(itemstack, user, pointed_thing)
-		return farming.hoe_on_use(itemstack, user, pointed_thing, 200)
-	end,
-})
+	local stages = plant_stages[node_name]
 
-minetest.register_tool("farming:hoe_bronze", {
-	description = "Bronze Hoe",
-	inventory_image = "farming_tool_bronzehoe.png",
-	groups = {hoe = 1},
-	on_use = function(itemstack, user, pointed_thing)
-		return farming.hoe_on_use(itemstack, user, pointed_thing, 220)
-	end,
-})
+	if not stages then return false end
 
-minetest.register_craft({
-	output = "farming:hoe_wood",
-	recipe = {
-		{"group:wood", "group:wood"},
-		{"", "group:stick"},
-		{"", "group:stick"},
-	}
-})
+	local max_growth = #stages.stages_left
 
-minetest.register_craft({
-	output = "farming:hoe_stone",
-	recipe = {
-		{"group:stone", "group:stone"},
-		{"", "group:stick"},
-		{"", "group:stick"},
-	}
-})
+	if max_growth <= 0 then return false end
 
-minetest.register_craft({
-	output = "farming:hoe_steel",
-	recipe = {
-		{"default:steel_ingot", "default:steel_ingot"},
-		{"", "group:stick"},
-		{"", "group:stick"},
-	}
-})
+	local chk1 = minetest.registered_nodes[node_name].growth_check -- old
+	local chk2 = minetest.registered_nodes[node_name].can_grow -- new
 
-minetest.register_craft({
-	output = "farming:hoe_bronze",
-	recipe = {
-		{"default:bronze_ingot", "default:bronze_ingot"},
-		{"", "group:stick"},
-		{"", "group:stick"},
-	}
-})
+	if chk1 then -- custom farming redo growth_check function
 
---
--- Override grass for drops
---
-minetest.override_item("default:grass_1", {
-	drop = {
-		max_items = 1,
-		items = {
-			{items = {'farming:seed_wheat'},rarity = 7},
-			{items = {'farming:seed_cotton'},rarity = 7},
-			{items = {'default:grass_1'}},
-		}
-	}
-})
+		if not chk1(pos, node_name) then return true end
 
-for i=2,5 do
-	minetest.override_item("default:grass_"..i, {
-		drop = {
-			max_items = 1,
-			items = {
-				{items = {'farming:seed_wheat'},rarity = 7},
-				{items = {'farming:seed_cotton'},rarity = 7},
-				{items = {'default:grass_1'}},
-			}
-		}
-	})
+	elseif chk2 then -- custom mt 5.9x farming can_grow function
+
+		if not chk2(pos) then return true end
+
+	-- default mt 5.9x farming.can_grow function
+	elseif not farming.can_grow(pos) then return true end
+
+	local growth
+	local light_pos = {x = pos.x, y = pos.y, z = pos.z}
+	local lambda = elapsed / STAGE_LENGTH_AVG
+
+	if lambda < 0.1 then return true end
+
+	local MIN_LIGHT = minetest.registered_nodes[node_name].minlight or farming.min_light
+	local MAX_LIGHT = minetest.registered_nodes[node_name].maxlight or farming.max_light
+
+	if max_growth == 1 or lambda < 2.0 then
+
+		local light = (minetest.get_node_light(light_pos) or 0)
+
+		if light < MIN_LIGHT or light > MAX_LIGHT then return true end
+
+		growth = 1
+	else
+		local night_light = (minetest.get_node_light(light_pos, 0) or 0)
+		local day_light = (minetest.get_node_light(light_pos, 0.5) or 0)
+		local night_growth = night_light >= MIN_LIGHT and night_light <= MAX_LIGHT
+		local day_growth = day_light >= MIN_LIGHT and day_light <= MAX_LIGHT
+
+		if not night_growth then
+
+			if not day_growth then return true end
+
+			lambda = day_or_night_time(elapsed, true) / STAGE_LENGTH_AVG
+
+		elseif not day_growth then
+
+			lambda = day_or_night_time(elapsed, false) / STAGE_LENGTH_AVG
+		end
+
+		growth = statistics.poisson(lambda, max_growth)
+
+		if growth < 1 then return true end
+	end
+
+	if minetest.registered_nodes[stages.stages_left[growth]] then
+
+		local p2 = minetest.registered_nodes[stages.stages_left[growth] ].place_param2 or 1
+
+		minetest.set_node(pos, {name = stages.stages_left[growth], param2 = p2})
+	else
+		return true
+	end
+
+	return growth ~= max_growth
 end
 
-minetest.register_node(":default:junglegrass", {
-	description = "Jungle Grass",
-	drawtype = "plantlike",
-	visual_scale = 1.3,
-	tiles = {"default_junglegrass.png"},
-	inventory_image = "default_junglegrass.png",
-	wield_image = "default_junglegrass.png",
-	paramtype = "light",
-	waving = 1,
-	walkable = false,
-	buildable_to = true,
-	is_ground_content = true,
-	drop = {
-		max_items = 1,
-		items = {
-			{items = {'farming:seed_cotton'},rarity = 8},
-			{items = {'default:junglegrass'}},
-		}
-	},
-	groups = {snappy=3,flammable=2,flora=1,attached_node=1},
-	sounds = default.node_sound_leaves_defaults(),
-	selection_box = {
-		type = "fixed",
-		fixed = {-0.5, -0.5, -0.5, 0.5, -5/16, 0.5},
-	},
-})
+-- refill placed plant by crabman (26/08/2015) updated by TenPlus1
 
---
--- Place seeds
---
-local function place_seed(itemstack, placer, pointed_thing, plantname)
+function farming.refill_plant(player, plantname, index)
+
+	local inv = player and player:get_inventory() ; if not inv then return end
+
+	local old_stack = inv:get_stack("main", index)
+
+	if old_stack:get_name() ~= "" then return end
+
+	for i, stack in ipairs(inv:get_list("main")) do
+
+		if stack:get_name() == plantname and i ~= index then
+
+			inv:set_stack("main", index, stack)
+			stack:clear()
+			inv:set_stack("main", i, stack)
+
+			return
+		end
+	end
+end
+
+-- Place Seeds on Soil
+
+function farming.place_seed(itemstack, placer, pointed_thing, plantname)
+
 	local pt = pointed_thing
+
 	-- check if pointing at a node
-	if not pt then
-		return
-	end
-	if pt.type ~= "node" then
-		return
-	end
+	if not itemstack or not pt or pt.type ~= "node" then return end
 
 	local under = minetest.get_node(pt.under)
+
+	-- am I right-clicking on something that has a custom on_place set?
+	-- thanks to Krock for helping with this issue :)
+	local def = minetest.registered_nodes[under.name]
+
+	if placer and itemstack and def and def.on_rightclick then
+		return def.on_rightclick(pt.under, under, placer, itemstack, pt)
+	end
+
 	local above = minetest.get_node(pt.above)
 
-	-- return if any of the nodes is not registered
-	if not minetest.registered_nodes[under.name] then
-		return
-	end
-	if not minetest.registered_nodes[above.name] then
-		return
-	end
-
 	-- check if pointing at the top of the node
-	if pt.above.y ~= pt.under.y+1 then
-		return
-	end
+	if pt.above.y ~= pt.under.y + 1 then return end
 
-	-- check if you can replace the node above the pointed node
-	if not minetest.registered_nodes[above.name].buildable_to then
-		return
-	end
+	-- return if any of the nodes is not registered
+	if not minetest.registered_nodes[under.name]
+	or not minetest.registered_nodes[above.name] then return end
 
-	-- check if pointing at soil
-	if minetest.get_item_group(under.name, "soil") <= 1 then
-		return
-	end
+	-- can I replace above node, and am I pointing directly at soil
+	if not minetest.registered_nodes[above.name].buildable_to
+	or minetest.get_item_group(under.name, "soil") < 2
+	or minetest.get_item_group(above.name, "plant") ~= 0 then return end
 
-	-- add the node and remove 1 item from the itemstack
-	minetest.add_node(pt.above, {name=plantname})
-	if not minetest.settings:get_bool("creative_mode") then
-		itemstack:take_item()
+	-- is player planting seed?
+	local name = placer and placer:get_player_name() or ""
+
+	-- if not protected then add node and remove 1 item from the itemstack
+	if not minetest.is_protected(pt.above, name) then
+
+		local p2 = minetest.registered_nodes[plantname].place_param2 or 1
+
+		minetest.set_node(pt.above, {name = plantname, param2 = p2})
+
+		farming.start_seed_timer(pt.above)
+
+		minetest.sound_play("default_place_node", {pos = pt.above, gain = 1.0})
+
+		minetest.log("action", string.format("%s planted %s at %s",
+			(placer and placer:is_player() and placer:get_player_name() or "A mod"),
+			itemstack:get_name(), minetest.pos_to_string(pt.above)
+		))
+
+		if placer and itemstack
+		and not farming.is_creative(placer:get_player_name()) then
+
+			local name = itemstack:get_name()
+
+			itemstack:take_item()
+
+			-- check for refill
+			if itemstack:get_count() == 0 then
+
+				minetest.after(0.2, farming.refill_plant,
+						placer, name, placer:get_wield_index())
+			end
+		end
+
+		return itemstack
 	end
-	return itemstack
 end
 
---
--- Wheat
---
-minetest.register_craftitem("farming:seed_wheat", {
-	description = "Wheat Seed",
-	inventory_image = "farming_wheat_seed.png",
-	on_place = function(itemstack, placer, pointed_thing)
-		return place_seed(itemstack, placer, pointed_thing, "farming:wheat_1")
-	end,
-})
+-- Function to register plants (default farming compatibility)
 
-minetest.register_craftitem("farming:wheat", {
-	description = "Wheat",
-	inventory_image = "farming_wheat.png",
-})
+farming.register_plant = function(name, def)
 
-minetest.register_craftitem("farming:flour", {
-	description = "Flour",
-	inventory_image = "farming_flour.png",
-})
+	if not def.steps then return nil end
 
-minetest.register_craftitem("farming:bread", {
-	description = "Bread",
-	inventory_image = "farming_bread.png",
-	on_use = minetest.item_eat(4),
-})
+	local mname = name:split(":")[1]
+	local pname = name:split(":")[2]
 
-minetest.register_craft({
-	type = "shapeless",
-	output = "farming:flour",
-	recipe = {"farming:wheat", "farming:wheat", "farming:wheat", "farming:wheat"}
-})
+	-- Check def
+	def.description = def.description or S("Seed")
+	def.inventory_image = def.inventory_image or "unknown_item.png"
+	def.minlight = def.minlight or 12
+	def.maxlight = def.maxlight or 15
 
-minetest.register_craft({
-	type = "cooking",
-	cooktime = 15,
-	output = "farming:bread",
-	recipe = "farming:flour"
-})
+	-- Register seed
+	minetest.register_node(":" .. mname .. ":seed_" .. pname, {
 
-for i=1,8 do
-	local drop = {
-		items = {
-			{items = {'farming:wheat'},rarity=9-i},
-			{items = {'farming:wheat'},rarity=18-i*2},
-			{items = {'farming:seed_wheat'},rarity=9-i},
-			{items = {'farming:seed_wheat'},rarity=18-i*2},
-		}
-	}
-	minetest.register_node("farming:wheat_"..i, {
-		drawtype = "plantlike",
-		tiles = {"farming_wheat_"..i..".png"},
-		paramtype = "light",
-		waving = 1,
-		walkable = false,
-		buildable_to = true,
-		is_ground_content = true,
-		drop = drop,
-		selection_box = {
-			type = "fixed",
-			fixed = {-0.5, -0.5, -0.5, 0.5, -5/16, 0.5},
+		description = def.description,
+		tiles = {def.inventory_image},
+		inventory_image = def.inventory_image,
+		wield_image = def.inventory_image,
+		drawtype = "signlike",
+		groups = {
+			seed = 1, snappy = 3, attached_node = 1, flammable = 2, growing = 1,
+			compostability = 65, handy = 1
 		},
-		groups = {snappy=3,flammable=2,plant=1,wheat=i,not_in_creative_inventory=1,attached_node=1},
-		sounds = default.node_sound_leaves_defaults(),
-	})
-end
+		_mcl_hardness = farming.mcl_hardness,
+		is_ground_content = false,
+		paramtype = "light",
+		paramtype2 = "wallmounted",
+		walkable = false,
+		sunlight_propagates = true,
+		selection_box = farming.select,
+		place_param2 = 1, -- place seed flat
+		next_plant = mname .. ":" .. pname .. "_1",
 
--- helper: extract light check and growth for crops
--- generic crop growth helper
--- opts = {
---   group = "wheat",          -- group name used for logging (optional)
---   max_stage = 8,            -- maximum growth stage number
---   plant_prefix = "farming:wheat_" -- node name prefix; final node is plant_prefix..stage
--- }
--- function farming._maybe_grow_crop(pos, node, current_stage, opts)
-function _maybe_grow_crop(pos, node, current_stage, opts)
-	opts = opts or {}
-	local group = opts.group or "crop"
-	local max_stage = opts.max_stage or 8
-	local plant_prefix = opts.plant_prefix or ("farming:"..group.."_")
+		on_timer = function(pos, elapsed)
 
-	-- sanity
-	if current_stage >= max_stage then
-		--minetest.log("action", string.format("++++++++++ [farming] %s already full grown at %s", group, minetest.pos_to_string(pos)))
-		ll(string.format("[farming] %s already full grown at %s", group, minetest.pos_to_string(pos)))
-		return
-	end
+			local def = minetest.registered_nodes[mname .. ":" .. pname .. "_1"]
 
-	local light_level = minetest.get_node_light(pos)
-	--minetest.log("action", string.format("++++++++++ [farming] %s light_level=%s at %s", group, tostring(light_level), minetest.pos_to_string(pos)))
-	ll(string.format("[farming] %s light_level=%s at %s", group, tostring(light_level), minetest.pos_to_string(pos)))
-	if not light_level then
-		--minetest.log("action", "++++++++++ [farming] light level unavailable, aborting")
-		ll("[farming] light level unavailable, aborting")
-		return
-	end
-
-	local c = math.max(1, math.ceil(2 * (light_level - 13) ^ 2 + 1))
-	--minetest.log("action", "++++++++++ [farming] computed chance cap c="..tostring(c))
-	ll("[farming] computed chance cap c="..tostring(c))
-
-	local roll = math.random(1, c)
-	--minetest.log("action", "++++++++++ [farming] random roll="..tostring(roll).." (1 means grow); light_level>=13="..tostring(light_level>=13))
-	ll("[farming] random roll="..tostring(roll).." (1 means grow); light_level>=13="..tostring(light_level>=13))
-
-	-- grow if roll hits or if very bright
-	if roll == 1 or light_level >= 13 then
-		local new_stage = current_stage + 1
-		if new_stage > max_stage then new_stage = max_stage end
-		--minetest.log("action", string.format("++++++++++ [farming] growing %s from %d to %d at %s", group, current_stage, new_stage, minetest.pos_to_string(pos)))
-		ll(string.format("[farming] growing %s from %d to %d at %s", group, current_stage, new_stage, minetest.pos_to_string(pos)))
-		minetest.set_node(pos, {name = plant_prefix .. new_stage})
-	else
-		--minetest.log("action", string.format("++++++++++ [farming] %s did not grow this tick (roll=%d, cap=%d)", group, roll, c))
-		ll(string.format("[farming] %s did not grow this tick (roll=%d, cap=%d)", group, roll, c))
-	end
-end
-
--- Ensure helper exists (defensive): create wrapper if missing
--- if not farming then farming = {} end
--- if not farming._maybe_grow_wheat then
--- function farming._maybe_grow_wheat(pos, node, wheat_group)
-function _maybe_grow_wheat(pos, node, wheat_group)
-	-- return farming._maybe_grow_crop(pos, node, wheat_group, {
-	return _maybe_grow_crop(pos, node, wheat_group, {
-		group = "wheat",
-		max_stage = 8,
-		plant_prefix = "farming:wheat_",
-	})
-end
-
-function _maybe_grow_cotton(pos, node, wheat_group)
-	-- return farming._maybe_grow_crop(pos, node, wheat_group, {
-	return _maybe_grow_crop(pos, node, wheat_group, {
-		group = "cotton",
-		max_stage = 8,
-		plant_prefix = "farming:cotton_",
-	})
-end
-
-minetest.register_abm({
-	nodenames = {"group:wheat"},
-	neighbors = {"group:soil"},
-	-- interval = 30,
-	interval = 10,
-	-- chance = 20,
-	chance = 100 ,
-	action = function(pos, node)
-			--minetest.log("action", "++++++++++ [farming] wheat ABM called at "..minetest.pos_to_string(pos).." node="..tostring(node.name))
-			ll("[farming] wheat ABM called at "..minetest.pos_to_string(pos).." node="..tostring(node.name))
-
-			-- return if already full grown
-			local wheat_group = minetest.get_item_group(node.name, "wheat")
-			--minetest.log("action", "++++++++++ [farming] wheat group value = "..tostring(wheat_group))
-			ll("[farming] wheat group value = "..tostring(wheat_group))
-			if wheat_group == 8 then
-				--minetest.log("action", "++++++++++ [farming] wheat already full grown, aborting")
-				ll("[farming] wheat already full grown, aborting")
-				return
+			if def then
+				minetest.swap_node(pos, {name = def.next_plant, param2 = def.place_param2})
 			end
+		end,
 
-			-- check if on wet soil
-			pos.y = pos.y-1
-			local n = minetest.get_node(pos)
-			local soil_group = minetest.get_item_group(n.name, "soil")
-			--minetest.log("action", "++++++++++ [farming] soil below is "..tostring(n.name).." with soil group="..tostring(soil_group))
-			ll("[farming] soil below is "..tostring(n.name).." with soil group="..tostring(soil_group))
-			if soil_group < 3 then
-				--minetest.log("action", "++++++++++ [farming] soil not wet enough (soil_group < 3), aborting")
-				ll("[farming] soil not wet enough (soil_group < 3), aborting")
-				pos.y = pos.y+1
-				return
-			end
-			pos.y = pos.y+1
+		on_place = function(itemstack, placer, pointed_thing)
 
-			-- delegate light check and growth to helper
-			-- farming._maybe_grow_wheat(pos, node, wheat_group)
-			_maybe_grow_wheat(pos, node, wheat_group)
+			return farming.place_seed(itemstack, placer, pointed_thing,
+					mname .. ":seed_" .. pname)
 		end
 	})
 
---
--- Cotton
---
-minetest.register_craftitem("farming:seed_cotton", {
-	description = "Cotton Seed",
-	inventory_image = "farming_cotton_seed.png",
-	on_place = function(itemstack, placer, pointed_thing)
-		return place_seed(itemstack, placer, pointed_thing, "farming:cotton_1")
-	end,
-})
-
-minetest.register_craftitem("farming:string", {
-	description = "String",
-	inventory_image = "farming_string.png",
-})
-
-minetest.register_craft({
-	output = "wool:white",
-	recipe = {
-		{"farming:string", "farming:string"},
-		{"farming:string", "farming:string"},
-	}
-})
-
-for i=1,8 do
-	local drop = {
-		items = {
-			{items = {'farming:string'},rarity=9-i},
-			{items = {'farming:string'},rarity=18-i*2},
-			{items = {'farming:string'},rarity=27-i*3},
-			{items = {'farming:seed_cotton'},rarity=9-i},
-			{items = {'farming:seed_cotton'},rarity=18-i*2},
-			{items = {'farming:seed_cotton'},rarity=27-i*3},
-		}
-	}
-	minetest.register_node("farming:cotton_"..i, {
-		drawtype = "plantlike",
-		tiles = {"farming_cotton_"..i..".png"},
-		paramtype = "light",
-		waving = 1,
-		walkable = false,
-		buildable_to = true,
-		is_ground_content = true,
-		drop = drop,
-		selection_box = {
-			type = "fixed",
-			fixed = {-0.5, -0.5, -0.5, 0.5, -5/16, 0.5},
-		},
-		groups = {snappy=3,flammable=2,plant=1,cotton=i,not_in_creative_inventory=1,attached_node=1},
-		sounds = default.node_sound_leaves_defaults(),
+	-- Register harvest
+	minetest.register_craftitem(":" .. mname .. ":" .. pname, {
+		description = pname:gsub("^%l", string.upper),
+		inventory_image = mname .. "_" .. pname .. ".png",
+		groups = def.groups or {flammable = 2},
 	})
+
+	-- Register growing steps
+	for i = 1, def.steps do
+
+		local base_rarity = 1
+
+		if def.steps ~= 1 then
+			base_rarity =  8 - (i - 1) * 7 / (def.steps - 1)
+		end
+
+		local drop = {
+			items = {
+				{items = {mname .. ":" .. pname}, rarity = base_rarity},
+				{items = {mname .. ":" .. pname}, rarity = base_rarity * 2},
+				{items = {mname .. ":seed_" .. pname}, rarity = base_rarity},
+				{items = {mname .. ":seed_" .. pname}, rarity = base_rarity * 2},
+			}
+		}
+
+		local sel = farming.select
+		local g = {
+			handy = 1, snappy = 3, flammable = 2, plant = 1, growing = 1,
+			attached_node = 1, not_in_creative_inventory = 1,
+		}
+
+		-- Last step doesn't need growing=1 so Abm never has to check these
+		-- also increase selection box for visual indication plant has matured
+		if i == def.steps then
+			sel = farming.select_final
+			g.growing = 0
+		end
+
+		local node_name = mname .. ":" .. pname .. "_" .. i
+
+		local next_plant = nil
+
+		if i < def.steps then
+			next_plant = mname .. ":" .. pname .. "_" .. (i + 1)
+		end
+
+		local desc = pname:gsub("^%l", string.upper)
+
+		minetest.register_node(node_name, {
+			description = S(desc) .. S(" Crop"),
+			drawtype = "plantlike",
+			waving = 1,
+			tiles = {mname .. "_" .. pname .. "_" .. i .. ".png"},
+			paramtype = "light",
+			paramtype2 = def.paramtype2,
+			place_param2 = def.place_param2,
+			walkable = false,
+			buildable_to = true,
+			sunlight_propagates = true,
+			drop = drop,
+			selection_box = sel,
+			groups = g,
+			_mcl_hardness = farming.mcl_hardness,
+			is_ground_content = false,
+			sounds = farming.node_sound_leaves_defaults(),
+			minlight = def.minlight,
+			maxlight = def.maxlight,
+			next_plant = next_plant
+		})
+	end
+
+	-- add to farming.registered_plants
+	farming.registered_plants[mname .. ":" .. pname] = {
+		crop = mname .. ":" .. pname,
+		seed = mname .. ":seed_" .. pname,
+		steps = def.steps,
+		minlight = def.minlight,
+		maxlight = def.maxlight
+	}
+--	print(dump(farming.registered_plants[mname .. ":" .. pname]))
+
+	return {seed = mname .. ":seed_" .. pname, harvest = mname .. ":" .. pname}
 end
 
--- ,,x1 hack speed
--- minetest.settings:get("time_speed")
-minetest.settings:set("time_speed", "72")
+-- default settings
 
-minetest.register_abm({
-	nodenames = {"group:cotton"},
-	neighbors = {"group:soil"},
-	-- interval = 60,
-	interval = 10,
-	chance = 20,
-	action = function(pos, node)
-			--minetest.log("action", "++++++++++ [farming] cotton ABM called at "..minetest.pos_to_string(pos).." node="..tostring(node.name))
-			ll("[farming] cotton ABM called at "..minetest.pos_to_string(pos).." node="..tostring(node.name))
+farming.asparagus = 0.002
+farming.eggplant = 0.002
+farming.spinach = 0.002
+farming.carrot = 0.002
+farming.potato = 0.002
+farming.tomato = 0.002
+farming.cucumber = 0.002
+farming.corn = 0.002
+farming.coffee = 0.002
+farming.melon = 0.009
+farming.pumpkin = 0.009
+farming.cocoa = true
+farming.raspberry = 0.002
+farming.blueberry = 0.002
+farming.rhubarb = 0.002
+farming.beans = 0.002
+farming.grapes = 0.002
+farming.barley = true
+farming.chili = 0.003
+farming.hemp = 0.003
+farming.garlic = 0.002
+farming.onion = 0.002
+farming.pepper = 0.002
+farming.pineapple = 0.003
+farming.peas = 0.002
+farming.beetroot = 0.002
+farming.mint = 0.005
+farming.cabbage = 0.002
+farming.blackberry = 0.002
+farming.soy = 0.002
+farming.vanilla = 0.002
+farming.lettuce = 0.002
+farming.artichoke = 0.002
+farming.parsley = 0.002
+farming.sunflower = 0.002
+farming.ginger = 0.002
+farming.strawberry = 0.002
+farming.cotton = 0.003
+farming.grains = true
+farming.rice = true
 
-			-- return if already full grown
-			local cotton_group = minetest.get_item_group(node.name, "cotton")
-			--minetest.log("action", "++++++++++ [farming] cotton group value = "..tostring(cotton_group))
-			ll("[farming] cotton group value = "..tostring(cotton_group))
-			if cotton_group == 8 then
-				--minetest.log("action", "++++++++++ [farming] cotton already full grown, aborting")
-				ll("[farming] cotton already full grown, aborting")
-				return
-			end
+-- Load new global settings if found inside mod folder
 
-			-- check if on wet soil
-			pos.y = pos.y-1
-			local n = minetest.get_node(pos)
-			local soil_group = minetest.get_item_group(n.name, "soil")
-			--minetest.log("action", "++++++++++ [farming] soil below is "..tostring(n.name).." with soil group="..tostring(soil_group))
-			ll("[farming] soil below is "..tostring(n.name).." with soil group="..tostring(soil_group))
-			if soil_group < 3 then
-				--minetest.log("action", "++++++++++ [farming] soil not wet enough (soil_group < 3), aborting")
-				ll("[farming] soil not wet enough (soil_group < 3), aborting")
-				pos.y = pos.y+1
-				return
-			end
-			pos.y = pos.y+1
+local input = io.open(farming.path .. "/farming.conf", "r")
 
-			-- check light
-			-- local light_level = minetest.get_node_light(pos)
-			-- --minetest.log("action", "++++++++++ [farming] light_level="..tostring(light_level))
-			-- ll("[farming] light_level="..tostring(light_level))
-			-- if not light_level then
-			-- 	--minetest.log("action", "++++++++++ [farming] light level unavailable, aborting")
-			-- 	ll("[farming] light level unavailable, aborting")
-			-- 	return
-			-- end
-			-- local c = math.ceil(2 * (light_level - 13) ^ 2 + 1)
-			-- --minetest.log("action", "++++++++++ [farming] computed chance cap c="..tostring(c))
-			-- ll("[farming] computed chance cap c="..tostring(c))
+if input then dofile(farming.path .. "/farming.conf") ; input:close() end
 
-			-- -- if light_level > 7 then
-			-- if light_level > 1 or true then
-			-- 	local roll = math.random(1, c)
-			-- 	--minetest.log("action", "++++++++++ [farming] random roll="..tostring(roll).." (1 means grow); light_level>=13="..tostring(light_level>=13))
-			-- 	ll("[farming] random roll="..tostring(roll).." (1 means grow); light_level>=13="..tostring(light_level>=13))
-			-- 	if true or roll == 1 or light_level >= 13 then
-			-- 		local height = minetest.get_item_group(node.name, "cotton") + 1
-			-- 		--minetest.log("action", "++++++++++ [farming] growing cotton from "..tostring(minetest.get_item_group(node.name, "cotton")).." to height "..tostring(height))
-			-- 		ll("[farming] growing cotton from "..tostring(minetest.get_item_group(node.name, "cotton")).." to height "..tostring(height))
-			-- 		minetest.set_node(pos, {name="farming:cotton_"..height})
-			-- 	else
-			-- 		--minetest.log("action", "++++++++++ [farming] did not grow cotton this tick (roll did not meet condition)")
-			-- 		ll("[farming] did not grow cotton this tick (roll did not meet condition)")
-			-- 	end
-			-- else
-			-- 	--minetest.log("action", "++++++++++ [farming] light too low (<=7), no growth")
-			-- 	ll("[farming] light too low (<=7), no growth")
-			-- end
-			_maybe_grow_cotton(pos, node, cotton_group)
-		end
-	})
+-- load new world-specific settings if found inside world folder
 
-minetest.register_node("farming:straw", {
-	description = "Straw",
-	tiles = {"farming_straw.png"},
-	is_ground_content = false,
-	groups = {snappy=3, flammable=4, fall_damage_add_percent=-30},
-	sounds = default.node_sound_leaves_defaults(),
-})
+local worldpath = minetest.get_worldpath()
 
-minetest.register_craft({
-	output = "farming:straw 3",
-	recipe = {
-		{"farming:wheat", "farming:wheat", "farming:wheat"},
-		{"farming:wheat", "farming:wheat", "farming:wheat"},
-		{"farming:wheat", "farming:wheat", "farming:wheat"},
-	}
-})
+input = io.open(worldpath .. "/farming.conf", "r")
 
-minetest.register_craft({
-	output = "farming:wheat 3",
-	recipe = {
-		{"farming:straw"},
-	}
-})
+if input then dofile(worldpath .. "/farming.conf") ; input:close() end
+
+-- helper function to add {eatable} group to food items, also {flammable}
+
+function farming.add_eatable(item, hp)
+
+	local def = minetest.registered_items[item]
+
+	if def then
+
+		local groups = table.copy(def.groups) or {}
+
+		groups.eatable = hp ; groups.flammable = 2
+
+		minetest.override_item(item, {groups = groups})
+	end
+end
+
+-- recipe item list and alternatives
+
+dofile(farming.path .. "/item_list.lua")
+
+-- setup soil, register hoes, override grass
+
+if minetest.get_modpath("default") then
+	dofile(farming.path .. "/soil.lua")
+	dofile(farming.path .. "/hoes.lua")
+end
+
+dofile(farming.path.."/grass.lua")
+
+-- disable crops Mineclone already has
+
+if farming.mcl then
+	farming.carrot = nil
+	farming.potato = nil
+	farming.melon = nil
+	farming.cocoa = nil
+	farming.beetroot = nil
+	farming.sunflower = nil
+	farming.pumpkin = nil
+else
+	dofile(farming.path.."/crops/wheat.lua") -- default crop outwith mineclone
+end
+
+dofile(farming.path.."/crops/cotton.lua") -- default crop
+
+-- helper function
+
+local function ddoo(file, check)
+
+	if check then dofile(farming.path .. "/crops/" .. file) end
+end
+
+-- add additional crops and food (if enabled)
+ddoo("carrot.lua", farming.carrot)
+ddoo("potato.lua", farming.potato)
+ddoo("tomato.lua", farming.tomato)
+ddoo("cucumber.lua", farming.cucumber)
+ddoo("corn.lua", farming.corn)
+ddoo("coffee.lua", farming.coffee)
+ddoo("melon.lua", farming.melon)
+ddoo("pumpkin.lua", farming.pumpkin)
+ddoo("cocoa.lua", farming.cocoa)
+ddoo("raspberry.lua", farming.raspberry)
+ddoo("blueberry.lua", farming.blueberry)
+ddoo("rhubarb.lua", farming.rhubarb)
+ddoo("beans.lua", farming.beans)
+ddoo("grapes.lua", farming.grapes)
+ddoo("barley.lua", farming.barley)
+ddoo("hemp.lua", farming.hemp)
+ddoo("garlic.lua", farming.garlic)
+ddoo("onion.lua", farming.onion)
+ddoo("pepper.lua", farming.pepper)
+ddoo("pineapple.lua", farming.pineapple)
+ddoo("peas.lua", farming.peas)
+ddoo("beetroot.lua", farming.beetroot)
+ddoo("chili.lua", farming.chili)
+ddoo("rye_oat.lua", farming.grains)
+ddoo("rice.lua", farming.rice)
+ddoo("mint.lua", farming.mint)
+ddoo("cabbage.lua", farming.cabbage)
+ddoo("blackberry.lua", farming.blackberry)
+ddoo("soy.lua", farming.soy)
+ddoo("vanilla.lua", farming.vanilla)
+ddoo("lettuce.lua", farming.lettuce)
+ddoo("artichoke.lua", farming.artichoke)
+ddoo("parsley.lua", farming.parsley)
+ddoo("sunflower.lua", farming.sunflower)
+ddoo("strawberry.lua", farming.strawberry)
+ddoo("asparagus.lua", farming.asparagus)
+ddoo("eggplant.lua", farming.eggplant)
+ddoo("spinach.lua", farming.eggplant)
+ddoo("ginger.lua", farming.ginger)
+
+-- register food items, non-food items, recipes and stairs
+
+dofile(farming.path .. "/item_non_food.lua")
+dofile(farming.path .. "/item_food.lua")
+dofile(farming.path .. "/item_recipes.lua")
+dofile(farming.path .. "/item_stairs.lua")
+
+if not farming.mcl then
+	dofile(farming.path .. "/compatibility.lua") -- Farming Plus compatibility
+end
+
+if minetest.get_modpath("lucky_block") then
+	dofile(farming.path .. "/lucky_block.lua")
+end
+
+print("[MOD] Farming Redo loaded")
