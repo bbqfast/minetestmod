@@ -20,6 +20,11 @@ end
 
 maidroid = maidroid or {}
 
+local last_lf_func = nil
+local last_lf_msg = nil
+local last_lf_count = 0
+local last_lf_time = 0
+
 maidroid.lf = function(func, msg)
 	local pre = "++++++++++++++++++++++++"
 	if func == nil then func = "unknown" end
@@ -31,13 +36,46 @@ maidroid.lf = function(func, msg)
 	black_list["follow:on_step"] = true
 	black_list["maidroid.globalstep"] = true
 
-	if black_list[func] == nil then
-		minetest.log("warning", pre .. func .. "(): " .. msg )
+	if black_list[func] ~= nil then
+		return
 	end
+
+    msg = string.format("[%s]: %s", func, msg)
+
+	if func == last_lf_func and msg == last_lf_msg then
+		last_lf_count = last_lf_count + 1
+		return
+	end
+
+	if last_lf_msg ~= nil then
+		local suffix = ""
+		if last_lf_count > 1 then
+			suffix = " (" .. tostring(last_lf_count) .. ")"
+		end
+		minetest.log("warning", pre .. last_lf_msg .. suffix)
+	end
+
+	last_lf_func = func
+	last_lf_msg = msg
+	last_lf_count = 1
+	last_lf_time = os.clock()
+	local scheduled_time = last_lf_time
+	minetest.after(2, function(check_time)
+		-- Flush only if no newer lf call has updated last_lf_time
+		if last_lf_msg ~= nil and last_lf_time == check_time then
+			local suffix = ""
+			if last_lf_count > 1 then
+				suffix = " (" .. tostring(last_lf_count) .. ")"
+			end
+			minetest.log("warning", pre .. last_lf_msg .. suffix)
+			last_lf_func = nil
+			last_lf_msg = nil
+			last_lf_count = 0
+		end
+	end, scheduled_time)
 end
 
 local lf = maidroid.lf
-
 
 -- maidroid = maidroid or {}
 
@@ -228,74 +266,74 @@ end
 
 
 minetest.register_globalstep(function(dtime)
-    local func_name = "maidroid.globalstep"
-    timer = timer + dtime
-    if timer < 10 then return end
-    timer = 0
-    local players = minetest.get_connected_players()
-    local maidroids_far = {}
-    for _, player in ipairs(players) do
-        local ppos = player:get_pos()
-        local objs = minetest.get_objects_inside_radius(ppos, 500) -- big radius
-        for _, obj in ipairs(objs) do
-            local ent = obj:get_luaentity()
-            if ent and maidroid.is_maidroid(ent.name) then
-                -- "inactive" example: paused or IDLE state
-                lf(func_name, "[maidroid] ACTIVE maidroid far from players: " .. tostring(ent.nametag or ent.name) .. " at " .. minetest.pos_to_string(obj:get_pos()))
-                lf(func_name, "Checking maidroid nametag for storage: nametag=" .. tostring(ent.nametag))
-                if ent.nametag and ent.nametag ~= "" then
-                    lf(func_name, "nametag is present: " .. ent.nametag)
-                    local pos = vector.round(obj:get_pos())
-                    local pos_str = minetest.pos_to_string(pos)
-                    local stored = false
-                    -- Prefer mod storage when available
-                    if minetest.get_mod_storage then
-                        lf(func_name, "get_mod_storage available")
-                        local storage = minetest.get_mod_storage()
-                        if storage then
-                            lf(func_name, "mod storage obtained")
-                            lf(func_name, "Saving position for " .. ent.nametag .. " in mod storage: " .. pos_str)
-                            storage:set_string("maidroid_pos_" .. ent.nametag, pos_str)
-                            stored = true
-                        else
-                            lf(func_name, "mod storage unavailable (nil)")
-                        end
-                    else
-                        lf(func_name, "get_mod_storage not available")
-                    end
-                    -- Fallback: write to text file if mod storage failed
-                    if (not stored) and maidroid_pos_file then
+	    local func_name = "maidroid.globalstep"
+	    timer = timer + dtime
+	    if timer < 10 then return end
+	    timer = 0
+	    local players = minetest.get_connected_players()
+	    local maidroids_far = {}
+	    for _, player in ipairs(players) do
+	        local ppos = player:get_pos()
+	        local objs = minetest.get_objects_inside_radius(ppos, 500) -- big radius
+	        for _, obj in ipairs(objs) do
+	            local ent = obj:get_luaentity()
+	            if ent and maidroid.is_maidroid(ent.name) then
+	                -- "inactive" example: paused or IDLE state
+	                lf(func_name, "[maidroid] ACTIVE maidroid far from players: " .. tostring(ent.nametag or ent.name) .. " at " .. minetest.pos_to_string(obj:get_pos()))
+	                lf(func_name, "Checking maidroid nametag for storage: nametag=" .. tostring(ent.nametag))
+	                if ent.nametag and ent.nametag ~= "" then
+	                    lf(func_name, "nametag is present: " .. ent.nametag)
+	                    local pos = vector.round(obj:get_pos())
+	                    local pos_str = minetest.pos_to_string(pos)
+	                    local stored = false
+	                    -- Prefer mod storage when available
+	                    if minetest.get_mod_storage then
+	                        lf(func_name, "get_mod_storage available")
+	                        local storage = minetest.get_mod_storage()
+	                        if storage then
+	                            lf(func_name, "mod storage obtained")
+	                            lf(func_name, "Saving position for " .. ent.nametag .. " in mod storage: " .. pos_str)
+	                            storage:set_string("maidroid_pos_" .. ent.nametag, pos_str)
+	                            stored = true
+	                        else
+	                            lf(func_name, "mod storage unavailable (nil)")
+	                        end
+	                    else
+	                        lf(func_name, "get_mod_storage not available")
+	                    end
+	                    -- Fallback: write to text file if mod storage failed
+	                    if (not stored) and maidroid_pos_file then
 
-                        local ok, err = pcall(save_maidroid_pos_fallback, ent.nametag, pos_str)
-                        if not ok then
-                            lf(func_name, "Error writing fallback file: " .. tostring(err))
-                        end
-                    end
-                    -- lf(func_name, "nametag missing or empty")
-                end
+	                        local ok, err = pcall(save_maidroid_pos_fallback, ent.nametag, pos_str)
+	                        if not ok then
+	                            lf(func_name, "Error writing fallback file: " .. tostring(err))
+	                        end
+	                    end
+	                    -- lf(func_name, "nametag missing or empty")
+	                end
 
-                local inactive = ent.pause or ent.state == maidroid.states.IDLE
-                if inactive then
-                    -- find nearest player distance
-                    local min_dist = math.huge
-                    for _, p2 in ipairs(players) do
-                        local d = vector.distance(obj:get_pos(), p2:get_pos())
-                        if d < min_dist then min_dist = d end
-                    end
-                    if min_dist > 200 then -- choose your threshold
-                        table.insert(maidroids_far, {ent = ent, dist = min_dist})
-                    end
-                end
-            end
-        end
-    end
+	                local inactive = ent.pause or ent.state == maidroid.states.IDLE
+	                if inactive then
+	                    -- find nearest player distance
+	                    local min_dist = math.huge
+	                    for _, p2 in ipairs(players) do
+	                        local d = vector.distance(obj:get_pos(), p2:get_pos())
+	                        if d < min_dist then min_dist = d end
+	                    end
+	                    if min_dist > 200 then -- choose your threshold
+	                        table.insert(maidroids_far, {ent = ent, dist = min_dist})
+	                    end
+	                end
+	            end
+	        end
+	    end
 
-    -- e.g. log them occasionally
-    for _, info in ipairs(maidroids_far) do
-        minetest.log("warning",
-            "[maidroid] far inactive maidroid: "
-            .. (info.ent.nametag or "<unnamed>") ..
-            " at " .. minetest.pos_to_string(vector.round(info.ent:get_pos())) ..
-            " dist=" .. math.floor(info.dist))
-    end
+	    -- e.g. log them occasionally
+	    for _, info in ipairs(maidroids_far) do
+	        minetest.log("warning",
+	            "[maidroid] far inactive maidroid: "
+	            .. (info.ent.nametag or "<unnamed>") ..
+	            " at " .. minetest.pos_to_string(vector.round(info.ent:get_pos())) ..
+	            " dist=" .. math.floor(info.dist))
+	    end
 end)

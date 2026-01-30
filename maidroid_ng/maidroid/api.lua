@@ -222,12 +222,17 @@ if maidroid.mods.sickles then
 	group_rotation.scythes = group_rotation.hoe
 end
 
+-- ,,tool
 local set_tool = function(self, name)
 	local p = vector.new(0.375, 3.5, -1.75)
 	local r = vector.new(-75, 0, 90)
 
+    -- lf("maidroid", "tool_rotation: " .. dump(tool_rotation))
+
+    -- lf("maidroid", "------------------------------------------- set_tool: " .. name)
 	if tool_rotation[name] then
 		r = tool_rotation[name]
+        -- lf("maidroid", "------------------------------------------- tool_rotation: " .. name.." "..minetest.pos_to_string(r))
 	else
 		for group, rotation in pairs(group_rotation) do
 			if minetest.get_item_group(name, group) > 0 then
@@ -241,10 +246,14 @@ local set_tool = function(self, name)
     -- local r = vector.new(-75, -90, 90)
     -- local p = vector.new(0.375, 3.5, -1.75)
     local p = vector.new(0.375, 3.5, 1.5)
+    -- local r = vector.new(180, 180, 180)
+
+    lf("maidroid", "------------------------------------------- set_tool position: " .. minetest.pos_to_string(p) .. " rotation: " .. minetest.pos_to_string(r))
+    
     
 	self.wield_item:set_properties({ wield_item = name })
 	-- self.wield_item:set_attach(self.object, "Arm_R", p, r)
-	self.wield_item:set_attach(self.object, "Arm_Right", p, r)
+	self.wield_item:set_attach(self.object, "Arm_Left", p, r)
 end
 
 -- get_pos get the position of maidroid object
