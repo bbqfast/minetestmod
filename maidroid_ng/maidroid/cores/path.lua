@@ -23,8 +23,15 @@ on_step = function(self, dtime, moveresult)
 		return
 	end
 	
-	if self.timers.walk >= timers.walk_max then -- time over.
-		wander_core.to_wander(self, "path:on_step_timeout")
+	-- Respect per-core walk_max when timing out path following.
+	local core_walk_max = (self.core and self.core.walk_max) or timers.walk_max
+	if self.timers.walk >= core_walk_max then -- time over.
+		wander_core.to_wander(
+			self,
+			"path:on_step_TIMEOUT, walk=" .. tostring(self.timers.walk) .. "/" .. tostring(core_walk_max),
+			self.timers.walk,
+			self.timers.change_dir
+		)
 		return true
 	end
 

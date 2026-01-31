@@ -719,8 +719,8 @@ minetest.register_entity("lottmobs:ltangel", {
 
         if player_has_angel_ring then
             self.hp_max = 2000
-            regen_timer = 1
-            regen_amount = math.ceil(self.hp_max * 0.05)
+            local regen_timer = 1
+            local regen_amount = math.ceil(self.hp_max * 0.05)
             -- 200% more attack damage (total 3x base) when owner has angel ring
             -- if self.hp > self.hp_max then
             --     self.hp = self.hp_max
@@ -812,7 +812,7 @@ minetest.register_entity("lottmobs:ltangel", {
 
                 -- new code
                 -- Step 1: Check for nearby hostiles
-                hostile_radius = 12
+                local hostile_radius = 12
                 run_dist = 12
                 local hostiles = minetest.get_objects_inside_radius(pos, hostile_radius)
                 if not self.is_disabled then
