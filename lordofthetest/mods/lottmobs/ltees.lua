@@ -717,10 +717,12 @@ minetest.register_entity("lottmobs:ltangel", {
         end
 
 
+        local regen_amount = 2
+        local regen_timer = 1
         if player_has_angel_ring then
             self.hp_max = 2000
-            local regen_timer = 1
-            local regen_amount = math.ceil(self.hp_max * 0.05)
+            regen_timer = 1
+            regen_amount = math.ceil(self.hp_max * 0.05)
             -- 200% more attack damage (total 3x base) when owner has angel ring
             -- if self.hp > self.hp_max then
             --     self.hp = self.hp_max
@@ -756,6 +758,7 @@ minetest.register_entity("lottmobs:ltangel", {
                 self.hp_regen_timer = 0
                 if self.hp and self.hp < self.hp_max then
                     self.hp = self.hp + regen_amount
+                    lf("ltangel hp", "regen amount: " .. regen_amount .. ", HP: " .. self.hp .. "/" .. self.hp_max)
                     if self.hp > self.hp_max then
                         self.hp = self.hp_max
                     end

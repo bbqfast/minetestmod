@@ -92,6 +92,9 @@ minetest.register_tool("maidroid:capture_rod", {
 
 		local sdata = luaentity:get_staticdata("capture")
 		local sdatad = minetest.deserialize(sdata)
+        if sdatad == nil then
+            sdatad = {}
+        end
 		sdatad.textures = eeee["textures"][1]
 		sdata = minetest.serialize(sdatad)
 		-- stack:set_metadata(luaentity:get_staticdata("capture"))

@@ -9,6 +9,11 @@ minetest.log("warning", "*************************  maidroid API")
 local S = maidroid.translator
 local mods = maidroid.mods
 
+-- Track spawned maidroid names to prevent duplicates
+local spawned_maidroid_names = {}
+local total_maidroids_spawned = 0
+local MAX_MAIDROIDS_ALLOWED = 3
+
 mydump = function(lbl, obj)
 	pre="**************************************************"
 	pre="++++++++++++++++++++++++++++++++++++++++++++++++++"
@@ -17,7 +22,7 @@ mydump = function(lbl, obj)
 	end
 
 	-- minetest.log("warning", pre..msg)
-	-- minetest.log("warning", "====================== "..lbl..":"..dump(obj))
+	minetest.log("warning", "====================== "..lbl..":"..dump(obj))
 	
 	
 end
@@ -195,8 +200,13 @@ local select_core = function(self)
 			self.hat:remove()
 		end
 		if self.core.hat then -- wear new core hat
-			self.hat = minetest.add_entity(self:get_pos(), self.core.hat.name)
-			self.hat:set_attach(self.object, "Head", self.core.hat.offset, self.core.hat.rotation)
+			local pos = self:get_pos()
+			if pos then
+				self.hat = minetest.add_entity(pos, self.core.hat.name)
+				self.hat:set_attach(self.object, "Head", self.core.hat.offset, self.core.hat.rotation)
+			else
+				minetest.log("warning", "maidroid: cannot add hat entity - maidroid position is nil")
+			end
 		end
 	end
 
@@ -1081,6 +1091,14 @@ end
 
 -- on_activate is a callback function that is called when the object is created or recreated.
 local function on_activate(self, staticdata)
+	-- Check if we've already spawned the maximum number of maidroids
+	-- if total_maidroids_spawned >= MAX_MAIDROIDS_ALLOWED then
+	-- 	minetest.log("error", "maidroid: maximum number of maidroids (" .. MAX_MAIDROIDS_ALLOWED .. ") already spawned. Removing duplicate maidroid.")
+	-- 	self.object:remove()
+	-- 	return
+	-- end
+	
+	
 	-- parse the staticdata, and compose a inventory.
 	if staticdata == "" then
 		minetest.log("warning", "*************************  on_activate null staticdata")
@@ -1119,6 +1137,7 @@ local function on_activate(self, staticdata)
 		local data = minetest.deserialize(staticdata)
 
 		self.nametag = data.nametag
+        -- self.display_name = data.nametag
 		self.owner = data.owner_name
 		self.tbchannel = data.tbchannel or ""
 
@@ -1157,6 +1176,20 @@ local function on_activate(self, staticdata)
 	self.timers.wander_skip = 0
 	self.timers.change_direction = 0
 
+	-- Check if this maidroid name has already been spawned
+	if spawned_maidroid_names[self.nametag] then
+		minetest.log("warning", "maidroid:maidroid already spawned with name '" .. self.nametag .. "' - removing duplicate.")
+		-- self.object:remove()
+		-- return
+	end
+	
+	-- Mark this name as spawned and increment total count
+	spawned_maidroid_names[self.nametag] = true
+	total_maidroids_spawned = total_maidroids_spawned + 1
+	
+	minetest.log("warning", "maidroid: activating maidroid #" .. total_maidroids_spawned .. "/" .. MAX_MAIDROIDS_ALLOWED .. " with name '" .. self.nametag .. "'")
+
+
 	self:select_core()
 end
 
@@ -1189,6 +1222,11 @@ local get_staticdata = function(self, captured)
 	-- minetest.log("warning", "====================== get_staticdata2:"..dump(data))
 	mydump("get_staticdata2 - data", data)
 	-- minetest.log("warning", "====================== get_staticdata3:"..dump(self:get_properties()))
+	-- check if object is destroyed, then return nil
+	if not self.object or not self.object:get_pos() then
+        lf("get_staticdata", "object is destroyed, name=" .. self.nametag)
+		return nil
+	end
 
 	local eeee = self.object:get_properties()
 	-- minetest.log("warning", "====================== get_staticdata3:"..dump(eeee))
@@ -1577,6 +1615,7 @@ end
 -- register_maidroid registers a definition of a new maidroid.
 local register_maidroid = function(product_name, def)
 	minetest.log("warning", "************************************************** register_maidroid = "..product_name)
+	
 	maidroid.registered_maidroids[product_name] = true
 
 	def.collisionbox = {-0.25, -0.5, -0.25, 0.25, 0.625, 0.25}
@@ -1623,12 +1662,15 @@ local register_maidroid = function(product_name, def)
 		get_staticdata = get_staticdata,
 		on_deactivate  = function(self)
 			mylog("maidroid_on_deactivate")
-			self.wield_item:remove()
+            
+			if self.wield_item then
+				self.wield_item:remove()
+			end
 			if self.hat then
 				self.hat:remove()
 			end
 		end,
-
+ 
 		-- extra methods.
 		get_inventory      = get_inventory,
 		get_front          = get_front,
