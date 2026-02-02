@@ -447,6 +447,7 @@ local hostile_mobs = {
     ["lottmobs:ent"] = true,
     ["lottmobs:uruk_hai"] = true,
     ["lottmobs:warg"] = true,
+    ["lottmobs:dunlending"] = true,
 }
 
 local function is_hostile_mob(name)

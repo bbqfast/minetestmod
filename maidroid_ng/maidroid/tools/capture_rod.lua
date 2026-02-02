@@ -19,27 +19,9 @@ local maid_skins = {
     -- Add more skin filenames here
 }
 
-mydump = function(lbl, obj)
-	pre="**************************************************"
-	pre="++++++++++++++++++++++++++++++++++++++++++++++++++"
-	if msg == nil then
-		msg = "null"
-	end
-
-	-- minetest.log("warning", pre..msg)
-	-- minetest.log("warning", "====================== "..lbl..":"..dump(obj))
-	
-	
-end
-
-mylog = function(msg)
-	pre="**************************************************"
-	pre="++++++++++++++++++++++++++++++++++++++++++++++++++"
-	if msg == nil then
-		msg = "null"
-	end
-
-	-- minetest.log("warning", pre..msg)
+mydump = function(func, msg, obj)
+	-- uncommon to incrase verbose
+	-- lf(func, msg..dump(obj))
 end
 
 minetest.register_tool("maidroid:capture_rod", {
@@ -87,19 +69,20 @@ minetest.register_tool("maidroid:capture_rod", {
 
 		local eeee = luaentity.object:get_properties()
 		-- minetest.log("warning", "====================== capture_rod2:"..dump(eeee))
-		mydump("capture_rod2", eeee)
+		mydump("capture_rod", "capture_rod2: ", eeee)
 
 
 		local sdata = luaentity:get_staticdata("capture")
 		local sdatad = minetest.deserialize(sdata)
         if sdatad == nil then
+            minetest.log("warning", "ERROR:   staticdata should not be nil")
             sdatad = {}
         end
 		sdatad.textures = eeee["textures"][1]
 		sdata = minetest.serialize(sdatad)
 		-- stack:set_metadata(luaentity:get_staticdata("capture"))
 		-- minetest.log("warning", "====================== capture_rod3:"..dump(sdatad))
-		mydump("capture_rod3", sdatad)
+		mydump("capture_rod", "capture_rod3: ", sdatad)
 		stack:set_metadata(sdata)
 
 		-- ,,text
@@ -120,7 +103,7 @@ minetest.register_tool("maidroid:capture_rod", {
 		luaentity.wield_item:remove()
 		pos = obj:get_pos()
 		obj:remove()
-		mylog("Rod capture obj remove")
+        lf("capture_rod", "Rod capture obj remove")
 
 		if maidroid.settings.tools_capture_rod_wears or
 			not minetest.check_player_privs(user:get_player_name(), { maidroid = true }) then
@@ -177,7 +160,7 @@ for name, _ in pairs(maidroid.registered_maidroids) do
 			local meta = itemstack:get_metadata()
 			-- minetest.log("warning", "====================== captured_xxxxxx_2"..dump(meta["textures"]))
 			-- minetest.log("warning", "====================== captured_xxxxxx_2"..dump(meta))
-			mydump("captured_egg_2 metadata full", meta)
+			mydump("captured_egg", "captured_egg_2 metadata full: ", meta)
 			-- Fix stack metadata if it is an "old maidroid"
 			if maidroid.settings.compat then
 				if maidroid_name:find("maidroid_mk") then
@@ -194,7 +177,7 @@ for name, _ in pairs(maidroid.registered_maidroids) do
 			-- m_skin = meta["textures"]
 			meta = minetest.deserialize(meta)
 			-- minetest.log("warning", "====================== captured_xxxxxx_3"..dump(meta["textures"]))
-			mydump("captured_egg_3 textures", meta["textures"])
+			mydump("captured_egg", "captured_egg_3 textures: ", meta["textures"])
 			-- minetest.log("warning", "====================== captured_xxxxxx_3"..meta["textures"])
 			-- meta["textures"] = maidroid.generate_texture(tonumber(maidroid_name:sub(-2):gsub("k","")))
 			-- meta["textures"] = m_skin

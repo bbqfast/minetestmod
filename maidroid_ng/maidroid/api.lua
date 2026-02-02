@@ -1,4 +1,3 @@
-minetest.log("warning", "*************************  maidroid API")
 ------------------------------------------------------------
 -- Copyright (c) 2016 tacigar. All rights reserved.
 ------------------------------------------------------------
@@ -8,35 +7,19 @@ minetest.log("warning", "*************************  maidroid API")
 
 local S = maidroid.translator
 local mods = maidroid.mods
+local lf = maidroid.lf
+lf("api", "*************************  maidroid API")
 
 -- Track spawned maidroid names to prevent duplicates
 local spawned_maidroid_names = {}
 local total_maidroids_spawned = 0
 local MAX_MAIDROIDS_ALLOWED = 3
 
-mydump = function(lbl, obj)
-	pre="**************************************************"
-	pre="++++++++++++++++++++++++++++++++++++++++++++++++++"
-	if msg == nil then
-		msg = "null"
-	end
 
-	-- minetest.log("warning", pre..msg)
-	minetest.log("warning", "====================== "..lbl..":"..dump(obj))
-	
-	
+local mydump = function(func, msg, obj)
+    -- uncommon to incrase verbose
+	-- lf(func, msg..dump(obj))
 end
-
-mylog = function(msg)
-	pre="**************************************************"
-	pre="++++++++++++++++++++++++++++++++++++++++++++++++++"
-	if msg == nil then
-		msg = "null"
-	end
-
-	minetest.log("warning", pre..msg)
-end
-
 
 -- animation frame data of "models/maidroid.b3d".
 maidroid.animation = {
@@ -205,7 +188,7 @@ local select_core = function(self)
 				self.hat = minetest.add_entity(pos, self.core.hat.name)
 				self.hat:set_attach(self.object, "Head", self.core.hat.offset, self.core.hat.rotation)
 			else
-				minetest.log("warning", "maidroid: cannot add hat entity - maidroid position is nil")
+				lf("api", "maidroid: cannot add hat entity - maidroid position is nil")
 			end
 		end
 	end
@@ -844,7 +827,7 @@ end
 
 -- generate_texture return a string with the maidroid texture
 maidroid.generate_texture2 = function(index)
-	minetest.log("warning", "******************************************   generate_texture")
+	lf("api", "******************************************   generate_texture")
 	-- error("This is an error message", 2)
 
 	-- ,,x1
@@ -865,7 +848,7 @@ maidroid.generate_texture2 = function(index)
 end
 
 maidroid.generate_texture = function(index)
-	minetest.log("warning", "******************************************   generate_texture")
+	lf("api", "******************************************   generate_texture")
 	texture_name=""
 	return texture_name
 end
@@ -1093,7 +1076,7 @@ end
 local function on_activate(self, staticdata)
 	-- Check if we've already spawned the maximum number of maidroids
 	-- if total_maidroids_spawned >= MAX_MAIDROIDS_ALLOWED then
-	-- 	minetest.log("error", "maidroid: maximum number of maidroids (" .. MAX_MAIDROIDS_ALLOWED .. ") already spawned. Removing duplicate maidroid.")
+	-- lf("api", "maidroid: maximum number of maidroids (" .. MAX_MAIDROIDS_ALLOWED .. ") already spawned. Removing duplicate maidroid.")
 	-- 	self.object:remove()
 	-- 	return
 	-- end
@@ -1101,13 +1084,13 @@ local function on_activate(self, staticdata)
 	
 	-- parse the staticdata, and compose a inventory.
 	if staticdata == "" then
-		minetest.log("warning", "*************************  on_activate null staticdata")
+		lf("api", "*************************  on_activate null staticdata")
 		create_inventory(self)
 	else
-		minetest.log("warning", "*************************  on_activate has staticdata")
+		lf("api", "*************************  on_activate has staticdata")
 		-- Clone and remove object if it is an "old maidroid"
 		if maidroid.settings.compat and self.name:find("maidroid_mk", 9) then
-			minetest.log("warning", "[MOD] maidroid: old maidroid found. replacing with new")
+			lf("api", "[MOD] maidroid: old maidroid found. replacing with new")
 
 			-- Fix old datas
 			local data = minetest.deserialize(staticdata)
@@ -1147,7 +1130,7 @@ local function on_activate(self, staticdata)
 		end
 
 		local my_texture = maid_skins[1]
-		minetest.log("warning", "*************************  on_activate: "..tostring(data.textures))
+		lf("api", "*************************  on_activate: "..tostring(data.textures))
 		self.textures = { my_texture }
 		-- data.textures = { my_texture }
 		self.object:set_properties({
@@ -1178,7 +1161,7 @@ local function on_activate(self, staticdata)
 
 	-- Check if this maidroid name has already been spawned
 	if spawned_maidroid_names[self.nametag] then
-		minetest.log("warning", "maidroid:maidroid already spawned with name '" .. self.nametag .. "' - removing duplicate.")
+		lf("api", "maidroid:maidroid already spawned with name '" .. self.nametag .. "' - removing duplicate.")
 		-- self.object:remove()
 		-- return
 	end
@@ -1187,7 +1170,7 @@ local function on_activate(self, staticdata)
 	spawned_maidroid_names[self.nametag] = true
 	total_maidroids_spawned = total_maidroids_spawned + 1
 	
-	minetest.log("warning", "maidroid: activating maidroid #" .. total_maidroids_spawned .. "/" .. MAX_MAIDROIDS_ALLOWED .. " with name '" .. self.nametag .. "'")
+	lf("api", "maidroid: activating maidroid #" .. total_maidroids_spawned .. "/" .. MAX_MAIDROIDS_ALLOWED .. " with name '" .. self.nametag .. "'")
 
 
 	self:select_core()
@@ -1217,11 +1200,12 @@ local get_staticdata = function(self, captured)
 
 	-- data.textures = luaentity.object:get_properties()["textures"][1]
 
-	-- minetest.log("warning", "====================== get_staticdata1:"..dump(self))
-	mydump("get_staticdata1 - self:", self)
-	-- minetest.log("warning", "====================== get_staticdata2:"..dump(data))
-	mydump("get_staticdata2 - data", data)
-	-- minetest.log("warning", "====================== get_staticdata3:"..dump(self:get_properties()))
+	-- lf("api", "====================== get_staticdata1:"..dump(self))
+	lf("get_staticdata", "====================== get_staticdata1:"..dump(self))
+    mydump("get_staticdata", "====================== get_staticdata1", self)
+	-- lf("api", "====================== get_staticdata2:"..dump(data))
+    mydump("get_staticdata", "====================== get_staticdata2", data)
+	-- lf("api", "====================== get_staticdata3:"..dump(self:get_properties()))
 	-- check if object is destroyed, then return nil
 	if not self.object or not self.object:get_pos() then
         lf("get_staticdata", "object is destroyed, name=" .. self.nametag)
@@ -1229,14 +1213,14 @@ local get_staticdata = function(self, captured)
 	end
 
 	local eeee = self.object:get_properties()
-	-- minetest.log("warning", "====================== get_staticdata3:"..dump(eeee))
-	mydump("get_staticdata2 - get_properties", eeee)
+	-- lf("api", "====================== get_staticdata3:"..dump(eeee))
+    mydump("get_staticdata", "====================== get_staticdata3", eeee)
 	-- ,,x1,,skip
 	-- to work aroudn texture loss problem save texture from object properties
 	data["textures"] = eeee["textures"][1]
 
 	-- if self:get_properties ~= nil then 
-	-- 	minetest.log("warning", "====================== get_staticdata3:"..dump(self:get_properties()))
+    -- mydump("get_staticdata", "====================== get_staticdata3", self:get_properties())
 	-- end
 
 
@@ -1270,7 +1254,7 @@ local get_staticdata = function(self, captured)
 				id_str = tostring(self.object)
 			end
 		end
-		minetest.log("warning", "====================== get_staticdata3 : " .. tostring(self.nametag)
+		lf("api", "====================== get_staticdata3 : " .. tostring(self.nametag)
 			.. "  entity_id=" .. id_str)
 	end
 	
@@ -1281,7 +1265,7 @@ local get_staticdata = function(self, captured)
         log("Inner pcall caught:", msg)
     end
 	local dumptext = ok and ser or tostring(data)
-	mylog("maidroid staticdata dump: " .. dumptext)
+	lf("api", "maidroid staticdata dump: " .. dumptext)
 
 	local worldpath = minetest.get_worldpath() or "."
 
@@ -1301,7 +1285,7 @@ local get_staticdata = function(self, captured)
 		return s:gsub("[^%w%._%-]", "_")
 	end)
 	if not ok then
-		minetest.log("error", "maidroid: failed to sanitize id_str: " .. tostring(safe_id))
+		lf("api", "maidroid: failed to sanitize id_str: " .. tostring(safe_id))
 		-- local fallback = tostring(id_str or "")
 		-- safe_id = fallback:gsub("[^%w%._%-]", "_")
 	end
@@ -1312,9 +1296,9 @@ local get_staticdata = function(self, captured)
 	if file then
 		file:write(dumptext)
 		file:close()
-		minetest.log("warning", "Saved maidroid staticdata to: " .. filepath)
+		lf("api", "Saved maidroid staticdata to: " .. filepath)
 	else
-		minetest.log("warning", "Failed saving maidroid staticdata to: " .. filepath .. " error: " .. tostring(ferr))
+		lf("api", "Failed saving maidroid staticdata to: " .. filepath .. " error: " .. tostring(ferr))
 	end
 
 
@@ -1324,15 +1308,15 @@ local get_staticdata = function(self, captured)
 
 	if ok_read and readtext then
 		if readtext == dumptext then
-			minetest.log("warning", "maidroid: staticdata verification OK: " .. filename)
+			lf("api", "maidroid: staticdata verification OK: " .. filename)
 		else
-			minetest.log("warning", "maidroid: staticdata verification FAILED (content mismatch): " .. filename)
+			lf("api", "maidroid: staticdata verification FAILED (content mismatch): " .. filename)
 			-- log small prefixes to avoid overly large logs
-			mylog("expected prefix: " .. tostring(dumptext):sub(1,200))
-			mylog("read     prefix: " .. tostring(readtext):sub(1,200))
+			lf("api", "expected prefix: " .. tostring(dumptext):sub(1,200))
+			lf("api", "read     prefix: " .. tostring(readtext):sub(1,200))
 		end
 	else
-		minetest.log("warning", "maidroid: staticdata verification error reading file: " .. tostring(readtext))
+		lf("api", "maidroid: staticdata verification error reading file: " .. tostring(readtext))
 	end
 
 	return minetest.serialize(data)
@@ -1447,7 +1431,7 @@ end
 local toggle_entity_jump = function(self, _, moveresult)
 
 	if not moveresult then
-		minetest.log("warning", "toggle_entity_jump: moveresult is nil")
+		lf("api", "toggle_entity_jump: moveresult is nil")
 		return
 	end
 
@@ -1614,7 +1598,7 @@ end
 -- ,,rm
 -- register_maidroid registers a definition of a new maidroid.
 local register_maidroid = function(product_name, def)
-	minetest.log("warning", "************************************************** register_maidroid = "..product_name)
+	lf("api", "************************************************** register_maidroid = "..product_name)
 	
 	maidroid.registered_maidroids[product_name] = true
 
@@ -1661,7 +1645,7 @@ local register_maidroid = function(product_name, def)
 		on_punch       = on_punch,
 		get_staticdata = get_staticdata,
 		on_deactivate  = function(self)
-			mylog("maidroid_on_deactivate")
+			lf("api", "maidroid_on_deactivate")
             
 			if self.wield_item then
 				self.wield_item:remove()
@@ -1708,7 +1692,7 @@ local register_maidroid = function(product_name, def)
 		stack_max = 1,
 
 		on_use = function(itemstack, user, pointed_thing)
-			minetest.log("warning", "====================== maidroid_egg:on_use")
+			lf("api", "====================== maidroid_egg:on_use")
 
 			if pointed_thing.above == nil then
 				return nil
@@ -1718,7 +1702,7 @@ local register_maidroid = function(product_name, def)
 
 			if new_maidroid then
 				local rand = math.random(6)
-				minetest.log("warning", "====================== maidroid_egg:rand="..tostring(rand))
+				lf("api", "====================== maidroid_egg:rand="..tostring(rand))
 				local m_skin = maid_skins[rand]
 				-- Set the custom texture for the "maidroid:maidroid" entity
 				new_maidroid:set_properties({
@@ -1752,7 +1736,7 @@ local register_maidroid = function(product_name, def)
 				end
 				new_maidroid:set_nametag_attributes({ text = display_name, color = { a = 255, r = 96, g = 224, b = 96 } })
 
-				mydump("maidroid_egg_on_use", new_maidroid:get_properties())
+                mydump("maidroid_egg_on_use", "====================== maidroid_egg_on_use", new_maidroid:get_properties())
 				-- print(new_maidroid:get_properties())
 
 				-- new_maidroid:get_luaentity().set_set_textures({ { name = m_skin } })
