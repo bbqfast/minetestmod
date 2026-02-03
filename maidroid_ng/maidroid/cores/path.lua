@@ -66,6 +66,8 @@ to_follow_path = function(self, path, destination, finalize, action)
 	self.state = maidroid.states.PATH
 	self.path = path
 	self.destination = destination
+	self.path_start_pos = self:get_pos() -- Store starting position
+	print("Starting position stored: " .. minetest.pos_to_string(self.path_start_pos))
 	self.timers.find_path = 0 -- find path counter
 	self.timers.walk = 0 -- walk counter
 	self.finalize = finalize

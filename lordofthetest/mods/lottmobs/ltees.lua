@@ -25,6 +25,35 @@ local function clear_ltee_hud(self)
 	self.hud_player = nil
 end
 
+-- ,,x1
+-- Helper function to attach a tool to an ltee
+function attach_tool(self, tool_name, attachment_point, position, rotation)
+	attachment_point = attachment_point or "Arm_Left"
+	position = position or {x = 0, y = 0, z = 0}
+	rotation = rotation or {x = 0, y = 0, z = 0}
+	
+	-- Remove existing wielded item if present
+	if self.wield_item and self.wield_item:get_pos() then
+		self.wield_item:remove()
+	end
+	
+	-- Create new wielded item entity using itemframes entity
+	-- self.wield_item = minetest.add_entity(self.object:get_pos(), "itemframes:item")
+    self.wield_item = minetest.add_entity(self.object:get_pos(), "maidroid:wield_item", minetest.serialize({state = "new"}))
+	if self.wield_item then
+		local lua_entity = self.wield_item:get_luaentity()
+		if lua_entity then
+			-- Set the texture to the tool name
+			lua_entity.texture = tool_name
+			self.wield_item:set_properties({textures = {tool_name}})
+		end
+		-- Attach the tool to the specified attachment point
+		self.wield_item:set_attach(self.object, attachment_point, position, rotation)
+		return true
+	end
+	return false
+end
+
 -- Per-player HUDs (for lottmobs:ltee)
 local function handle_player_hud(self, player, dtime, pos, target_pos, quotes, min_dist, color, hud_pos)
 	hud_pos = hud_pos or {x = 0.5, y = 0.8}
@@ -603,6 +632,7 @@ minetest.register_entity("lottmobs:ltangel", {
         self.say = true
 
 		self:update_hp_tag()
+ 
 	end,	
 
     on_punch = function(self, hitter, time_from_last_punch, tool_capabilities, dir, damage)
@@ -699,6 +729,16 @@ minetest.register_entity("lottmobs:ltangel", {
 		-- lottmobs_trader(self, clicker, entity, lottmobs.elf, "gui_elfbg.png", "GAMEelf")
 	end,	
     on_step = function(self, dtime)
+        -- Attach tool on first step if not already done
+        -- ,,x2
+        if not self.tool_attached then
+            local p = vector.new(0.375, 3.5, -1.75)
+            local r = vector.new(-75, 0, 90)
+            r = vector.new(-75, -90, 90)
+            attach_tool(self, "default:sword_steel", "Arm_Right", p, r)
+            self.tool_attached = true
+        end
+
         -- Check if player has angel ring in inventory
         local player_has_angel_ring = false
         if self.player_name then
@@ -904,7 +944,7 @@ minetest.register_entity("lottmobs:ltangel", {
 					local yaw = math.atan2(dir.z, dir.x) + math.pi / 2
 					yaw = yaw + math.pi
 					self.object:set_yaw(yaw)
-					self.object:set_velocity(vector.multiply(dir, 1))
+					self.object:set_velocity(vector.multiply(dir, 0.2))
 					self:set_animation("walk")
 				else
 					-- minetest.log("warning", "NPC reached player, stopping")

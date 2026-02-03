@@ -15,6 +15,16 @@ local timers = maidroid.timers
 local lf = maidroid.lf
 local chest_reach_dist = 2.5
 
+-- Treat chests as blocking for generic cooker movement, similar to fences,
+-- so the maidroid does not walk past chests while pathing or wandering.
+local function is_fence_or_chest(name)
+	if maidroid.helpers.is_fence(name) then
+		return true
+	end
+    return false
+	-- return name == "default:chest" or name == "default:chest_locked"
+end
+
 -- Load cooker items configuration
 local cooker_items = dofile(maidroid.modpath .. "/cores/cooker_items.lua")
 local all_cookable_items = cooker_items.all_cookable_items
@@ -25,6 +35,7 @@ local all_take_item_names = cooker_items.all_take_item_names
 local chest_taken_metrics = {}
 local action_taken_metrics = {}
 local craft_metrics = {}
+local furnace_taken_metrics = {}
 -- Timer for periodic metrics logging
 local metrics_log_timer = 0
 local metrics_log_interval = 35 -- seconds
@@ -62,6 +73,17 @@ local function log_chest_taken_metrics()
 			table.insert(craft_parts, string.format("%s:%d", item_name, count))
 		end
 		lf("craft_metrics", "Craft Metrics: " .. table.concat(craft_parts, ", "))
+	end
+	
+	-- Log furnace taken metrics
+	if next(furnace_taken_metrics) == nil then
+		lf("furnace_metrics", "No items taken from furnaces yet.")
+	else
+		local furnace_parts = {}
+		for item_name, count in pairs(furnace_taken_metrics) do
+			table.insert(furnace_parts, string.format("%s:%d", item_name, count))
+		end
+		lf("furnace_metrics", "Furnace Taken Metrics: " .. table.concat(furnace_parts, ", "))
 	end
     lf("chest_metrics", "**************** End Metrics ****************")
 
@@ -387,6 +409,7 @@ end
 --   { "name", N }
 -- The first spec for which the maidroid has matching items and the furnace
 -- has room will be fed into the correct list (fuel/src).
+-- ,,fg3
 local function feed_furnace_from_inventory_generic(droid, pos, items)
 	if not pos then
 		return false
@@ -422,19 +445,25 @@ local function feed_furnace_from_inventory_generic(droid, pos, items)
 		end
 		if name and count and count > 0 then
 			local listname = (name == "default:coal_lump") and "fuel" or "src"
-			-- Try to remove up to 'count' items; if the player has fewer,
-			-- remove and use whatever is available.
-			local want = name .. " " .. tostring(count)
-			local stack = inv:remove_item("main", want)
-			if not stack:is_empty() then
-				if not finv:room_for_item(listname, stack) then
-					-- Not enough room; put items back and try next spec.
-					inv:add_item("main", stack)
-				else
-					finv:add_item(listname, stack)
-					lf("generic_cooker", "feed_furnace_from_inventory_generic: added " .. tostring(stack:get_count()) .. " " .. name .. " to " .. listname .. " at " .. minetest.pos_to_string(pos))
-					return true
+			-- Check if maidroid has more than 5 of this item type
+			local current_stack = inv:contains_item("main", name .. " 5")
+			if current_stack then
+				-- Try to remove up to 'count' items; if the player has fewer,
+				-- remove and use whatever is available.
+				local want = name .. " " .. tostring(count)
+				local stack = inv:remove_item("main", want)
+				if not stack:is_empty() then
+					if not finv:room_for_item(listname, stack) then
+						-- Not enough room; put items back and try next spec.
+						inv:add_item("main", stack)
+					else
+						finv:add_item(listname, stack)
+						lf("generic_cooker", "feed_furnace_from_inventory_generic: added " .. tostring(stack:get_count()) .. " " .. name .. " to " .. listname .. " at " .. minetest.pos_to_string(pos))
+						return true
+					end
 				end
+			else
+				lf("generic_cooker", "feed_furnace_from_inventory_generic: skipping " .. name .. " - only have 5 or fewer")
 			end
 		end
 	end
@@ -443,10 +472,61 @@ local function feed_furnace_from_inventory_generic(droid, pos, items)
 	return false
 end
 
--- ,,fg2
--- Combined helper: if furnace is active, do nothing;
--- if inactive and has finished items, collect them;
--- otherwise, feed the specified item into the furnace.
+local function add_coal_fuel_if_needed(droid, pos, finv)
+	-- If fuel is less than 20, and the droid has at least 5 coal, try to add 5 coal as fuel.
+	local fuel_list = finv:get_list("fuel") or {}
+	local fuel_count = 0
+	for _, stack in ipairs(fuel_list) do
+		if not stack:is_empty() then
+			fuel_count = fuel_count + stack:get_count()
+		end
+	end
+	if fuel_count < 20 then
+		local inv = droid:get_inventory()
+		if inv:contains_item("main", "default:coal_lump 5")
+			and finv:room_for_item("fuel", "default:coal_lump 5") then
+			local coal_stack = inv:remove_item("main", "default:coal_lump 5")
+			if not coal_stack:is_empty() then
+				finv:add_item("fuel", coal_stack)
+				lf("generic_cooker:feed_get_from_furnace__generic",
+					"added 5 coal to furnace fuel at " .. minetest.pos_to_string(pos) .. " (fuel was " .. fuel_count .. ")")
+			end
+		end
+	end
+end
+
+local function collect_finished_items_from_furnace(droid, pos, finv)
+	-- First, try to collect finished items from dst if any.
+	local dst = finv:get_list("dst") or {}
+	local collected = {}
+	for idx, stack in ipairs(dst) do
+		if not stack:is_empty() then
+			collected[#collected + 1] = stack
+			dst[idx] = ItemStack("")
+		end
+	end
+	if #collected > 0 then
+		finv:set_list("dst", dst)
+		droid:add_items_to_main(collected)
+		
+		-- Update furnace_taken_metrics
+		for _, stack in ipairs(collected) do
+			local item_name = stack:get_name()			
+			furnace_taken_metrics[item_name] = (furnace_taken_metrics[item_name] or 0) + stack:get_count()
+			lf("furnace_metrics", "furnace_taken_metrics updated: " .. item_name .. " = " .. furnace_taken_metrics[item_name])
+		end
+		
+		lf("generic_cooker:feed_get_from_furnace__generic",
+			"collected finished items from furnace at " .. minetest.pos_to_string(pos))
+            return true
+        end
+        return false
+    end
+    
+    -- Combined helper: if furnace is active, do nothing;
+    -- if inactive and has finished items, collect them;
+    -- otherwise, feed the specified item into the furnace.
+    -- ,,fg2
 local function feed_get_from_furnace__generic(droid, pos)
     lf("generic_cooker:feed_get_from_furnace__generic", "pos=" .. minetest.pos_to_string(pos))
 	
@@ -481,51 +561,15 @@ local function feed_get_from_furnace__generic(droid, pos)
 
 	local meta = minetest.get_meta(pos)
 	local finv = meta and meta:get_inventory()
-	if finv then
-		-- If there is no fuel, and the droid has at least 5 coal, try to add 5 coal as fuel.
-		local fuel_list = finv:get_list("fuel") or {}
-		local has_fuel = false
-		for _, stack in ipairs(fuel_list) do
-			if not stack:is_empty() then
-				has_fuel = true
-				break
-			end
-		end
-		if not has_fuel then
-			local inv = droid:get_inventory()
-			if inv:contains_item("main", "default:coal_lump 5")
-				and finv:room_for_item("fuel", "default:coal_lump 5") then
-				local coal_stack = inv:remove_item("main", "default:coal_lump 5")
-				if not coal_stack:is_empty() then
-					finv:add_item("fuel", coal_stack)
-					lf("generic_cooker:feed_get_from_furnace__generic",
-						"added 5 coal to furnace fuel at " .. minetest.pos_to_string(pos))
-				end
-			end
-		end
-
-		-- First, try to collect finished items from dst if any.
-		local dst = finv:get_list("dst") or {}
-		local collected = {}
-		for idx, stack in ipairs(dst) do
-			if not stack:is_empty() then
-				collected[#collected + 1] = stack
-				dst[idx] = ItemStack("")
-			end
-		end
-		if #collected > 0 then
-			finv:set_list("dst", dst)
-			droid:add_items_to_main(collected)
-			lf("generic_cooker:feed_get_from_furnace__generic",
-				"collected finished items from furnace at " .. minetest.pos_to_string(pos))
-			return true
-		end
-	end
+    
+    collect_finished_items_from_furnace(droid, pos, finv)
+    
+    add_coal_fuel_if_needed(droid, pos, finv)
 
 	return feed_furnace_from_inventory_generic(droid, pos, all_cookable_items)
 end
 
--- ,,fg1,
+-- ,,fg1,,fur
 -- Pathfinding helper: walk to a nearby furnace and then perform the
 -- combined feed/get behavior defined in feed_get_from_furnace__generic.
 local function try_feed_get_from_furnace__generic(droid, pos)
@@ -573,6 +617,14 @@ local function feed_furnace_from_inventory(droid, pos)
 		if #collected > 0 then
 			finv:set_list("dst", dst)
 			droid:add_items_to_main(collected)
+			
+			-- Update furnace_taken_metrics
+			for _, stack in ipairs(collected) do
+				local item_name = stack:get_name()
+				furnace_taken_metrics[item_name] = (furnace_taken_metrics[item_name] or 0) + stack:get_count()
+				lf("furnace_metrics", "furnace_taken_metrics updated: " .. item_name .. " = " .. furnace_taken_metrics[item_name])
+			end
+			
 			lf("generic_cooker", "collected finished items from furnace at " .. minetest.pos_to_string(furnace_pos))
 		end
 	end
@@ -1124,6 +1176,13 @@ act = function(droid, dtime)
         craft_rice_flour(droid)
 	end
 
+	-- Teleport back to starting position if available
+	if droid.path_start_pos then
+		droid.object:set_pos(droid.path_start_pos)
+		lf("generic_cooker:act", ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Teleported back to start pos: " .. minetest.pos_to_string(vector.round(droid.path_start_pos)))
+	end
+
+
 	-- Action finished: return cleanly to wander behavior, like waffler.to_wander
 	return to_wander(droid, "generic_cooker:act")
 end
@@ -1151,9 +1210,54 @@ task = function(droid)
 	end
 end
 
+-- Check for fence detection failures
+local check_fence_detection = function(droid)
+	local front = droid:get_front()
+	local below1 = vector.add(front, {x = 0, y = -1, z = 0})
+	local below2 = vector.add(front, {x = 0, y = -2, z = 0})
+	local pos_here = vector.round(droid:get_pos())
+	local pos_here_below = vector.add(pos_here, {x = 0, y = -1, z = 0})
+	local n_front = minetest.get_node(front).name
+	local n_below1 = minetest.get_node(below1).name
+	local n_below2 = minetest.get_node(below2).name
+	local n_here = minetest.get_node(pos_here).name
+	local n_here_below = minetest.get_node(pos_here_below).name
+	local has_fence = maidroid.helpers.is_fence(n_front)
+		or maidroid.helpers.is_fence(n_below1)
+		or maidroid.helpers.is_fence(n_below2)
+		or maidroid.helpers.is_fence(n_here)
+		or maidroid.helpers.is_fence(n_here_below)
+	if has_fence and not droid:is_blocked(maidroid.helpers.is_fence, true) then
+		local pos = vector.round(droid:get_pos())
+		minetest.log("warning",
+			"[maidroid fence debug] FAILED blocked detection (farming); droid=" .. minetest.pos_to_string(pos) ..
+			" front=" .. minetest.pos_to_string(front) ..
+			" below1=" .. minetest.pos_to_string(below1) ..
+			" below2=" .. minetest.pos_to_string(below2) ..
+			" n_front=" .. n_front ..
+			" n_below1=" .. n_below1 ..
+			" n_below2=" .. n_below2 ..
+			" n_here=" .. n_here ..
+			" n_here_below=" .. n_here_below)
+		if not droid.pause and droid.core and droid.core.on_pause then
+			droid.core.on_pause(droid)
+			droid.pause = true
+		end
+	end
+end
 -- ,,step
 on_step = function(droid, dtime, moveresult)
 	droid:pickup_item()
+
+	-- Check if maidroid is more than 20 blocks away from activation position
+	if droid._activation_pos then
+		local current_pos = droid:get_pos()
+		local distance = vector.distance(current_pos, droid._activation_pos)
+		if distance > 10 then
+			lf("generic_cooker", "Too far from activation (" .. string.format("%.1f", distance) .. " > 20), teleporting back")
+			droid.object:set_pos(droid._activation_pos)
+		end
+	end
 
 	-- Update metrics logging timer
 	metrics_log_timer = metrics_log_timer + dtime
@@ -1162,9 +1266,37 @@ on_step = function(droid, dtime, moveresult)
 		metrics_log_timer = 0 -- Reset timer
 	end
 
-	if droid.state == states.WANDER then
-		wander.on_step(droid, dtime, moveresult, task)
-	elseif droid.state == states.PATH then
+	if droid.state ~= maidroid.states.ACT and droid.state ~= maidroid.states.PATH then
+	-- if droid.state ~= maidroid.states.ACT  then
+		wander.on_step(droid, dtime, moveresult, task, is_fence_or_chest, true)
+		-- Check for fence detection failures
+		check_fence_detection(droid)
+	end
+    
+
+    if droid.state == states.PATH then
+		-- Even while following a path, still respect fences and chests by using the
+		-- same is_blocked logic; this avoids unexpectedly crossing them.
+		-- local isblocked = droid:is_blocked(is_fence_or_chest, true)
+		-- if isblocked then
+		-- 	lf("generic_cooker", "PATH blocked by fence; cancelling path")
+			
+		-- 	-- Update action_taken_metrics
+		-- 	action_taken_metrics["path_blocked"] = (action_taken_metrics["path_blocked"] or 0) + 1
+		-- 	-- lf("action_metrics", "path_blocked called: " .. awdction_taken_metrics["path_blocked"])
+			
+        --     			-- Stop the maidroid immediately without cancelling path targets
+		-- 	droid:halt()
+		-- 	droid:set_animation(maidroid.animation.STAND)
+		-- 	return
+
+		-- 	-- Cancel any pending path targets
+		-- 	-- droid._generic_cooker_target = nil
+		-- 	-- droid._furnace_target = nil
+		-- 	-- to_wander(droid, "generic_cooker:path_blocked", 0, timers.change_dir_max)
+		-- 	-- droid.timers.wander_skip = 1
+		-- 	-- return
+		-- end
 		maidroid.cores.path.on_step(droid, dtime, moveresult)
 	elseif droid.state == states.ACT then
 		act(droid, dtime)
@@ -1233,6 +1365,7 @@ maidroid.register_core("generic_cooker", {
 	is_tool = is_tool,
 	default_item = "maidroid:spatula",
     walk_max = 4.5 * timers.walk_max,
+	no_jump = true,
 	hat = hat,
 	can_sell = true,
 	doc = doc,

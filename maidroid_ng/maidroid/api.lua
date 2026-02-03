@@ -1153,6 +1153,9 @@ local function on_activate(self, staticdata)
 	if not self.home then
 		self.home = self:get_pos()
 	end
+	-- Store activation position for distance checking
+	self._activation_pos = self:get_pos()
+	lf("api", "Stored activation position: " .. minetest.pos_to_string(self._activation_pos))
 	self.t_health = minetest.get_gametime()
 	self.timers = {}
 	self.timers.walk = 0
@@ -1201,7 +1204,6 @@ local get_staticdata = function(self, captured)
 	-- data.textures = luaentity.object:get_properties()["textures"][1]
 
 	-- lf("api", "====================== get_staticdata1:"..dump(self))
-	lf("get_staticdata", "====================== get_staticdata1:"..dump(self))
     mydump("get_staticdata", "====================== get_staticdata1", self)
 	-- lf("api", "====================== get_staticdata2:"..dump(data))
     mydump("get_staticdata", "====================== get_staticdata2", data)
