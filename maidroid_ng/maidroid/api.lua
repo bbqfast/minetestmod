@@ -997,6 +997,7 @@ get_formspec = function(self, player, tab)
 		.. ( owns and "," .. S("Flush") or "")
 		.. ( self.core.can_sell and "," .. S("Shop") or "" )
 		.. ( (owns and self.core.doc) and "," .. S("Doc") or "" )
+		.. ( (self.core.name == "generic_cooker" and owns) and "," .. S("Cooker") or "" )
 		.. ";" .. tab .. ";false;true]"
 	self.current_tab = tab
 
@@ -1068,6 +1069,44 @@ get_formspec = function(self, player, tab)
 	if owns and self.core.doc and tab == tab_max then
 		form = form .. "textarea[3,0;8,7.5;;;" .. self.core.doc .. "]"
 		return form
+	end
+	
+	-- Cooker tab for generic_cooker core
+	if owns and self.core.name == "generic_cooker" then
+		tab_max = tab_max + 1
+		if tab == tab_max then
+			-- Get current max distance setting using the getter function with fallback
+			local current_distance = 10
+			if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.get_max_distance_from_activation then
+				current_distance = maidroid.cores.generic_cooker.get_max_distance_from_activation()
+			elseif maidroid.get_max_distance_from_activation then
+				current_distance = maidroid.get_max_distance_from_activation()
+			else
+				-- Last resort: read directly from settings
+				current_distance = tonumber(minetest.settings:get("maidroid.generic_cooker.max_distance_from_activation")) or 10
+			end
+			
+			form = form .. enligthen_tool(self)
+				.. "label[3,0;" .. S("Cooker Control Panel") .. "]"
+				.. "label[3,0.5;" .. S("Configure cooker behavior and view metrics") .. "]"
+				.. "label[3,1.5;" .. S("Current Task:") .. " "
+				.. minetest.colorize("#ACEEAC", (self.action and self.action or S("Idle"))) .. "]"
+				.. "label[3,2;" .. S("Current State:") .. " "
+				.. minetest.colorize("#ACEEAC", (self.state and tostring(self.state) or S("Unknown"))) .. "]"
+				.. "label[3,2.5;" .. S("Position:") .. " "
+				.. minetest.colorize("#ACEEAC", minetest.pos_to_string(vector.round(self:get_pos()))) .. "]"
+				.. "button[3,3.5;2.5,1;toggle_cooker;" .. S("Toggle Cooker") .. "]"
+				.. "button[6,3.5;2.5,1;view_metrics;" .. S("View Metrics") .. "]"
+				.. "label[3,4.5;" .. S("Cooker Settings") .. "]"
+				.. "label[3,5;" .. S("Max Distance from Activation:") .. "]"
+				.. "field[6,5;2,1;max_distance;;" .. tostring(current_distance) .. "]"
+				.. "field_close_on_enter[max_distance;false]"
+				.. "button[8.5,4.75;2,1;set_distance;" .. S("Set Distance") .. "]"
+				.. "checkbox[3,5.5;auto_craft;" .. S("Auto Craft") .. ";true]"
+				.. "checkbox[3,6;auto_fuel;" .. S("Auto Fuel") .. ";true]"
+				.. "checkbox[3,6.5;auto_collect;" .. S("Auto Collect") .. ";true]"
+			return form
+		end
 	end
 
 end
@@ -1793,6 +1832,104 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 					get_formspec(droid, player, 2))
 			end
 		end
+		return
+	end
+	
+	-- Cooker tab field handling
+	if fields.toggle_cooker then
+		-- Toggle cooker functionality
+		if droid.pause then
+			droid.pause = false
+			if droid.core and droid.core.on_resume then
+				droid.core.on_resume(droid)
+			end
+			minetest.chat_send_player(player_name, "Cooker resumed")
+		else
+			droid.pause = true
+			if droid.core and droid.core.on_pause then
+				droid.core.on_pause(droid)
+			end
+			minetest.chat_send_player(player_name, "Cooker paused")
+		end
+		-- Refresh the formspec
+		local current_tab = droid.current_tab or 1
+		minetest.show_formspec(player_name, "maidroid:gui",
+			get_formspec(droid, player, current_tab))
+		return
+	end
+	
+	if fields.set_distance or (fields.max_distance and fields.key_enter_field == "max_distance") then
+		-- Set the max distance from activation
+		local new_distance = tonumber(fields.max_distance)
+		if new_distance and new_distance > 0 and new_distance <= 100 then
+			-- Try to access the generic_cooker functions directly from the module
+			local success = false
+            success = maidroid.set_max_distance_from_activation(new_distance)
+			-- if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.set_max_distance_from_activation then
+			-- 	success = maidroid.cores.generic_cooker.set_max_distance_from_activation(new_distance)
+            --     lf("api", "====================== function maidroid.cores.generic_cooker.set_max_distance_from_activation")
+			-- elseif maidroid.set_max_distance_from_activation then
+			-- 	-- Fallback to direct function access
+			-- 	success = maidroid.set_max_distance_from_activation(new_distance)
+            --     lf("api", "====================== function maidroid_set_distance_from_activation")
+			-- else
+			-- 	-- Last resort: set the setting directly
+			-- 	minetest.settings:set("maidroid.generic_cooker.max_distance_from_activation", tostring(new_distance))
+			-- 	-- Also try to set the external variable if it exists
+			-- 	if maidroid.cores.generic_cooker then
+			-- 		maidroid.cores.generic_cooker.max_distance_from_activation = new_distance
+			-- 	end
+			-- 	success = true
+			-- end
+			
+			if success then
+				minetest.chat_send_player(player_name, "Max distance from activation set to " .. new_distance .. " blocks")
+			else
+				minetest.chat_send_player(player_name, "Failed to set distance")
+			end
+		else
+			minetest.chat_send_player(player_name, "Invalid distance. Please enter a number between 1 and 100.")
+		end
+		-- Refresh the formspec to show updated value
+		local current_tab = droid.current_tab or 1
+		minetest.show_formspec(player_name, "maidroid:gui",
+			get_formspec(droid, player, current_tab))
+		return
+	end
+	
+	if fields.view_metrics then
+		-- Show metrics in chat
+		if maidroid.get_chest_taken_metrics then
+			local chest_metrics = maidroid.get_chest_taken_metrics()
+			local output = {"Cooker Metrics:"}
+			
+			if next(chest_metrics) == nil then
+				output[#output + 1] = "No items taken from chests yet."
+			else
+				for item_name, count in pairs(chest_metrics) do
+					output[#output + 1] = string.format("%s: %d", item_name, count)
+				end
+			end
+			
+			for _, line in ipairs(output) do
+				minetest.chat_send_player(player_name, line)
+			end
+		else
+			minetest.chat_send_player(player_name, "Metrics function not available")
+		end
+		return
+	end
+	
+	-- Handle checkbox changes for cooker settings
+	if fields.auto_craft or fields.auto_fuel or fields.auto_collect then
+		-- Store cooker settings (you could add these to the maidroid's staticdata)
+		local settings = droid._cooker_settings or {}
+		settings.auto_craft = fields.auto_craft == "true"
+		settings.auto_fuel = fields.auto_fuel == "true"
+		settings.auto_collect = fields.auto_collect == "true"
+		droid._cooker_settings = settings
+		
+		minetest.chat_send_player(player_name, "Cooker settings updated")
 		return
 	end
 

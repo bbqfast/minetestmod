@@ -30,6 +30,7 @@ local cooker_items = dofile(maidroid.modpath .. "/cores/cooker_items.lua")
 local all_cookable_items = cooker_items.all_cookable_items
 local all_farming_outputs = cooker_items.all_farming_outputs
 local all_take_item_names = cooker_items.all_take_item_names
+local all_furnace_inputs = cooker_items.all_furnace_inputs
 
 -- Metrics table to track items taken from chests
 local chest_taken_metrics = {}
@@ -39,6 +40,32 @@ local furnace_taken_metrics = {}
 -- Timer for periodic metrics logging
 local metrics_log_timer = 0
 local metrics_log_interval = 35 -- seconds
+
+-- Configurable distance threshold for teleporting back to activation position
+-- This can be set via minetest.settings or externally
+local max_distance_from_activation = tonumber(minetest.settings:get("maidroid.generic_cooker.max_distance_from_activation")) or 10
+
+-- Function to get the current distance threshold (allows external modification)
+local function get_max_distance_from_activation()
+	-- Check if settings value has been updated
+	local settings_value = tonumber(minetest.settings:get("maidroid.generic_cooker.max_distance_from_activation"))
+	if settings_value then
+		max_distance_from_activation = settings_value
+	end
+	return maidroid.cores.generic_cooker.max_distance_from_activation or max_distance_from_activation
+end
+
+-- Function to set the distance threshold
+local function set_max_distance_from_activation(distance)
+	if distance and distance > 0 and distance <= 100 then
+		max_distance_from_activation = distance
+		maidroid.cores.generic_cooker.max_distance_from_activation = distance
+		-- Also save to minetest settings for persistence
+		minetest.settings:set("maidroid.generic_cooker.max_distance_from_activation", tostring(distance))
+		return true
+	end
+	return false
+end
 
 -- Function to log chest taken metrics
 local function log_chest_taken_metrics()
@@ -91,6 +118,24 @@ end
 
 -- Expose the function globally
 maidroid.get_all_cookable_furnace_inputs = get_all_cookable_furnace_inputs
+maidroid.get_chest_taken_metrics = function() return chest_taken_metrics end
+
+-- Create the cores table if it doesn't exist
+if not maidroid.cores then
+	maidroid.cores = {}
+end
+if not maidroid.cores.generic_cooker then
+	maidroid.cores.generic_cooker = {}
+end
+
+-- Expose the configurable distance threshold and setter function
+maidroid.cores.generic_cooker.max_distance_from_activation = max_distance_from_activation
+maidroid.cores.generic_cooker.set_max_distance_from_activation = set_max_distance_from_activation
+maidroid.cores.generic_cooker.get_max_distance_from_activation = get_max_distance_from_activation
+
+-- Also expose directly to maidroid table as fallback
+maidroid.set_max_distance_from_activation = set_max_distance_from_activation
+maidroid.get_max_distance_from_activation = get_max_distance_from_activation
 
 -- Encapsulated target info for a single chest interaction
 local GenericCookerTarget = {}
@@ -441,7 +486,7 @@ local function feed_furnace_from_inventory_generic(droid, pos, items)
 			count = spec.count or spec[2] or 1
 		elseif type(spec) == "string" then
 			name = spec
-			count = 1
+			count = 99
 		end
 		if name and count and count > 0 then
 			local listname = (name == "default:coal_lump") and "fuel" or "src"
@@ -566,7 +611,8 @@ local function feed_get_from_furnace__generic(droid, pos)
     
     add_coal_fuel_if_needed(droid, pos, finv)
 
-	return feed_furnace_from_inventory_generic(droid, pos, all_cookable_items)
+	-- return feed_furnace_from_inventory_generic(droid, pos, all_cookable_items)
+	return feed_furnace_from_inventory_generic(droid, pos, all_furnace_inputs)
 end
 
 -- ,,fg1,,fur
@@ -973,7 +1019,7 @@ local function tests()
     -- test_get_items_in_groups()
     -- test_get_craft_requirements()
     local cookable_inputs = get_all_cookable_furnace_inputs()
-    lf("tests", "cookable_inputs=" .. dump(cookable_inputs))
+    lf("tests", "cookable_inputs=" .. dump(cookable_inputs).."total=" .. #cookable_inputs)
     lf("tests", "")
     error("tests")
 end
@@ -1249,12 +1295,13 @@ end
 on_step = function(droid, dtime, moveresult)
 	droid:pickup_item()
 
-	-- Check if maidroid is more than 20 blocks away from activation position
+	-- Check if maidroid is more than max_distance_from_activation blocks away from activation position
 	if droid._activation_pos then
 		local current_pos = droid:get_pos()
 		local distance = vector.distance(current_pos, droid._activation_pos)
-		if distance > 10 then
-			lf("generic_cooker", "Too far from activation (" .. string.format("%.1f", distance) .. " > 20), teleporting back")
+		local max_distance = get_max_distance_from_activation()
+		if distance > max_distance then
+			lf("generic_cooker", "Too far from activation (" .. string.format("%.1f", distance) .. " > " .. max_distance .. "), teleporting back")
 			droid.object:set_pos(droid._activation_pos)
 		end
 	end

@@ -22,3 +22,15 @@ Get-Content .\debug.txt -Encoding Byte -Tail 0 -Wait | Where-Object { $_ -ne 0 }
 
 tail -n0 -F debug.txt | tr -d '\000' | tee debug_clean_stream.txt
 tail -n0 -F debug.txt | tr -d '\000'
+
+
+
+Updates:
+- consolidate log stmt
+- farmer core now only need 1 layer fence
+- cooker teleport to path if too far
+- cooker do not cross fence, and teleport back if stuck inside fence line
+- refactor furnace 
+- furance always take, refuel
+- furnace lower than 20 coal check
+- attach sword to ltangel 
