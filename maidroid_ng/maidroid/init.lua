@@ -26,7 +26,7 @@ local last_lf_count = 0
 local last_lf_time = 0
 
 maidroid.lf = function(func, msg)
-	local pre = "++++++++++++++++++++++++"
+	local pre = "M++++++++++++++++++++++++"
 	if func == nil then func = "unknown" end
 	if msg == nil then msg = "null" end
 
@@ -35,6 +35,7 @@ maidroid.lf = function(func, msg)
 	black_list["mow"] = true
 	black_list["follow:on_step"] = true
 	black_list["maidroid.globalstep"] = true
+	-- black_list["digger:on_step"] = true
 
 	if black_list[func] ~= nil then
 		return
@@ -154,7 +155,8 @@ local function append_maidroid_positions_from_file(out)
 end
 
 -- ,,command
-minetest.register_chatcommand("maidroid_list", {
+
+local cmd_maidroid_list = {
 	description = "List all Maidroids' names and stored positions",
 	privs = {server=true},
 	func = function(name)
@@ -190,9 +192,12 @@ minetest.register_chatcommand("maidroid_list", {
 		end
 		return true, table.concat(output, "\n")
 	end
-})
+}
 
-minetest.register_chatcommand("maidroid_tp", {
+minetest.register_chatcommand("maidroid_list", cmd_maidroid_list)
+minetest.register_chatcommand("mr_list", cmd_maidroid_list)
+
+local cmd_maidroid_tp = {
 	description = "Teleport to a maidroid by name",
 	privs = {server=true},
 	params = "<maidroid_name>",
@@ -237,7 +242,75 @@ minetest.register_chatcommand("maidroid_tp", {
 		player:set_pos(found_pos)
 		return true, "Teleported to maidroid '" .. target_name .. "' at " .. minetest.pos_to_string(found_pos)
 	end
-})
+}
+
+minetest.register_chatcommand("maidroid_tp", cmd_maidroid_tp)
+minetest.register_chatcommand("mr_tp", cmd_maidroid_tp)
+
+local cmd_maidroid_surface = {
+	description = "Teleport to the surface at your current X/Z",
+	privs = {server=true},
+	func = function(name)
+		local player = minetest.get_player_by_name(name)
+		if not player then
+			return false, "Player not found."
+		end
+
+		local pos = player:get_pos()
+		if not pos then
+			return false, "Player position not found."
+		end
+
+		local x = math.floor(pos.x + 0.5)
+		local z = math.floor(pos.z + 0.5)
+		local target = {x = x, y = 0, z = z}
+		player:set_pos(target)
+		return true, "Teleported to ground level at " .. minetest.pos_to_string(target)
+	end,
+}
+
+minetest.register_chatcommand("maidroid_surface", cmd_maidroid_surface)
+
+local cmd_mr_surface = {
+	description = "Teleport to ground level (0) or move vertically relative to your current position",
+	privs = {server=true},
+	params = "[delta_y]",
+	func = function(name, param)
+		local player = minetest.get_player_by_name(name)
+		if not player then
+			return false, "Player not found."
+		end
+
+		local pos = player:get_pos()
+		if not pos then
+			return false, "Player position not found."
+		end
+
+		param = (param or ""):gsub("^%s+", ""):gsub("%s+$", "")
+		local dy = 0
+		if param ~= "" then
+			dy = tonumber(param)
+			if not dy then
+				return false, "Usage: /mr_surface [delta_y] (e.g. /mr_surface 200 or /mr_surface -50 or /mr_surface 0)"
+			end
+		end
+
+		local x = math.floor(pos.x + 0.5)
+		local z = math.floor(pos.z + 0.5)
+		local y
+		if dy == 0 then
+			y = 0
+		else
+			y = pos.y + dy
+		end
+
+		local target = {x = x, y = y, z = z}
+		player:set_pos(target)
+		return true, "Teleported to " .. minetest.pos_to_string(target)
+	end,
+}
+
+minetest.register_chatcommand("mr_surface", cmd_mr_surface)
 
 
 

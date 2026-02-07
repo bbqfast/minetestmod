@@ -768,6 +768,7 @@ function maidroid.register_core(name, def)
 			static_save = false,
 
 			on_detach = function(self)
+				lf("api", "wield_item on_detach called - removing wield_item object")
 				self.object:remove()
 			end
 		})
@@ -1151,6 +1152,7 @@ local function on_activate(self, staticdata)
 			-- obj:get_luaentity().set_set_textures({ { name = maid_skins[0] } })
 
 			-- Remove this old maidroid
+			lf("api", "REMOVING old maidroid during migration - nametag: " .. tostring(self.nametag) .. ", pos: " .. minetest.pos_to_string(self:get_pos()))
 			self.object:remove()
 			return
 		end
@@ -1230,8 +1232,30 @@ local function safe_read_file(path)
 	return ok, content
 end
 
+-- Calculate distance from maidroid to player
+local function distance_from_player(self)
+	local player = minetest.get_player_by_name(self.owner)
+	if not player then
+		return nil
+	end
+	
+	local pos = self:get_pos()
+	local player_pos = player:get_pos()
+	
+	if not pos or not player_pos then
+		return nil
+	end
+	
+	return vector.distance(pos, player_pos)
+end
+
 -- called when the object is destroyed.
 local get_staticdata = function(self, captured)
+	-- Log who called get_staticdata and why
+	local pos = self:get_pos()
+	local dist = distance_from_player and distance_from_player(self) or "unknown"
+	lf("get_staticdata", "CALLED - nametag: " .. tostring(self.nametag) .. ", pos: " .. (pos and minetest.pos_to_string(pos) or "nil") .. ", distance from player: " .. tostring(dist) .. ", captured: " .. tostring(captured))
+	
 	local data = {
 		nametag = self.nametag,
 		owner_name = self.owner,
@@ -1366,7 +1390,7 @@ end
 -- Chat command to restore a maidroid from a staticdata dump file in the world folder.
 -- Usage: /maidroid_load Eve_623
 -- This will look for: <worldpath>/maidroid_staticdata_Eve_623.txt
-minetest.register_chatcommand("maidroid_load", {
+local cmd_maidroid_load = {
 	params = "<id>",
 	description = S("Load a maidroid from maidroid_staticdata_<id>.txt in this world"),
 	privs = { maidroid = true },
@@ -1417,9 +1441,12 @@ minetest.register_chatcommand("maidroid_load", {
 
 		return true, "Maidroid loaded from " .. filename
 	end,
-})
+}
 
-minetest.register_chatcommand("maidroid_ls", {
+minetest.register_chatcommand("maidroid_load", cmd_maidroid_load)
+minetest.register_chatcommand("mr_load", cmd_maidroid_load)
+
+local cmd_maidroid_ls = {
 	params = "",
 	description = S("List all maidroid_staticdata_*.txt files in this world"),
 	privs = { maidroid = true },
@@ -1440,9 +1467,12 @@ minetest.register_chatcommand("maidroid_ls", {
 		end
 
 		table.sort(ids)
-		return true, "Saved maidroids (" .. #ids .. "):\n" .. table.concat(ids, ", ")
+		return true, "Saved maidroids (" .. #ids .. "): \n" .. table.concat(ids, ", ")
 	end,
-})
+}
+
+minetest.register_chatcommand("maidroid_ls", cmd_maidroid_ls)
+minetest.register_chatcommand("mr_ls", cmd_maidroid_ls)
 
 -- pickup_item pickup collect all stacks from world in radius
 local pickup_item = function(self, radius)
@@ -1592,6 +1622,8 @@ local function on_punch(self, puncher, _, tool_capabilities, _, damage)
 		hp = math.max(hp - damage, 0)
 		if hp == 0 then
 			local pos = self.object:get_pos()
+			local dist = distance_from_player and distance_from_player(self) or "unknown"
+			lf("api", "MAIDROID DYING - nametag: " .. tostring(self.nametag) .. ", pos: " .. (pos and minetest.pos_to_string(pos) or "nil") .. ", distance from player: " .. tostring(dist) .. ", damage: " .. tostring(damage))
 
 			for _, i_stack in pairs(self:get_inventory():get_list("main")) do
 				minetest.add_item(random_pos_near(pos), i_stack)
@@ -1622,6 +1654,7 @@ local function on_punch(self, puncher, _, tool_capabilities, _, damage)
 			if self.hat then
 				self.hat:remove()
 			end
+			lf("api", "CALLING object:remove() for dying maidroid: " .. tostring(self.nametag))
 			self.object:remove()
 			return true
 		end
@@ -1686,12 +1719,14 @@ local register_maidroid = function(product_name, def)
 		on_punch       = on_punch,
 		get_staticdata = get_staticdata,
 		on_deactivate  = function(self)
-			lf("api", "maidroid_on_deactivate")
-            
+			lf("api", "maidroid_on_deactivate CALLED - nametag: " .. tostring(self.nametag))
+			
 			if self.wield_item then
+				lf("api", "Removing wield_item for maidroid: " .. tostring(self.nametag))
 				self.wield_item:remove()
 			end
 			if self.hat then
+				lf("api", "Removing hat for maidroid: " .. tostring(self.nametag))
 				self.hat:remove()
 			end
 		end,

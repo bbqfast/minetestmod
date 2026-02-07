@@ -22,6 +22,7 @@ local on_start, on_pause, on_resume, on_stop, on_step, is_tool
 local plant, mow, collect_papyrus, plant_papyrus, to_action
 local craft_seeds, select_seed, task, task_base
 local is_seed, is_plantable, is_papyrus, is_papyrus_soil, is_mowable, is_scythe
+local is_player_has_follow_item
 
 local wander_core =  maidroid.cores.wander
 local to_wander = wander_core.to_wander
@@ -55,10 +56,252 @@ local ld = function(msg, dest)
 	
 end
 
--- ,,x1
+-- Calculate distance from maidroid to player
+local function distance_from_player(self)
+	local player = minetest.get_player_by_name(self.owner)
+	if not player then
+		return nil
+	end
+	
+	local pos = self:get_pos()
+	local player_pos = player:get_pos()
+	
+	if not pos or not player_pos then
+		return nil
+	end
+	
+	return vector.distance(pos, player_pos)
+end
+
 local function extract_before_underscore(str)
     -- return str:match("([^_]*)")
     return str:match("(.*)_[0-9]+")
+end
+
+-- Check if player has follow item (pick_stone or goldpick)
+local function is_player_has_follow_item(self)
+	local player = minetest.get_player_by_name(self.owner)
+	if not player then
+		return false
+	end
+	
+	local wielded_item = player:get_wielded_item():get_name()
+	-- return wielded_item == "default:pick_stone" or wielded_item == "lottores:goldpick"
+	return  wielded_item == "lottores:goldpick"
+end
+
+-- ,,tpm
+local function handle_teleport_to_maidroid(self, player)
+	local inv = self:get_inventory()
+	local first_stack = inv and inv:get_stack("main", 1)
+    local dist_from_maidroid = 3
+	if first_stack and player:get_wielded_item():get_name() == first_stack:get_name() then
+		local self_pos = self:get_pos()
+		if self_pos then
+			player:set_pos({x = self_pos.x, y = self_pos.y + dist_from_maidroid, z = self_pos.z})
+			-- minetest.chat_send_player(player:get_player_name(), "Teleported to your maidroid!")
+			return true
+		end
+	end
+
+	return false
+end
+
+-- ,,light
+local function handle_helper_light(self, pos, player)
+    lf("digger:handle_helper_light", "handle_helper_light: " .. minetest.pos_to_string(pos))
+	local light_pos = {
+		x = math.floor(pos.x + 0.5),
+		y = math.floor(pos.y + 0.5),
+		z = math.floor(pos.z + 0.5),
+	}
+
+	-- local should_light = self._helper_light_enabled == true
+	local should_light = true
+	-- local now = minetest.get_gametime()
+	-- if player then
+	-- 	local ppos = player:get_pos()
+	-- 	if ppos then
+	-- 		self._helper_light_last_player_time = now
+	-- 		local dist = vector.distance(ppos, pos)
+	-- 		if should_light then
+	-- 			if dist >= 17 then
+	-- 				should_light = false
+	-- 			end
+	-- 		else
+	-- 			if dist <= 15 then
+	-- 				should_light = true
+	-- 			end
+	-- 		end
+	-- 	end
+	-- else
+	-- 	local last = self._helper_light_last_player_time
+	-- 	if last and (now - last) <= 2 then
+	-- 		should_light = true
+	-- 	else
+	-- 		should_light = false
+	-- 	end
+	-- end
+
+	self._helper_light_enabled = should_light
+
+	local target_node = minetest.get_node(light_pos)
+
+	if not should_light then
+		if self._last_light_pos then
+			local old = minetest.get_node(self._last_light_pos)
+			if old and old.name == "maidroid:helper_light" then
+				lf("digger:handle_helper_light", "Removing helper_light at " .. minetest.pos_to_string(self._last_light_pos))
+				minetest.remove_node(self._last_light_pos)
+			end
+		end
+		self._last_light_pos = nil
+		self._last_light_node = nil
+		return
+	end
+
+	local is_same_pos = self._last_light_pos and vector.equals(light_pos, self._last_light_pos)
+	if is_same_pos then
+		if target_node and target_node.name ~= "maidroid:helper_light" then
+			if target_node.name == "air" or target_node.name == "ignore" then
+				minetest.set_node(light_pos, {name = "maidroid:helper_light"})
+			end
+		end
+		return
+	end
+
+	if self._last_light_pos then
+		local old = minetest.get_node(self._last_light_pos)
+		if old and old.name == "maidroid:helper_light" then
+			minetest.remove_node(self._last_light_pos)
+		end
+	end
+
+	if target_node and (target_node.name == "air" or target_node.name == "ignore") then
+		minetest.set_node(light_pos, {name = "maidroid:helper_light"})
+		self._last_light_pos = vector.new(light_pos)
+		self._last_light_node = target_node and target_node.name or nil
+	else
+		self._last_light_pos = vector.new(light_pos)
+		self._last_light_node = target_node and target_node.name or nil
+	end
+end
+
+local move_up_one = function(self)
+end
+
+
+local function is_liquid(node)
+	isliquid = node and (
+		minetest.get_item_group(node.name, "water") > 0
+		or minetest.get_item_group(node.name, "lava") > 0
+		or node.name == "default:water_source"
+		or node.name == "default:water_flowing"
+		or node.name == "default:river_water_source"
+		or node.name == "default:river_water_flowing"
+		or node.name == "default:lava_source"
+		or node.name == "default:lava_flowing"
+	)
+
+    -- if not isliquid then
+    --     lf("digger:is_liquid", "is_liquid: not liquid: " .. node.name)
+    --     return false
+    -- end
+
+    return isliquid
+end
+
+local function is_liquid2(node1, node2)
+	return is_liquid(node1) or is_liquid(node2)
+end
+
+local move_up_to_closest_air = function(self)
+	local pos = self:get_pos()
+	if not pos or not self.object then
+        lf("digger:move_up_to_closest_air", "move_up_to_closest_air: pos or object is nil")
+		return
+	end
+
+	local p = vector.round(pos)
+
+	local max_up = 30
+	for dy = 0, max_up do
+		local check_pos = {x = p.x, y = p.y + dy, z = p.z}
+		local node = minetest.get_node(check_pos)
+		if node and node.name ~= "ignore" and not is_liquid(node) then
+			lf("digger:move_up_to_closest_air", "Moving up by " .. dy .. " nodes from " .. minetest.pos_to_string(pos) .. " to: " .. minetest.pos_to_string(check_pos))
+
+			self.object:set_pos({x = pos.x, y = check_pos.y , z = pos.z})
+			return
+		end
+	end
+    lf("digger:move_up_to_closest_air", "move_up_to_closest_air: could not find air")
+end
+
+
+local function restore_gravity_and_accel(self, pos)
+	lf("digger:on_step", "Not in liquid: " .. minetest.pos_to_string(pos))
+	if self._digger_saved_gravity ~= nil then
+		self.object:set_properties({gravity = self._digger_saved_gravity})
+		self._digger_saved_gravity = nil
+	end
+	if self._digger_saved_accel then
+		self.object:set_acceleration(self._digger_saved_accel)
+		self._digger_saved_accel = nil
+	end
+end
+
+-- ,,x1
+-- ,,water
+local function handle_water_below(self, below)
+	local node_below = minetest.get_node(below)
+	if node_below and (
+		node_below.name == "default:water_source"
+		or node_below.name == "default:river_water_source"
+		or node_below.name == "default:water_flowing"
+		or node_below.name == "default:river_water_flowing"
+		or minetest.get_item_group(node_below.name, "water") > 0
+	) then
+		for dx = -1, 1 do
+			for dz = -1, 1 do
+				local pos_to_set = {x = below.x + dx, y = below.y, z = below.z + dz}
+				local n = minetest.get_node(pos_to_set)
+				if n and (
+					n.name == "default:water_source"
+					or n.name == "default:river_water_source"
+					or n.name == "default:water_flowing"
+					or n.name == "default:river_water_flowing"
+					or minetest.get_item_group(n.name, "water") > 0
+				) then
+					minetest.set_node(pos_to_set, {name = "default:dirt"})
+					lf("digger:handle_water_below", "setting to dirt: " .. n.name .. " at " .. minetest.pos_to_string(pos_to_set))
+				end
+			end
+		end
+		-- self.timers.dig_below = -2
+		move_up_to_closest_air(self)
+		return true
+	end
+
+	local pos = self:get_pos()
+	if pos then
+		local here = vector.round(pos)
+		local node_here = minetest.get_node(here)
+		if node_here and (
+			minetest.get_item_group(node_here.name, "water") > 0
+			or node_here.name == "default:lava_source"
+			or node_here.name == "default:lava_flowing"
+			or node_here.name == "default:water_flowing"
+			or node_here.name == "default:water_source"
+			or minetest.get_item_group(node_here.name, "lava") > 0
+		) then
+            lf("digger:handle_water_below", "IN WATER Moving up to closest air from " .. minetest.pos_to_string(pos) .. " to: " .. minetest.pos_to_string(here))
+			move_up_to_closest_air(self)
+			return true
+		end
+	end
+
+	return false
 end
 
 
@@ -77,6 +320,7 @@ on_start = function(self)
 	self:set_animation(maidroid.animation.STAND)	
 	self._old_accel = self.object:get_acceleration()
 	self.object:set_acceleration({x = 0, y = -3, z = 0})  -- tweak -3 → -2/-4 as you like
+    self._onstep_timer = 0.2
 end
 
 on_resume = function(self)
@@ -122,15 +366,8 @@ to_action = function(self)
 	self.timers.walk = 0
 end
 
-local move_up_one = function(self)
-	local pos = self:get_pos()
-	-- if pos and self.object then
-	-- 	self.object:set_pos({x = pos.x, y = pos.y + 2, z = pos.z})
-	-- end
-end
 
-
--- ,,db
+-- ,,db,,dig
 local dig_block_in_direction = function(self, direction, except_nodes)
 	-- lf("digger:dig_block_in_direction", "direction: " .. minetest.pos_to_string(direction))
 	local pos = self:get_pos()
@@ -161,12 +398,12 @@ local dig_block_in_direction = function(self, direction, except_nodes)
 	-- lf("digger:dig_block_in_direction", "Node to dig: " .. tostring(node.name))
 
 	if node.name == "air" then
-		-- lf("digger:dig_block_in_direction", "Node at target position is air.")
+		lf("digger:dig_block_in_direction", "Node at target position is air.")
 		return
 	end
 
 	if except_nodes and except_nodes[node.name] then
-		-- lf("digger:dig_block_in_direction", "Skipping node in except_nodes: " .. node.name)
+		lf("digger:dig_block_in_direction", "Skipping node in except_nodes: " .. node.name)
 		return
 	end
 
@@ -228,128 +465,99 @@ local dig_block_in_direction = function(self, direction, except_nodes)
 	end
 end
 
+-- ,,step
 on_step = function(self, dtime, moveresult)
-	if self.object and self.object:get_velocity().y < -1 then
-		local vel = self.object:get_velocity()
-		self.object:set_velocity({x = vel.x, y = math.max(vel.y, -1), z = vel.z})
-	end
+    self._digger_step_timer = (self._digger_step_timer or 0) + dtime
+    if self._digger_step_timer < self._onstep_timer then
+        return
+    end
+    self._digger_step_timer = 0
 
+
+    local pos = self:get_pos()
+	-- lf("digger:on_step", "Position: " .. (pos and minetest.pos_to_string(pos) or "nil"))
+
+    -- reset velocity to offset gravity acceleration
+	-- if self.object and self.object:get_velocity().y < -1 then
+	-- 	local vel = self.object:get_velocity()
+	-- 	self.object:set_velocity({x = vel.x, y = math.max(vel.y, -1), z = vel.z})
+	-- end
+
+    local vel = self.object:get_velocity()
+    self.object:set_velocity({x = vel.x, y = -1, z = vel.z})
+    self._onstep_timer = 0.2
 	-- get owner safely
 	local player = minetest.get_player_by_name(self.owner)
 
-	local pos = self:get_pos()
-	if pos then
-		local light_pos = {
-			x = math.floor(pos.x + 0.5),
-			y = math.floor(pos.y),
-			z = math.floor(pos.z + 0.5),
-		}
-
-		-- Always light up when close to player, regardless of what they're holding
-		local should_light = false
-		if player then
-			local ppos = player:get_pos()
-			if ppos then
-				local dist = vector.distance(ppos, pos)
-				if dist <= 15 then
-					should_light = true
-				end
-			end
-		end
-
-		local node = minetest.get_node(light_pos)
-
-		if self._last_light_pos and node and node.name == "maidroid:helper_light" then
-			local moved = vector.distance(light_pos, self._last_light_pos) > 0.1
-			if moved then
-				minetest.remove_node(self._last_light_pos)
-				lf("digger:on_step", "Moved helper_light from " .. minetest.pos_to_string(self._last_light_pos) .. " to " .. minetest.pos_to_string(light_pos))
-				if node.name == "air" or node.name == "ignore" then
-					minetest.set_node(light_pos, {name = "maidroid:helper_light"})
-				end
-			end
-		end
 
 
-		if should_light then
-			if node.name ~= "maidroid:helper_light" then
-				if self._last_light_pos then
-					-- lf("digger:on_step", "Removing previous helper_light at " .. minetest.pos_to_string(self._last_light_pos))
-					minetest.remove_node(self._last_light_pos)
-				end
-				minetest.set_node(light_pos, {name = "maidroid:helper_light"})
-				-- lf("digger:on_step", "Placed helper_light at " .. minetest.pos_to_string(light_pos))
-				self._last_light_pos = vector.new(light_pos)
-				self._last_light_node = node and node.name or nil
-			else
-				self._last_light_pos = vector.new(light_pos)
-				self._last_light_node = node and node.name or nil
-			end
-		else
-			if node.name == "maidroid:helper_light" then
-				lf("digger:on_step", "Removing helper_light at " .. minetest.pos_to_string(light_pos))
-				minetest.remove_node(light_pos)
-			end
-			self._last_light_pos = nil
-			self._last_light_node = nil
-		end
-	end
 
+    -- handle_water_below(self, below)     
 	-- Check for lava and move up if necessary
 	pos = self:get_pos()
+    local below = vector.add(pos, { x = 0, y = -1, z = 0 })
+    local node_below = minetest.get_node(below)
+
 	if pos and self.object then
 		local here = vector.round(pos)
 		local here_node = minetest.get_node(here)
-		if here_node and (
-			here_node.name == "default:lava_source" or
-			here_node.name == "default:lava_flowing" or
-			here_node.name == "default:water_source" or
-			here_node.name == "default:water_flowing" or
-			here_node.name == "default:river_water_source" or
-			here_node.name == "default:river_water_flowing" or
-			minetest.get_item_group(here_node.name, "water") > 0
-		) then
+		-- local in_liquid = is_liquid(here_node)
+		local in_liquid = is_liquid2(here_node, node_below)
+		if in_liquid then
 			minetest.log("action", "[maidroid:digger] Emergency escape at " .. minetest.pos_to_string(pos))
-			self.object:set_pos({x = pos.x, y = pos.y + 3, z = pos.z})
+			if self._digger_saved_gravity == nil then
+				local props = self.object:get_properties()
+				self._digger_saved_gravity = props and props.gravity or 1
+			end
+			if not self._digger_saved_accel then
+				self._digger_saved_accel = self.object:get_acceleration()
+			end
+			move_up_to_closest_air(self)
+			minetest.log("action", "[maidroid:digger] Current gravity: " .. tostring(self._digger_saved_gravity))
+			minetest.log("action", "[maidroid:digger] Current acceleration: " .. tostring(self._digger_saved_accel))
+			-- self.object:set_velocity({x = 0, y = 0, z = 0})
+			-- self.object:set_properties({gravity = 0})
+			-- self.object:set_acceleration({x = 0, y = 0, z = 0})
+		else
+            -- restore_gravity_and_accel(self, pos)
 		end
 	end
+
+    lf("digger:on_step", "After not in liquid")
+
+    -- light need to go below current node detection otherwised will detected current node as light source
+    -- and hiding the water
+	if pos then
+		handle_helper_light(self, pos, player)
+	end    
 
 	if not self._digger_accum then
 		self._digger_accum = 0
 	end
 	self._digger_accum = self._digger_accum + dtime
-	if self._digger_accum < 1 then
-		return
-	end
+	-- if self._digger_accum < 0.2 then
+    --     lf("digger:on_step", "Skipping action: time less " .. tostring(self._digger_accum))
+	-- 	return
+	-- end
 	dtime = self._digger_accum
 	self._digger_accum = 0
 
 	player = minetest.get_player_by_name(self.owner)
 	-- lf("digger:on_step", "Checking teleport: player=" .. tostring(player and player:get_player_name() or "nil") ..
 	-- 	", wielded=" .. tostring(player and player:get_wielded_item():get_name() or "nil"))
-	if player then
-		local inv = self:get_inventory()
-		local first_stack = inv and inv:get_stack("main", 1)
-		if first_stack and player:get_wielded_item():get_name() == first_stack:get_name() then
-			local self_pos = self:get_pos()
-			-- lf("digger:on_step", "Teleport trigger: self_pos=" .. minetest.pos_to_string(self_pos or {}))
-			if self_pos then
-				player:set_pos({x = self_pos.x, y = self_pos.y + 5, z = self_pos.z})
-				minetest.chat_send_player(player:get_player_name(), "Teleported to your maidroid!")
-			end
-		end
-	end
+    handle_teleport_to_maidroid(self, player)
 
 	local func_name = "digger:on_step"
-	player = minetest.get_player_by_name(self.owner)
-	if player and (player:get_wielded_item():get_name() == "default:pick_stone" or player:get_wielded_item():get_name() == "lottores:goldpick") then
+	if player and is_player_has_follow_item(self) then
 		local player_pos = player:get_pos()
 		self.object:set_pos({x = player_pos.x, y = player_pos.y + 1, z = player_pos.z})
+        lf("digger:on_step", "Following player: " .. minetest.pos_to_string(player_pos))
 		return
 	end
 
 	if maidroid.settings.farming_offline == false
 		and not minetest.get_player_by_name(self.owner) then
+        lf("digger:on_step", "maidroid.settings.farming_offline == false")
 		return
 	end
 
@@ -376,108 +584,87 @@ on_step = function(self, dtime, moveresult)
 		self.object:set_pos({x = target_x, y = pos.y, z = math.floor(pos.z + 0.5)})
 	end
 
-	self.timers.dig_below = (self.timers.dig_below or 0) + dtime
-	if self.timers.dig_below >= DIG_BELOW_INTERVAL then
-		self.timers.dig_below = 0
-		self:set_animation(maidroid.animation.MINE)
-		local pos = self:get_pos()
-		local below = vector.add(pos, { x = 0, y = -1, z = 0 })
-		-- minetest.add_particlespawner({
-		-- 	amount = 16,
-		-- 	time = 0.2,
-		-- 	minpos = vector.subtract(below, 0.3),
-		-- 	maxpos = vector.add(below, 0.3),
-		-- 	minvel = {x = -0.5, y = 0.5, z = -0.5},
-		-- 	maxvel = {x = 0.5, y = 1.5, z = 0.5},
-		-- 	minacc = {x = 0, y = -9.8, z = 0},
-		-- 	maxacc = {x = 0, y = -9.8, z = 0},
-		-- 	minexptime = 0.3,
-		-- 	maxexptime = 0.7,
-		-- 	minsize = 1,
-		-- 	maxsize = 2,
-		-- 	texture = minetest.registered_nodes[minetest.get_node(below).name] and
-		-- 		(minetest.registered_nodes[minetest.get_node(below).name].tiles[1] or "default_dirt.png") or "default_dirt.png",
-		-- 	glow = 0,
-		-- })
+    lf("digger:on_step", "Before dig")
+    self:set_animation(maidroid.animation.MINE)
+    local pos = self:get_pos()
+    local below = vector.add(pos, { x = 0, y = -1, z = 0 })
+    -- minetest.add_particlespawner({
+    -- 	amount = 16,
+    -- 	time = 0.2,
+    -- 	minpos = vector.subtract(below, 0.3),
+    -- 	maxpos = vector.add(below, 0.3),
+    -- 	minvel = {x = -0.5, y = 0.5, z = -0.5},
+    -- 	maxvel = {x = 0.5, y = 1.5, z = 0.5},
+    -- 	minacc = {x = 0, y = -9.8, z = 0},
+    -- 	maxacc = {x = 0, y = -9.8, z = 0},
+    -- 	minexptime = 0.3,
+    -- 	maxexptime = 0.7,
+    -- 	minsize = 1,
+    -- 	maxsize = 2,
+    -- 	texture = minetest.registered_nodes[minetest.get_node(below).name] and
+    -- 		(minetest.registered_nodes[minetest.get_node(below).name].tiles[1] or "default_dirt.png") or "default_dirt.png",
+    -- 	glow = 0,
+    -- })
 
-		local node_below = minetest.get_node(below)
-		lf("digger", "node_below: " .. node_below.name)
-		if node_below and (node_below.name == "default:lava_source" or node_below.name == "default:lava_flowing") then
-			self.object:set_pos({x = pos.x, y = pos.y + 1, z = pos.z})
-			minetest.set_node(below, {name = "default:water_source"})
-			self.timers.dig_below = -2
-			move_up_one(self)
-			return
-		end
+    local node_below = minetest.get_node(below)
+    local dist = distance_from_player(self)
+    -- ,,lava
+    lf("digger:on_step", "node_below: " .. node_below.name .. ", distance from player: " .. tostring(dist or "unknown"))
+    if node_below and (node_below.name == "default:lava_source" or node_below.name == "default:lava_flowing") then
+        self.object:set_pos({x = pos.x, y = pos.y + 1, z = pos.z})
+        minetest.set_node(below, {name = "default:water_source"})
+        lf("digger:on_step", "set node to water from lava")
+        -- self.timers.dig_below = -2
+        -- move_up_one(self)
+        self.object:set_velocity({x = 0, y = 0, z = 0})
+        self.object:set_acceleration({x = 0, y = 0, z = 0})
+        self._onstep_timer = 5
+        move_up_to_closest_air(self)
+        return
+    end
 
-		node_below = minetest.get_node(below)
-		if node_below and (
-			node_below.name == "default:water_source"
-			or node_below.name == "default:river_water_source"
-			or node_below.name == "default:water_flowing"
-			or node_below.name == "default:river_water_flowing"
-			or minetest.get_item_group(node_below.name, "water") > 0
-		) then
-			for dx = -1, 1 do
-				for dz = -1, 1 do
-					local pos_to_set = {x = below.x + dx, y = below.y, z = below.z + dz}
-					local n = minetest.get_node(pos_to_set)
-					if n and (
-						n.name == "default:water_source"
-						or n.name == "default:river_water_source"
-						or n.name == "default:water_flowing"
-						or n.name == "default:river_water_flowing"
-						or minetest.get_item_group(n.name, "water") > 0
-					) then
-						minetest.set_node(pos_to_set, {name = "default:dirt"})
-						lf("digger", "setting to dirt: " .. n.name .. " at " .. minetest.pos_to_string(pos_to_set))
-					end
-				end
-			end
-			self.timers.dig_below = -2
-			move_up_one(self)
-			return
-		end
+    -- ,,m1
+    handle_water_below(self, below) 
 
-		node_below = minetest.get_node(below)
-		if node_below and node_below.name == "air" then
-			self.timers.dig_below = self.timers.dig_below - dtime + 2
-			return
-		end
+    node_below = minetest.get_node(below)
+    if node_below and node_below.name == "air" then
+        self.timers.dig_below = self.timers.dig_below - dtime + 2
+        lf("digger:on_step", "Skipping dig_below: " .. node_below.name .. ", dig_below: " .. tostring(self.timers.dig_below))
+        return
+    end
 
-		except_nodes2 = {["default:lava_source"] = true, ["default:lava_flowing"] = true}
+    except_nodes2 = {["default:lava_source"] = true, ["default:lava_flowing"] = true}
 
-		except_nodes1 = {
-			["default:stone"] = true,
-			["default:cobble"] = true,
-			["default:obsidian"] = true,
-			["default:dirt"] = true,
-			["lottmapgen:shire_grass"] = true,
-			["lottmapgen:lorien_grass"] = true,
-			["default:sand"] = true,
-		}
+    except_nodes1 = {
+        ["default:stone"] = true,
+        ["default:cobble"] = true,
+        ["default:obsidian"] = true,
+        ["default:dirt"] = true,
+        ["lottmapgen:shire_grass"] = true,
+        ["lottmapgen:lorien_grass"] = true,
+        ["default:sand"] = true,
+    }
 
-		-- except_nodes1 = {}
+    -- except_nodes1 = {}
 
-		-- ,,db
-		dig_block_in_direction(self, {x = 1, y = 0, z = 0}, except_nodes1)
-		dig_block_in_direction(self, {x = -1, y = 0, z = 0}, except_nodes1)
-		dig_block_in_direction(self, {x = 0, y = 0, z = -1}, except_nodes1)
-		dig_block_in_direction(self, {x = 0, y = 0, z = 1}, except_nodes1)
-		dig_block_in_direction(self, {x = 0, y = -1, z = 0}, except_nodes2)
+    -- ,,db
+    dig_block_in_direction(self, {x = 1, y = 0, z = 0}, except_nodes1)
+    dig_block_in_direction(self, {x = -1, y = 0, z = 0}, except_nodes1)
+    dig_block_in_direction(self, {x = 0, y = 0, z = -1}, except_nodes1)
+    dig_block_in_direction(self, {x = 0, y = 0, z = 1}, except_nodes1)
+    dig_block_in_direction(self, {x = 0, y = -1, z = 0}, except_nodes2)
 
-	end
 end
 
 
 is_tool = function(stack)
 	local name = stack:get_name()
-	lf("is_tool", "stack  "..name)
+	lf("digger:is_tool", "stack  "..name)
 
 	local istool = name == "default:pick_stone" or name == "default:pick_gold" or name == "lottores:goldpick"
 	-- local istool = minetest.get_item_group(name, "pickaxe") > 0
 
-	lf("is_tool", "is_tool: "..tostring(istool))
+	lf("digger:is_tool", "is_tool: "..tostring(istool))
 	return istool
 	-- return true
 end

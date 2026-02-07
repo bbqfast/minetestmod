@@ -508,7 +508,7 @@ local function feed_furnace_from_inventory_generic(droid, pos, items)
 					end
 				end
 			else
-				lf("generic_cooker", "feed_furnace_from_inventory_generic: skipping " .. name .. " - only have 5 or fewer")
+				-- lf("generic_cooker", "feed_furnace_from_inventory_generic: skipping " .. name .. " - only have 5 or fewer")
 			end
 		end
 	end

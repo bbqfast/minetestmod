@@ -643,6 +643,7 @@ dump_inventory_to_chest = function(self, pos, inv)
 		end
 end
 
+-- ,,chest,,ch2
 dump_inventory_to_chest_direct = function(self, chest_pos, inv)
 	if not chest_pos then
 		return

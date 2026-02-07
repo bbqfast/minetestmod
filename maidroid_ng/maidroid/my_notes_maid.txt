@@ -34,3 +34,4 @@ Updates:
 - furance always take, refuel
 - furnace lower than 20 coal check
 - attach sword to ltangel 
+- 
