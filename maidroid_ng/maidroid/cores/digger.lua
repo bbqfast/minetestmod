@@ -21,6 +21,8 @@ local on_start, on_pause, on_resume, on_stop, on_step, is_tool
 -- Core extra functions
 local plant, mow, collect_papyrus, plant_papyrus, to_action
 local craft_seeds, select_seed, task, task_base
+local act
+local dig_block_in_direction
 local is_seed, is_plantable, is_papyrus, is_papyrus_soil, is_mowable, is_scythe
 local is_player_has_follow_item
 
@@ -55,6 +57,18 @@ local ld = function(msg, dest)
 	end
 	
 end
+
+local except_nodes2 = { ["default:lava_source"] = true, ["default:lava_flowing"] = true }
+
+local except_nodes1 = {
+	["default:stone"] = true,
+	["default:cobble"] = true,
+	["default:obsidian"] = true,
+	["default:dirt"] = true,
+	["lottmapgen:shire_grass"] = true,
+	["lottmapgen:lorien_grass"] = true,
+	["default:sand"] = true,
+}
 
 -- Calculate distance from maidroid to player
 local function distance_from_player(self)
@@ -215,12 +229,16 @@ local function is_liquid2(node1, node2)
 	return is_liquid(node1) or is_liquid(node2)
 end
 
+local function is_liquid3(node1, node2, node3)
+	return is_liquid(node1) or is_liquid(node2) or is_liquid(node3)
+end
+
 local find_first_non_solid_vertically = function(pos, max_up)
 	if not pos then
 		return nil
 	end
 	local p = vector.round(pos)
-	local limit = max_up or 30
+	local limit = max_up or 60
 	for dy = 0, limit do
 		local check_pos = {x = p.x, y = p.y + dy, z = p.z}
 		local node = minetest.get_node(check_pos)
@@ -362,7 +380,7 @@ on_start = function(self)
 	self:set_animation(maidroid.animation.STAND)	
 	self._old_accel = self.object:get_acceleration()
 	self.object:set_acceleration({x = 0, y = -3, z = 0})  -- tweak -3 → -2/-4 as you like
-	self.onstep_timer_default = 0.5
+	self.onstep_timer_default = 0.1
 	self._onstep_timer = self.onstep_timer_default
 end
 
@@ -409,7 +427,6 @@ to_action = function(self)
 	self.timers.action = 0
 	self.timers.walk = 0
 end
-
 
 -- ,,db,,dig
 local dig_block_in_direction = function(self, direction, except_nodes)
@@ -492,12 +509,68 @@ local dig_block_in_direction = function(self, direction, except_nodes)
 	end
 end
 
+
+-- ,,act
+act = function(self, dtime)
+	self.timers.action = 0
+	lf("digger:act", "act: pos=" .. minetest.pos_to_string(vector.round(self:get_pos())) .. " action=" .. tostring(self.action))
+
+	if self.action == "digger_dig_y_neg" then
+		dig_block_in_direction(self, {x = 0, y = -1, z = 0}, except_nodes2)
+    elseif self.action == "digger_dig_x_pos" then
+		dig_block_in_direction(self, {x = 1, y = 0, z = 0}, except_nodes1)
+	elseif self.action == "digger_dig_x_neg" then
+		dig_block_in_direction(self, {x = -1, y = 0, z = 0}, except_nodes1)
+	elseif self.action == "digger_dig_z_neg" then
+		dig_block_in_direction(self, {x = 0, y = 0, z = -1}, except_nodes1)
+	elseif self.action == "digger_dig_z_pos" then
+		dig_block_in_direction(self, {x = 0, y = 0, z = 1}, except_nodes1)
+	end
+
+	self.action = nil
+	self.state = maidroid.states.IDLE
+end
+
+-- ,,task
+task = function(self)
+	self._digger_dig_action_idx = (self._digger_dig_action_idx or 0) + 1
+	if self._digger_dig_action_idx > 5 then
+		self._digger_dig_action_idx = 1
+	end
+
+	local idx = self._digger_dig_action_idx
+	if idx == 1 then
+		self.action = "digger_dig_x_pos"
+	elseif idx == 2 then
+		self.action = "digger_dig_x_neg"
+	elseif idx == 3 then
+		self.action = "digger_dig_z_neg"
+	elseif idx == 4 then
+		self.action = "digger_dig_z_pos"
+	else
+		self.action = "digger_dig_y_neg"
+	end
+
+	lf("digger:task", "selected idx=" .. tostring(idx) .. " action=" .. tostring(self.action))
+	local now = minetest.get_gametime()
+	local last = self._digger_last_task_gametime
+	if last then
+		lf("digger:task", "task interval=" .. tostring(now - last) .. "s")
+	end
+	self._digger_last_task_gametime = now
+
+	return to_action(self)
+end
+
+
+
 -- ,,step
 on_step = function(self, dtime, moveresult)
     self._digger_step_timer = (self._digger_step_timer or 0) + dtime
     if self._digger_step_timer < self._onstep_timer then
         return
     end
+    lf("digger:on_step", "digger step timer=" .. tostring(self._digger_step_timer))
     self._digger_step_timer = 0
 
 
@@ -528,8 +601,10 @@ on_step = function(self, dtime, moveresult)
 	if pos and self.object then
 		local here = vector.round(pos)
 		local here_node = minetest.get_node(here)
+		local above = vector.add(here, {x = 0, y = 1, z = 0})
+		local node_above = minetest.get_node(above)
 		-- local in_liquid = is_liquid(here_node)
-		local in_liquid = is_liquid2(here_node, node_below)
+		local in_liquid = is_liquid3(here_node, node_below, node_above)
 		if in_liquid then
 			minetest.log("action", "[maidroid:digger] Emergency escape at " .. minetest.pos_to_string(pos))
 			if self._digger_saved_gravity == nil then
@@ -580,11 +655,14 @@ on_step = function(self, dtime, moveresult)
 		local player_pos = player:get_pos()
         local y = find_first_non_solid_vertically(player_pos)
 		-- self.object:set_pos({x = player_pos.x, y = player_pos.y - 1, z = player_pos.z})
+        if y then
 		self.object:set_pos({x = player_pos.x, y = y.y, z = player_pos.z})
-        -- lf("digger:on_step", "Following player: " .. minetest.pos_to_string(player_pos))
+        end
+        lf("digger:on_step", "Following player: " .. minetest.pos_to_string(player_pos))
         self.object:set_velocity({x = 0, y = 0, z = 0})
         self.object:set_acceleration({x = 0, y = 0, z = 0})
-        self.onstep_timer = 2
+		self._digger_step_timer = 0
+		self._onstep_timer = 2
 		return
 	end
 
@@ -642,33 +720,22 @@ on_step = function(self, dtime, moveresult)
     -- ,,m1
     handle_water_below(self, below) 
 
+    lf("digger:on_step", "after handle_water_below: " .. node_below.name .. ", dig_below: " .. tostring(self.timers.dig_below))
     node_below = minetest.get_node(below)
     if node_below and node_below.name == "air" then
-        self.timers.dig_below = self.timers.dig_below - dtime + 2
+        -- self.timers.dig_below = self.timers.dig_below - dtime + 2
+        self._digger_step_timer = 0
+        self._onstep_timer = 2
         lf("digger:on_step", "Skipping dig_below: " .. node_below.name .. ", dig_below: " .. tostring(self.timers.dig_below))
         return
     end
 
-    except_nodes2 = {["default:lava_source"] = true, ["default:lava_flowing"] = true}
-
-    except_nodes1 = {
-        ["default:stone"] = true,
-        ["default:cobble"] = true,
-        ["default:obsidian"] = true,
-        ["default:dirt"] = true,
-        ["lottmapgen:shire_grass"] = true,
-        ["lottmapgen:lorien_grass"] = true,
-        ["default:sand"] = true,
-    }
-
-    -- except_nodes1 = {}
-
-    -- ,,db
-    dig_block_in_direction(self, {x = 1, y = 0, z = 0}, except_nodes1)
-    dig_block_in_direction(self, {x = -1, y = 0, z = 0}, except_nodes1)
-    dig_block_in_direction(self, {x = 0, y = 0, z = -1}, except_nodes1)
-    dig_block_in_direction(self, {x = 0, y = 0, z = 1}, except_nodes1)
-    dig_block_in_direction(self, {x = 0, y = -1, z = 0}, except_nodes2)
+    -- ,,db (cycle one direction per step)
+    if self.state == maidroid.states.ACT and self.action then
+        act(self, dtime)
+    else
+        task(self)
+    end
 
 end
 

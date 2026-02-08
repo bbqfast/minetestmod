@@ -1604,7 +1604,7 @@ local function on_punch(self, puncher, _, tool_capabilities, _, damage)
 	elseif not player_controls then
 		return true
 	-- Pause maidroids with 'control item'
-	elseif stack:get_name() == control_item then
+	elseif stack:get_name() == control_item or stack:get_name() == "default:paper" then
 		self.pause = not self.pause
 		if self.pause == true then
 			self.core.on_pause(self)
