@@ -380,6 +380,7 @@ on_start = function(self)
 	self:set_animation(maidroid.animation.STAND)	
 	self._old_accel = self.object:get_acceleration()
 	self.object:set_acceleration({x = 0, y = -3, z = 0})  -- tweak -3 → -2/-4 as you like
+    self.is_dig_all_dir = true
 	self.onstep_timer_default = 0.1
 	self._onstep_timer = self.onstep_timer_default
 end
@@ -509,6 +510,14 @@ local dig_block_in_direction = function(self, direction, except_nodes)
 	end
 end
 
+local dig_all_direction = function(self)
+	dig_block_in_direction(self, {x = 1, y = 0, z = 0}, except_nodes1)
+	dig_block_in_direction(self, {x = -1, y = 0, z = 0}, except_nodes1)
+	dig_block_in_direction(self, {x = 0, y = 0, z = -1}, except_nodes1)
+	dig_block_in_direction(self, {x = 0, y = 0, z = 1}, except_nodes1)
+	dig_block_in_direction(self, {x = 0, y = -1, z = 0}, except_nodes2)
+end
+
 
 -- ,,act
 act = function(self, dtime)
@@ -525,6 +534,8 @@ act = function(self, dtime)
 		dig_block_in_direction(self, {x = 0, y = 0, z = -1}, except_nodes1)
 	elseif self.action == "digger_dig_z_pos" then
 		dig_block_in_direction(self, {x = 0, y = 0, z = 1}, except_nodes1)
+    elseif self.action == "digger_all_direction" then
+        dig_all_direction(self)
 	end
 
 	self.action = nil
@@ -533,6 +544,18 @@ end
 
 -- ,,task
 task = function(self)
+	if self.is_dig_all_dir == true then
+		self.action = "digger_all_direction"
+		lf("digger:task", "selected action=" .. tostring(self.action))
+		-- local now = minetest.get_gametime()
+		-- local last = self._digger_last_task_gametime
+		-- if last then
+		-- 	lf("digger:task", "task interval=" .. tostring(now - last) .. "s")
+		-- end
+		-- self._digger_last_task_gametime = now
+		return to_action(self)
+	end
+
 	self._digger_dig_action_idx = (self._digger_dig_action_idx or 0) + 1
 	if self._digger_dig_action_idx > 5 then
 		self._digger_dig_action_idx = 1
@@ -552,12 +575,12 @@ task = function(self)
 	end
 
 	lf("digger:task", "selected idx=" .. tostring(idx) .. " action=" .. tostring(self.action))
-	local now = minetest.get_gametime()
-	local last = self._digger_last_task_gametime
-	if last then
-		lf("digger:task", "task interval=" .. tostring(now - last) .. "s")
-	end
-	self._digger_last_task_gametime = now
+	-- local now = minetest.get_gametime()
+	-- local last = self._digger_last_task_gametime
+	-- if last then
+	-- 	lf("digger:task", "task interval=" .. tostring(now - last) .. "s")
+	-- end
+	-- self._digger_last_task_gametime = now
 
 	return to_action(self)
 end
