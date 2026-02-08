@@ -135,7 +135,7 @@ minetest.register_tool("maidroid:capture_rod", {
 	end
 })
 
-
+-- ,,egg
 for name, _ in pairs(maidroid.registered_maidroids) do
 	local maidroid_name = name:sub(10)
 	local egg_def = minetest.registered_tools["maidroid:maidroid_egg"]
@@ -147,7 +147,12 @@ for name, _ in pairs(maidroid.registered_maidroids) do
 		groups = {not_in_creative_inventory = 1},
 		on_use = function(itemstack, user, pointed_thing)
 			minetest.log("warning", "====================== captured_egg")
-			if pointed_thing.type ~= "node" then
+			local spawn_pos
+			if pointed_thing.type == "node" then
+				spawn_pos = pointed_thing.above
+			elseif pointed_thing.type == "nothing" then
+				spawn_pos = vector.round(user:get_pos())
+			else
 				if pointed_thing.type == "object" then
 					local luaentity = pointed_thing.ref:get_luaentity()
 					if luaentity and luaentity.name == "__builtin:item" then
@@ -192,7 +197,7 @@ for name, _ in pairs(maidroid.registered_maidroids) do
 
 			meta = minetest.serialize(meta)	
 
-			local obj = minetest.add_entity(pointed_thing.above, "maidroid:maidroid", meta)
+			local obj = minetest.add_entity(spawn_pos, "maidroid:maidroid", meta)
 			local luaentity = obj:get_luaentity()
 
 			luaentity:set_yaw({obj:get_pos(), user:get_pos()})

@@ -109,7 +109,7 @@ end
 
 -- ,,light
 local function handle_helper_light(self, pos, player)
-    lf("digger:handle_helper_light", "handle_helper_light: " .. minetest.pos_to_string(pos))
+    -- lf("digger:handle_helper_light", "handle_helper_light: " .. minetest.pos_to_string(pos))
 	local light_pos = {
 		x = math.floor(pos.x + 0.5),
 		y = math.floor(pos.y + 0.5),
@@ -215,6 +215,28 @@ local function is_liquid2(node1, node2)
 	return is_liquid(node1) or is_liquid(node2)
 end
 
+local find_first_non_solid_vertically = function(pos, max_up)
+	if not pos then
+		return nil
+	end
+	local p = vector.round(pos)
+	local limit = max_up or 30
+	for dy = 0, limit do
+		local check_pos = {x = p.x, y = p.y + dy, z = p.z}
+		local node = minetest.get_node(check_pos)
+		if node and node.name ~= "ignore" and not is_liquid(node) then
+			if node.name == "air" then
+				return vector.new(check_pos)
+			end
+			local def = minetest.registered_nodes[node.name]
+			if def and def.buildable_to == true then
+				return vector.new(check_pos)
+			end
+		end
+	end
+	return nil
+end
+
 local move_up_to_closest_air = function(self)
 	local pos = self:get_pos()
 	if not pos or not self.object then
@@ -304,7 +326,27 @@ local function handle_water_below(self, below)
 	return false
 end
 
+local spawn_dig_particles = function(target_pos, node_name)
+	minetest.add_particlespawner({
+		amount = 12,
+		time = 0.2,
+		minpos = vector.subtract(target_pos, 0.3),
+		maxpos = vector.add(target_pos, 0.3),
+		minvel = {x = -0.5, y = 0.5, z = -0.5},
+		maxvel = {x = 0.5, y = 1.5, z = 0.5},
+		minacc = {x = 0, y = -9.8, z = 0},
+		maxacc = {x = 0, y = -9.8, z = 0},
+		minexptime = 0.3,
+		maxexptime = 0.7,
+		minsize = 1,
+		maxsize = 2,
+		texture = minetest.registered_nodes[node_name] and
+			(minetest.registered_nodes[node_name].tiles[1] or "default_dirt.png") or "default_dirt.png",
+		glow = 0,
+	})
+end
 
+-- ,,start
 on_start = function(self)
 	lf("digger:on_start", "initialized digger core")
 
@@ -320,12 +362,14 @@ on_start = function(self)
 	self:set_animation(maidroid.animation.STAND)	
 	self._old_accel = self.object:get_acceleration()
 	self.object:set_acceleration({x = 0, y = -3, z = 0})  -- tweak -3 → -2/-4 as you like
-    self._onstep_timer = 0.2
+	self.onstep_timer_default = 0.5
+	self._onstep_timer = self.onstep_timer_default
 end
 
 on_resume = function(self)
 	self.path = nil
 	-- wander_core.on_resume(self)
+	self._onstep_timer = self.onstep_timer_default or 0.2
 end
 
 on_stop = function(self)
@@ -409,24 +453,7 @@ local dig_block_in_direction = function(self, direction, except_nodes)
 
 	local drops = minetest.get_node_drops(node.name)
 	minetest.remove_node(target_pos)
-
-	minetest.add_particlespawner({
-		amount = 12,
-		time = 0.2,
-		minpos = vector.subtract(target_pos, 0.3),
-		maxpos = vector.add(target_pos, 0.3),
-		minvel = {x = -0.5, y = 0.5, z = -0.5},
-		maxvel = {x = 0.5, y = 1.5, z = 0.5},
-		minacc = {x = 0, y = -9.8, z = 0},
-		maxacc = {x = 0, y = -9.8, z = 0},
-		minexptime = 0.3,
-		maxexptime = 0.7,
-		minsize = 1,
-		maxsize = 2,
-		texture = minetest.registered_nodes[node.name] and
-			(minetest.registered_nodes[node.name].tiles[1] or "default_dirt.png") or "default_dirt.png",
-		glow = 0,
-	})
+	spawn_dig_particles(target_pos, node.name)
 
 
 	move_up_one(self)
@@ -485,7 +512,7 @@ on_step = function(self, dtime, moveresult)
 
     local vel = self.object:get_velocity()
     self.object:set_velocity({x = vel.x, y = -1, z = vel.z})
-    self._onstep_timer = 0.2
+    self._onstep_timer = self.onstep_timer_default
 	-- get owner safely
 	local player = minetest.get_player_by_name(self.owner)
 
@@ -548,10 +575,16 @@ on_step = function(self, dtime, moveresult)
     handle_teleport_to_maidroid(self, player)
 
 	local func_name = "digger:on_step"
+    -- ,,follow
 	if player and is_player_has_follow_item(self) then
 		local player_pos = player:get_pos()
-		self.object:set_pos({x = player_pos.x, y = player_pos.y + 1, z = player_pos.z})
-        lf("digger:on_step", "Following player: " .. minetest.pos_to_string(player_pos))
+        local y = find_first_non_solid_vertically(player_pos)
+		-- self.object:set_pos({x = player_pos.x, y = player_pos.y - 1, z = player_pos.z})
+		self.object:set_pos({x = player_pos.x, y = y.y, z = player_pos.z})
+        -- lf("digger:on_step", "Following player: " .. minetest.pos_to_string(player_pos))
+        self.object:set_velocity({x = 0, y = 0, z = 0})
+        self.object:set_acceleration({x = 0, y = 0, z = 0})
+        self.onstep_timer = 2
 		return
 	end
 
@@ -588,23 +621,6 @@ on_step = function(self, dtime, moveresult)
     self:set_animation(maidroid.animation.MINE)
     local pos = self:get_pos()
     local below = vector.add(pos, { x = 0, y = -1, z = 0 })
-    -- minetest.add_particlespawner({
-    -- 	amount = 16,
-    -- 	time = 0.2,
-    -- 	minpos = vector.subtract(below, 0.3),
-    -- 	maxpos = vector.add(below, 0.3),
-    -- 	minvel = {x = -0.5, y = 0.5, z = -0.5},
-    -- 	maxvel = {x = 0.5, y = 1.5, z = 0.5},
-    -- 	minacc = {x = 0, y = -9.8, z = 0},
-    -- 	maxacc = {x = 0, y = -9.8, z = 0},
-    -- 	minexptime = 0.3,
-    -- 	maxexptime = 0.7,
-    -- 	minsize = 1,
-    -- 	maxsize = 2,
-    -- 	texture = minetest.registered_nodes[minetest.get_node(below).name] and
-    -- 		(minetest.registered_nodes[minetest.get_node(below).name].tiles[1] or "default_dirt.png") or "default_dirt.png",
-    -- 	glow = 0,
-    -- })
 
     local node_below = minetest.get_node(below)
     local dist = distance_from_player(self)

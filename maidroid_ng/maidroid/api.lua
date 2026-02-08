@@ -15,6 +15,23 @@ local spawned_maidroid_names = {}
 local total_maidroids_spawned = 0
 local MAX_MAIDROIDS_ALLOWED = 3
 
+local all_maidroid_metrics = {}
+all_maidroid_metrics.total_activated = 0
+all_maidroid_metrics.total_deactivated = 0
+
+local maidroid_metrics_log_timer = 0
+local maidroid_metrics_log_interval = 30
+
+minetest.register_globalstep(function(dtime)
+	maidroid_metrics_log_timer = maidroid_metrics_log_timer + (dtime or 0)
+	if maidroid_metrics_log_timer < maidroid_metrics_log_interval then
+		return
+	end
+	maidroid_metrics_log_timer = 0
+	lf("GLOBAL_STATS", "maidroid_metrics: activated=" .. tostring(all_maidroid_metrics.total_activated) .. " deactivated=" .. tostring(all_maidroid_metrics.total_deactivated))
+	lf("GLOBAL_STATS", "spawned_maidroid_names: " .. dump(spawned_maidroid_names))
+    
+end)
 
 local mydump = function(func, msg, obj)
     -- uncommon to incrase verbose
@@ -1109,11 +1126,11 @@ get_formspec = function(self, player, tab)
 			return form
 		end
 	end
-
 end
 
 -- on_activate is a callback function that is called when the object is created or recreated.
 local function on_activate(self, staticdata)
+	all_maidroid_metrics.total_activated = (all_maidroid_metrics.total_activated or 0) + 1
 	-- Check if we've already spawned the maximum number of maidroids
 	-- if total_maidroids_spawned >= MAX_MAIDROIDS_ALLOWED then
 	-- lf("api", "maidroid: maximum number of maidroids (" .. MAX_MAIDROIDS_ALLOWED .. ") already spawned. Removing duplicate maidroid.")
@@ -1204,14 +1221,15 @@ local function on_activate(self, staticdata)
 	self.timers.change_direction = 0
 
 	-- Check if this maidroid name has already been spawned
-	if spawned_maidroid_names[self.nametag] then
+	local spawned_count = spawned_maidroid_names[self.nametag] or 0
+	if spawned_count > 0 then
 		lf("api", "maidroid:maidroid already spawned with name '" .. self.nametag .. "' - removing duplicate.")
 		-- self.object:remove()
 		-- return
 	end
 	
 	-- Mark this name as spawned and increment total count
-	spawned_maidroid_names[self.nametag] = true
+	spawned_maidroid_names[self.nametag] = spawned_count + 1
 	total_maidroids_spawned = total_maidroids_spawned + 1
 	
 	lf("api", "maidroid: activating maidroid #" .. total_maidroids_spawned .. "/" .. MAX_MAIDROIDS_ALLOWED .. " with name '" .. self.nametag .. "'")
@@ -1487,11 +1505,15 @@ local pickup_item = function(self, radius)
 			and luaentity.name == "__builtin:item"
 			and luaentity.itemstring ~= "" then
 			local stack = ItemStack(luaentity.itemstring)
+			if stack:get_name() == "maidroid:helper_light" then
+				goto continue
+			end
 			self.need_core_selection = true
 			table.insert(stacks, stack)
 			obj:remove()
 			ok = true
 		end
+		::continue::
 	end
 	if ok then
 		self:add_items_to_main(stacks)
@@ -1719,7 +1741,15 @@ local register_maidroid = function(product_name, def)
 		on_punch       = on_punch,
 		get_staticdata = get_staticdata,
 		on_deactivate  = function(self)
+			all_maidroid_metrics.total_deactivated = (all_maidroid_metrics.total_deactivated or 0) + 1
 			lf("api", "maidroid_on_deactivate CALLED - nametag: " .. tostring(self.nametag))
+			if self._last_light_pos then
+				local old = minetest.get_node(self._last_light_pos)
+				if old and old.name == "maidroid:helper_light" then
+					minetest.remove_node(self._last_light_pos)
+				end
+				self._last_light_pos = nil
+			end
 			
 			if self.wield_item then
 				lf("api", "Removing wield_item for maidroid: " .. tostring(self.nametag))
@@ -1954,7 +1984,6 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 		end
 		return
 	end
-	
 	-- Handle checkbox changes for cooker settings
 	if fields.auto_craft or fields.auto_fuel or fields.auto_collect then
 		-- Store cooker settings (you could add these to the maidroid's staticdata)
