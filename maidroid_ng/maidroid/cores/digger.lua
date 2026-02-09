@@ -70,6 +70,14 @@ local except_nodes1 = {
 	["default:sand"] = true,
 }
 
+local skip_storage_nodes = {
+	["default:cobble"] = true,
+	["default:dirt"] = true,
+	["default:sandstone"] = true,
+	["lottores:limestone"] = true,
+	["default:sand"] = true,
+}
+
 -- Calculate distance from maidroid to player
 local function distance_from_player(self)
 	local player = minetest.get_player_by_name(self.owner)
@@ -482,7 +490,11 @@ local dig_block_in_direction = function(self, direction, except_nodes)
 
 	local stacks = {}
 	for _, item in ipairs(drops) do
-		table.insert(stacks, ItemStack(item))
+		local stack = ItemStack(item)
+		local name = stack:get_name()
+		if not skip_storage_nodes[name] then
+			table.insert(stacks, stack)
+		end
 	end
 
 	if self.get_inventory then
@@ -718,18 +730,19 @@ on_step = function(self, dtime, moveresult)
 		self.object:set_pos({x = target_x, y = pos.y, z = math.floor(pos.z + 0.5)})
 	end
 
-    lf("digger:on_step", "Before dig")
-    self:set_animation(maidroid.animation.MINE)
-    local pos = self:get_pos()
-    local below = vector.add(pos, { x = 0, y = -1, z = 0 })
+    	lf("digger:on_step", "Before dig")
+	self:set_animation(maidroid.animation.MINE)
+	local pos = self:get_pos()
+	local p = vector.round(pos)
+	local below = vector.add(p, { x = 0, y = -1, z = 0 })
 
-    local node_below = minetest.get_node(below)
-    local dist = distance_from_player(self)
-    -- ,,lava
-    lf("digger:on_step", "node_below: " .. node_below.name .. ", distance from player: " .. tostring(dist or "unknown"))
-    if node_below and (node_below.name == "default:lava_source" or node_below.name == "default:lava_flowing") then
-        self.object:set_pos({x = pos.x, y = pos.y + 1, z = pos.z})
-        minetest.set_node(below, {name = "default:water_source"})
+	local node_below = minetest.get_node(below)
+	local dist = distance_from_player(self)
+	-- ,,lava
+	lf("digger:on_step", "node_below: " .. node_below.name .. ", distance from player: " .. tostring(dist or "unknown"))
+	if node_below and (node_below.name == "default:lava_source" or node_below.name == "default:lava_flowing") then
+		self.object:set_pos({x = pos.x, y = pos.y + 1, z = pos.z})
+		minetest.set_node(below, {name = "default:water_source"})
         lf("digger:on_step", "set node to water from lava")
         -- self.timers.dig_below = -2
         -- move_up_one(self)
@@ -738,27 +751,37 @@ on_step = function(self, dtime, moveresult)
         self._onstep_timer = 5
         move_up_to_closest_air(self)
         return
-    end
+    	end
 
-    -- ,,m1
-    handle_water_below(self, below) 
+	-- ,,m1
+	handle_water_below(self, below) 
 
-    lf("digger:on_step", "after handle_water_below: " .. node_below.name .. ", dig_below: " .. tostring(self.timers.dig_below))
-    node_below = minetest.get_node(below)
-    if node_below and node_below.name == "air" then
-        -- self.timers.dig_below = self.timers.dig_below - dtime + 2
-        self._digger_step_timer = 0
-        self._onstep_timer = 2
+	node_below = minetest.get_node(below)
+	lf("digger:on_step", "after handle_water_below: " .. node_below.name .. ", dig_below: " .. tostring(self.timers.dig_below))
+	if node_below and node_below.name == "air" then
+		-- self.timers.dig_below = self.timers.dig_below - dtime + 2
+		local below2 = vector.add(below, {x = 0, y = -1, z = 0})
+		local node_below2 = minetest.get_node(below2)
+		self._digger_step_timer = 0
+		if node_below2 and node_below2.name == "air" then
+			self._onstep_timer = 2
+		else
+			self._onstep_timer = 0.2
+		end
         lf("digger:on_step", "Skipping dig_below: " .. node_below.name .. ", dig_below: " .. tostring(self.timers.dig_below))
         return
     end
 
-    -- ,,db (cycle one direction per step)
-    if self.state == maidroid.states.ACT and self.action then
-        act(self, dtime)
-    else
-        task(self)
-    end
+    	-- ,,db (cycle one direction per step)
+	if self.is_dig_all_dir == true then
+		dig_all_direction(self)
+		return
+	end
+	if self.state == maidroid.states.ACT and self.action then
+		act(self, dtime)
+	else
+		task(self)
+	end
 
 end
 

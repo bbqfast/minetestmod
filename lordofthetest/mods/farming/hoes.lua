@@ -86,22 +86,24 @@ function farming.hoe_on_use(itemstack, user, pointed_thing, uses)
 		-- check if pointing at dirt
 		if minetest.get_item_group(under.name, "soil") ~= 1 then return end
 
-		-- check if (wet) soil defined
+		-- check if (wet) soil defined, if not use simple conversion
 		local ndef = minetest.registered_nodes[under.name]
 
 		if ndef.soil == nil or ndef.soil.wet == nil or ndef.soil.dry == nil then
-			return
+			-- Simple fallback: convert any soil=1 node to farming:soil
+			minetest.set_node(pt.under, {name = "farming:soil"}) ; is_used = true
+			minetest.sound_play("default_dig_crumbly", {pos = pt.under, gain = 0.5}, true)
+		else
+			-- Original behavior: use defined soil types
+			if minetest.is_protected(pt.under, user:get_player_name()) then
+				minetest.record_protection_violation(pt.under, user:get_player_name())
+				return
+			end
+
+			-- turn the node into soil, wear out item and play sound
+			minetest.set_node(pt.under, {name = ndef.soil.dry}) ; is_used = true
+			minetest.sound_play("default_dig_crumbly", {pos = pt.under, gain = 0.5}, true)
 		end
-
-		if minetest.is_protected(pt.under, user:get_player_name()) then
-			minetest.record_protection_violation(pt.under, user:get_player_name())
-			return
-		end
-
-		-- turn the node into soil, wear out item and play sound
-		minetest.set_node(pt.under, {name = ndef.soil.dry}) ; is_used = true
-
-		minetest.sound_play("default_dig_crumbly", {pos = pt.under, gain = 0.5}, true)
 	end
 
 	local wdef = itemstack:get_definition()

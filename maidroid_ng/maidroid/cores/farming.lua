@@ -286,6 +286,12 @@ lf("[maidroid:farming]", "Registered mature plants:")
 for plant_name, plant_def in pairs(mature_plants) do
 	lf("[maidroid:farming]", "  " .. plant_name .. " -> " .. plant_def.crop)
 end
+
+lf("[maidroid:farming]", "Registered seeds:")
+for seed_name, plant_name in pairs(seeds) do
+	lf("[maidroid:farming]", "  " .. seed_name .. " -> " .. plant_name)
+end
+
 -- raise_error("maidroid:farming")
 
 local ethereal_plants={}
@@ -924,6 +930,52 @@ local place_plant_support = function(self, plantname)
 	return true
 end
 
+local seed_for_crop = function(crop_name)
+	if not crop_name then
+		return nil
+	end
+	for seed_name, crop in pairs(seeds) do
+		if crop == crop_name then
+			return seed_name
+		end
+	end
+	return nil
+end
+
+local replant_after_harvest = function(self, mature_name, pos)
+	if not mature_name or not pos then
+		return
+	end
+	local desc = mature_plants[mature_name]
+	if not desc then
+		return
+	end
+	local seed_name = seed_for_crop(desc.crop)
+	if not seed_name then
+		return
+	end
+	local inv = self:get_inventory()
+	if not inv:contains_item("main", seed_name) then
+		return
+	end
+	if not place_plant_support(self, seed_name) then
+		return
+	end
+	if not is_plantable(pos, self.owner) then
+		return
+	end
+	local plantname = seeds[seed_name]
+	minetest.set_node(pos, {
+		name = plantname,
+		param2 = minetest.registered_nodes[plantname].place_param2 or 1,
+	})
+    lf("replant_after_harvest", "replanted " .. plantname .. " at " .. minetest.pos_to_string(pos))
+	if not farming_redo then
+		minetest.get_node_timer(pos):start(math.random(166, 286))
+	end
+	inv:remove_item("main", ItemStack(seed_name))
+end
+
 local freeze_action = function(self, toolname)
 	-- Check tool was not removed from inventory
 	if not toolname or not self:get_inventory():contains_item("main", toolname) then
@@ -1119,6 +1171,7 @@ mow = function(self, dtime)
 		end
 		self:add_items_to_main(stacks)
 		lf("mow", "added items to inventory (normal mode), stacks count = " .. tostring(#stacks))
+		replant_after_harvest(self, mature, self.destination)
 		to_wander(self, "farming:mow_done", 0, timers.change_dir_max, "mow")
 	end
 end
