@@ -16,6 +16,35 @@ local is_near = function(self, pos, distance)
 	return vector.distance(p, pos) < distance
 end
 
+local function pos_xyz(p)
+	if not p then return "(nil)" end
+	return string.format("(%s, %s, %s)", tostring(p.x), tostring(p.y), tostring(p.z))
+end
+
+local function path_to_str(path)
+	local path_parts = {}
+	for i, p in ipairs(path or {}) do
+		path_parts[i] = pos_xyz(p)
+	end
+	return "[" .. table.concat(path_parts, ", ") .. "]"
+end
+
+local function path_nodes_to_str(path)
+	local parts = {}
+	for i, p in ipairs(path or {}) do
+		local node_name = "(nil)"
+		if p then
+			local below = { x = p.x, y = p.y - 1, z = p.z }
+			local node = minetest.get_node(below)
+			if node and node.name then
+				node_name = node.name
+			end
+		end
+		parts[i] = tostring(node_name)
+	end
+	return "[" .. table.concat(parts, ", ") .. "]"
+end
+
 on_step = function(self, dtime, moveresult)
 	if is_near(self, self.destination, 1.5) then
 		lf("path", "Reached destination (near); finishing path at " .. minetest.pos_to_string(self.destination))
@@ -63,6 +92,18 @@ end
 
 -- ,,follow
 to_follow_path = function(self, path, destination, finalize, action)
+	local start_pos = self:get_pos()
+	lf("path", "start=" .. pos_xyz(start_pos) .. " path=" .. path_to_str(path) .. " destination=" .. pos_xyz(destination))
+	local destination_node_name = "(nil)"
+	if destination then
+		local below = { x = destination.x, y = destination.y - 1, z = destination.z }
+		local node = minetest.get_node(below)
+		if node and node.name then
+			destination_node_name = node.name
+		end
+	end
+	lf("path", "start=" .. pos_xyz(start_pos) .. " path_nodes=" .. path_nodes_to_str(path) .. " destination=" .. pos_xyz(destination) .. " destination_node=" .. tostring(destination_node_name))
+    
 	self.state = maidroid.states.PATH
 	self.path = path
 	self.destination = destination

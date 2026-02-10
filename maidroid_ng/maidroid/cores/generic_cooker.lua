@@ -149,13 +149,16 @@ local all_cookable_items_short = {
 
 local all_take_items = {
 	{ item_name = "farming:seed_rice",  quantity = 5 },
+	{ item_name = "farming:wheat",  quantity = 5 },
 	{ item_name = "farming:rice_flour", quantity = 5 },
+	{ item_name = "default:papyrus", quantity = 5 },
 }
 
 local craft_outputs = {
     "farming:flour",
     "farming:rice_flour",
-    "farming:bread_slice"
+    "farming:bread_slice",
+    "farming:rhubarb_pie"
 }
 
 local function lfv(verbose, ...)
@@ -1127,58 +1130,76 @@ local function craft_generic(droid)
         return false
     end -- if not inv
 
+    local best_output_stack = nil
+    local best_output_name = nil
+    local best_consumables = nil
+    local best_replacements = nil
+    local best_ingredient_count = -1
+
     for _, spec in ipairs(craft_outputs or {}) do
         local output_stack = ItemStack(spec)
         local output_name = output_stack:get_name()
         if output_name ~= "" then
             local recipe_options = get_craft_requirements_from_registered(output_name)
             if recipe_options then
-                -- Try each recipe option until we find one that can be crafted
-                for _, recipe_tuple in ipairs(recipe_options) do
-                    local consumables = recipe_tuple[1]
-                    local replacements = recipe_tuple[2]
-                    
-                    -- Ensure there is room for the result before consuming inputs.
-                    if inv:room_for_item("main", output_stack) then
+                -- Ensure there is room for the result before consuming inputs.
+                if inv:room_for_item("main", output_stack) then
+                    -- Try each recipe option and select the craftable one with the most ingredients.
+                    for _, recipe_tuple in ipairs(recipe_options) do
+                        local consumables = recipe_tuple[1]
+                        local replacements = recipe_tuple[2]
+
                         local missing, matching_items = check_required_items_with_group(inv, consumables, output_name)
-                        
-                        -- Convert matching_items list back to consumables table format
-                        local new_consumables = {}
-                        for _, item in ipairs(matching_items) do
-                            new_consumables[item.name] = item.count
-                        end
-                        consumables = new_consumables
 
-                        -- ,,x1
                         if not missing then
-                            local removed_items = try_remove_item_for_craft(inv, consumables)
+                            -- Convert matching_items list back to consumables table format
+                            local new_consumables = {}
+                            for _, item in ipairs(matching_items) do
+                                new_consumables[item.name] = item.count
+                            end
 
-                            if removed_items then
-                                for _, rep in ipairs(replacements or {}) do
-                                    lf("generic_cooker", "craft_generic(" .. output_name .. "): replacement " .. dump(rep))
-                                    local replacement_name = rep
-                                    if replacement_name and replacement_name ~= "" then
-                                        local replacement_stack = ItemStack(replacement_name)
-                                        inv:add_item("main", replacement_stack)
-                                        lf("generic_cooker", "craft_generic(" .. output_name .. "): returned replacement " .. replacement_stack:to_string())
-                                    end
-                                end
+                            local ingredient_count = 0
+                            for _, count in pairs(new_consumables) do
+                                ingredient_count = ingredient_count + (count or 0)
+                            end
 
-                                inv:add_item("main", output_stack)
-                                lf("generic_cooker", "craft_generic: crafted " .. output_stack:to_string())
-                                
-                                -- Update craft_metrics
-                                local crafted_name = output_stack:get_name()
-                                craft_metrics[crafted_name] = (craft_metrics[crafted_name] or 0) + output_stack:get_count()
-                                lf("craft_metrics", "crafted " .. output_stack:to_string() .. " total: " .. craft_metrics[crafted_name])
-                                
-                                return true
+                            if ingredient_count > best_ingredient_count then
+                                best_output_stack = output_stack
+                                best_output_name = output_name
+                                best_consumables = new_consumables
+                                best_replacements = replacements
+                                best_ingredient_count = ingredient_count
                             end
                         end
-                    end
-                end -- for recipe_options loop
+                    end -- for recipe_options loop
+                end
             end -- if recipe_options
         end -- if output
+    end
+
+    if best_consumables and best_output_stack then
+        local removed_items = try_remove_item_for_craft(inv, best_consumables)
+        if removed_items then
+            for _, rep in ipairs(best_replacements or {}) do
+                lf("generic_cooker", "craft_generic(" .. best_output_name .. "): replacement " .. dump(rep))
+                local replacement_name = rep
+                if replacement_name and replacement_name ~= "" then
+                    local replacement_stack = ItemStack(replacement_name)
+                    inv:add_item("main", replacement_stack)
+                    lf("generic_cooker", "craft_generic(" .. best_output_name .. "): returned replacement " .. replacement_stack:to_string())
+                end
+            end
+
+            inv:add_item("main", best_output_stack)
+            lf("generic_cooker", "craft_generic: crafted " .. best_output_stack:to_string())
+
+            -- Update craft_metrics
+            local crafted_name = best_output_stack:get_name()
+            craft_metrics[crafted_name] = (craft_metrics[crafted_name] or 0) + best_output_stack:get_count()
+            lf("craft_metrics", "crafted " .. best_output_stack:to_string() .. " total: " .. craft_metrics[crafted_name])
+
+            return true
+        end
     end
 
     return false
@@ -1241,7 +1262,7 @@ task = function(droid)
 	-- : randomly pick one of two furnace actions, with choice 1 being twice as likely as choice 2
 	-- Use math.random(3): values 1 and 2 map to choice 1, value 3 maps to choice 2
 	local choice = math.random(3)
-    -- choice = 3
+    -- choice = 2
 
 	if choice == 1 then
 		lf("generic_cooker:task", "CHOICE=1: try_feed_get_from_furnace__generic for ")

@@ -31,3 +31,11 @@ Game item:
 - fix trader spawn issue
 - angel ring
 
+
+- rename internal name npc to ltangel 
+- ltangel HP update and regen only if idle
+- ltangel stay behind player
+- consolidate log lf
+- food boost damage
+- food boost defend
+- fix hoes to work with lottsoil

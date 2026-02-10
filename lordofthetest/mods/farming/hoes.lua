@@ -89,6 +89,8 @@ function farming.hoe_on_use(itemstack, user, pointed_thing, uses)
 		-- check if (wet) soil defined, if not use simple conversion
 		local ndef = minetest.registered_nodes[under.name]
 
+        -- ,,fix
+        -- to work for lottmapgen soils
 		if ndef.soil == nil or ndef.soil.wet == nil or ndef.soil.dry == nil then
 			-- Simple fallback: convert any soil=1 node to farming:soil
 			minetest.set_node(pt.under, {name = "farming:soil"}) ; is_used = true

@@ -1,3 +1,7 @@
+Todo:
+- farmer replant on the same spot if seed avaiable
+
+
 
 1. One‑shot clean (what you already used)
 [IO.File]::WriteAllText('.\debug_clean.txt', -join (Get-Content .\debug.txt -Encoding Byte | Where-Object { $_ -ne 0 } | ForEach-Object { [char]$_ }))
@@ -34,4 +38,8 @@ Updates:
 - furance always take, refuel
 - furnace lower than 20 coal check
 - attach sword to ltangel 
-- 
+- farmer replant on the same spot if seed avaiable
+
+
+todo:
+- fix sitting maidroid  moving

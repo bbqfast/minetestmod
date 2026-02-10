@@ -76,7 +76,7 @@ mature_plants["farming:pepper_7"] = {chance=1, crop="farming:pepper_1"}
 mature_plants["farming:pepper_6"] = {chance=3, crop="farming:pepper_1"}
 mature_plants["farming:pepper_5"] = {chance=9, crop="farming:pepper_1"}
 if farming_redo then
-	lf("[maidroid:farming]", "Detected farming redo, using registered_plants")
+	lf("farming:init", "Detected farming redo, using registered_plants")
 	local mature, crop
 	for _, v in pairs(farming.registered_plants) do
 		if v.steps then -- happens with mods like: "resources crops"
@@ -102,14 +102,14 @@ if farming_redo then
 		maidroid.register_tool_rotation("farming:scythe_mithril", vector.new(-75,45,-45))
 	end
 else
-	lf("[maidroid:farming]", "Using default farming (not redo)")
+	lf("farming:init", "Using default farming (not redo)")
 	local plant_list = { "cotton", "wheat" }
 	local crop
 	for _, plantname in ipairs(plant_list) do
 			crop = "farming:" .. plantname .. "_1"
 			mature_plants["farming:" .. plantname .. "_8"] = {chance=1,crop=crop}
 			seeds["farming:seed_" .. plantname] = crop
-			lf("[maidroid:farming]", "Added " .. plantname .. "_8 to mature_plants")
+			lf("farming:init", "Added " .. plantname .. "_8 to mature_plants")
 	end
 
 	if maidroid.mods.better_farming then
@@ -165,17 +165,17 @@ maybe_dump_to_nearby_chest = function(self, inv, pos)
     lf("farming:dump", "maybe_dump_to_nearby_chest: checking inventory at " .. minetest.pos_to_string(pos))
 
 	-- Check if we even have an oversized stack to dump
-	local main = inv:get_list("main") or {}
-	local has_big_stack = false
-	for _, stack in ipairs(main) do
-		if not stack:is_empty() and stack:get_count() > 90 then
-			has_big_stack = true
-			break
-		end
-	end
-	if not has_big_stack then
-		return false
-	end
+	-- local main = inv:get_list("main") or {}
+	-- local has_big_stack = false
+	-- for _, stack in ipairs(main) do
+	-- 	if not stack:is_empty() and stack:get_count() > 90 then
+	-- 		has_big_stack = true
+	-- 		break
+	-- 	end
+	-- end
+	-- if not has_big_stack then
+	-- 	return false
+	-- end
 
 	-- Look for a nearby default chest within radius 10
 	lf("farming:dump", "Looking for chest near " .. minetest.pos_to_string(pos))
@@ -223,15 +223,18 @@ dump_at_chest = function(self, dtime)
 	-- When returning from a chest path, we know the exact chest position;
 	-- use the direct variant to avoid relying on front/below detection.
 	if self._dump_chest_pos then
-        lf("farming:dump", "Dumping to chest at " .. minetest.pos_to_string(self._dump_chest_pos))
-		dump_inventory_to_chest_direct(self, self._dump_chest_pos, inv)
+        lf("farming:dump_at_chest", "Dumping to chest at " .. minetest.pos_to_string(self._dump_chest_pos))
+
+        -- dump,,list
+		local dump_list = {"default:papyrus", "farming:wheat", "farming:rhubarb"}
+		dump_inventory_to_chest_direct(self, self._dump_chest_pos, inv, dump_list)
 		self._dump_chest_pos = nil
 	else
 		-- Fallback to positional detection if for some reason chest pos is missing.	minetest.log("error", "[maidroid:farming] dump_at_chest: No chest position stored, cannot dump inventory")
 		error("[maidroid:farming] dump_at_chest: No chest position stored, cannot dump inventory")
         
 
-        lf("farming:dump", "Dumping to chest at " .. minetest.pos_to_string(pos))
+        lf("farming:dump_at_chest", "Dumping to chest at " .. minetest.pos_to_string(pos))
 		dump_inventory_to_chest(self, pos, inv)
         self._dump_chest_pos = nil
 	end
@@ -240,12 +243,12 @@ dump_at_chest = function(self, dtime)
 	-- via wander_core.on_step after returning from dumping.
 	-- Any long-term pausing should be managed by the core itself
 	-- (for example, distance-from-home logic in on_step).
-	lf("farming:dump", "Finished dumping; returning to normal behavior without pausing")
+	lf("farming:dump_at_chest", "Finished dumping; returning to normal behavior without pausing")
 	   
 	-- If we saved a return position when starting the chest path,
 	-- teleport back there after dumping.
 	if self._dump_return_pos then
-		lf("farming:dump", "Teleporting back to return_pos=" .. minetest.pos_to_string(self._dump_return_pos))
+		lf("farming:dump_at_chest", "Teleporting back to return_pos=" .. minetest.pos_to_string(self._dump_return_pos))
 		self.object:set_pos(self._dump_return_pos)
 		self._dump_return_pos = nil
 	end
@@ -282,14 +285,14 @@ if lottfarming_on then
 	mature_plants["lottfarming:pipeweed_4"] = {chance=1, crop="lottfarming:pipeweed_1"}	
 end
 
-lf("[maidroid:farming]", "Registered mature plants:")
+lf("farming:init", "Registered mature plants:")
 for plant_name, plant_def in pairs(mature_plants) do
-	lf("[maidroid:farming]", "  " .. plant_name .. " -> " .. plant_def.crop)
+	lf("farming:init", "  " .. plant_name .. " -> " .. plant_def.crop)
 end
 
-lf("[maidroid:farming]", "Registered seeds:")
+lf("farming:init", "Registered seeds:")
 for seed_name, plant_name in pairs(seeds) do
-	lf("[maidroid:farming]", "  " .. seed_name .. " -> " .. plant_name)
+	lf("farming:init", "  " .. seed_name .. " -> " .. plant_name)
 end
 
 -- raise_error("maidroid:farming")
@@ -366,7 +369,7 @@ is_weed = function(name)
 
 	if trim_name ~= nil then 
 		if string.find(trim_name, "grass") then
-			lf("is_weed", "name: "..name.." trim name: "..trim_name)
+			lf("farming:is_weed", "name: "..name.." trim name: "..trim_name)
 		end
 		local weed = weed_plants[trim_name]
 		if weed ~= nil then
@@ -449,7 +452,11 @@ papyrus_neighbors["default:dirt_with_dry_grass"] = true
 papyrus_neighbors["default:dirt_with_rainforest_litter"] = true
 papyrus_neighbors["default:dry_dirt"] = true
 papyrus_neighbors["default:dry_dirt_with_dry_grass"] = true
+papyrus_neighbors["lottmapgen:gondor_grass"] = true
+-- ,,x1
 
+
+-- ,,ispapyrus
 is_papyrus = function(pos, name)
 	if minetest.is_protected(pos, name) then
 		return false
@@ -467,6 +474,8 @@ is_papyrus = function(pos, name)
 	if papyrus_neighbors[node.name] then
 		return true
 	end
+
+    lf("farming:is_papyrus", "node.name="..node.name)
 	return false
 end
 
@@ -505,26 +514,26 @@ select_seed = function(self)
 	local support
 
 	self.selected_seed = nil
-	lf("select_seed", "starting for owner=" .. tostring(self.owner))
+	lf("farming:select_seed", "starting for owner=" .. tostring(self.owner))
 
 	local list = inv:get_list("main") or {}
 	for idx, stack in ipairs(list) do
 		if not stack:is_empty() then
 			local name = stack:get_name()
-			lf("select_seed", "checking slot " .. tostring(idx) .. " item='" .. tostring(name) .. "'")
+			lf("farming:select_seed", "checking slot " .. tostring(idx) .. " item='" .. tostring(name) .. "'")
 			if is_seed(name) then
 				support = supports[name]
 				if support then
-					lf("select_seed", "seed '" .. name .. "' requires support '" .. support .. "'; checking inventory")
+					lf("farming:select_seed", "seed '" .. name .. "' requires support '" .. support .. "'; checking inventory")
 					if inv:contains_item("main", support) then
-						lf("select_seed", "support '" .. support .. "' available, selecting seed '" .. name .. "'")
+						lf("farming:select_seed", "support '" .. support .. "' available, selecting seed '" .. name .. "'")
 						self.selected_seed = name
 						return true
 					else
-						lf("select_seed", "support '" .. support .. "' NOT available for seed '" .. name .. "'")
+						lf("farming:select_seed", "support '" .. support .. "' NOT available for seed '" .. name .. "'")
 					end
 				else
-					lf("select_seed", "seed '" .. name .. "' requires no support, selecting")
+					lf("farming:select_seed", "seed '" .. name .. "' requires no support, selecting")
 					self.selected_seed = name
 					return true
 				end
@@ -532,7 +541,7 @@ select_seed = function(self)
 		end
 	end
 
-	lf("select_seed", "no suitable seed found")
+	lf("farming:select_seed", "no suitable seed found")
 	if self.state ~= maidroid.states.WANDER then
 		to_wander(self, "farming:select_seed_none")
 	end
@@ -560,17 +569,17 @@ end
 -- ,,task,,tb
 task_base = function(self, action, destination)
 	if not destination then 
-		lf("[maidroid:farming]", "task_base: no destination")
+		lf("farming:task_base", "task_base: no destination")
 		return 
 	end
 
-	lf("[maidroid:farming]", "task_base: destination=" .. minetest.pos_to_string(destination) .. " action=" .. tostring(action) .. ", state=" .. tostring(self.state))
+	lf("farming:task_base", "task_base: destination=" .. minetest.pos_to_string(destination) .. " action=" .. tostring(action) .. ", state=" .. tostring(self.state))
 	local pos = self:get_pos()
 	-- lf("[maidroid:farming]", "task_base: current pos=" .. minetest.pos_to_string(pos))
 	
 	-- Is this droid able to make an action
 	if position_ok(pos, destination) then
-		lf("[maidroid:farming]", "task_base: position ok, setting action immediately")
+		lf("farming:task_base", "task_base: position ok, setting action immediately")
 		self.destination = destination
 		self.action = action
 		to_action(self)
@@ -578,14 +587,17 @@ task_base = function(self, action, destination)
 	end
 
 	-- Or does the droid have to follow a path
-	lf("[maidroid:farming]", "task_base: finding path from " .. minetest.pos_to_string(pos) .. " to " .. minetest.pos_to_string(destination))
-	local path = minetest.find_path(pos, destination, 8, 1, 1, "A*_noprefetch")
+	lf("farming:task_base", "task_base: finding path from " .. minetest.pos_to_string(pos) .. " to " .. minetest.pos_to_string(destination))
+	-- local path = minetest.find_path(pos, destination, 8, 1, 1, "A*_noprefetch")
+	local path = minetest.find_path(pos, destination, 8, 1, 1, "A*")
+
 	if path ~= nil then
-		lf("[maidroid:farming]", "task_base: path found with " .. #path .. " nodes; calling core_path.to_follow_path")
+		lf("farming:task_base", "task_base: path found with " .. #path .. " nodes; calling core_path.to_follow_path")
+		self:set_yaw({self:get_pos(), destination})
 		core_path.to_follow_path(self, path, destination, to_action, action)
 		return true
 	else
-		lf("[maidroid:farming]", "task_base: NO PATH FOUND")
+		lf("farming:task_base", "task_base: NO PATH FOUND")
 	end
 end
 
@@ -622,7 +634,7 @@ dump_inventory_to_chest = function(self, pos, inv)
 			chest_pos = chest_pos or below_pos
 		end
 		if chest_pos then
-			lf("task", "at chest for dumping at "..minetest.pos_to_string(chest_pos))
+			lf("farming:dump", "at chest for dumping at "..minetest.pos_to_string(chest_pos))
 			local meta = minetest.get_meta(chest_pos)
 			local owner = meta:get_string("owner")
 			if not owner or owner == "" or owner == self.owner then
@@ -650,28 +662,75 @@ dump_inventory_to_chest = function(self, pos, inv)
 end
 
 -- ,,chest,,ch2
-dump_inventory_to_chest_direct = function(self, chest_pos, inv)
+dump_inventory_to_chest_direct = function(self, chest_pos, inv, dump_item_list)
 	if not chest_pos then
 		return
 	end
-	lf("task", "at chest for dumping at " .. minetest.pos_to_string(chest_pos))
+	lf("farming:dump_inventory_to_chest_direct", "at chest for dumping at " .. minetest.pos_to_string(chest_pos))
 	local meta = minetest.get_meta(chest_pos)
 	local owner = meta:get_string("owner")
 	if not owner or owner == "" or owner == self.owner then
 		local chest_inv = meta:get_inventory()
 		local main = inv:get_list("main") or {}
 		local changed = false
-		for idx, stack in ipairs(main) do
-			if not stack:is_empty() and stack:get_count() > 90 then
-				local leftover = chest_inv:add_item("main", stack)
-				if leftover:is_empty() then
-					main[idx] = ItemStack("")
-				else
-					main[idx] = leftover
+		local reserve_count = 10
+		local function dump_stack_reserving(idx, stack)
+            lf("farming:dump_inventory_to_chest_direct", "dumping stack " .. stack:get_name() .. " count=" .. stack:get_count())
+			local count = stack:get_count()
+			if count <= reserve_count then
+				return false
+			end
+			local dump_stack = ItemStack(stack)
+			dump_stack:set_count(count - reserve_count)
+			local keep_stack = ItemStack(stack)
+			keep_stack:set_count(reserve_count)
+			local leftover = chest_inv:add_item("main", dump_stack)
+			local leftover_count = leftover:get_count()
+			if leftover_count > 0 then
+				keep_stack:set_count(reserve_count + leftover_count)
+			end
+            lf("farming:dump_inventory_to_chest_direct", "dumped stack " .. stack:get_name() .. " count=" .. count )
+			main[idx] = keep_stack
+			return true
+		end
+		local function should_dump_stack(stack)
+            lf("farming:dump_inventory_to_chest_direct", "should_dump_stack: " .. stack:get_name())
+			if not dump_item_list then
+				return false
+			end
+			local name = stack:get_name()
+			if name == "" then
+				return false
+			end
+			-- dump_item_list is expected to be an array-style list like:
+			-- {"default:papyrus", "farming:wheat"}
+			for _, v in ipairs(dump_item_list) do
+                -- lf("farming:dump_inventory_to_chest_direct", "dump_item_list: " .. v .. " " .. name)
+				if v == name then
+					return true
 				end
-				changed = true
-				-- Only dump one stack > 90 per call
-				break
+			end
+			return false
+		end
+		-- First priority: explicitly requested dump list items, regardless of count.
+		if dump_item_list then
+			for idx, stack in ipairs(main) do
+                lf("farming:dump_inventory_to_chest_direct", "dumping stack " .. stack:get_name() .. " count=" .. stack:get_count())
+				if not stack:is_empty() and should_dump_stack(stack) then
+					changed = dump_stack_reserving(idx, stack)
+					-- Only dump one stack per call
+					-- break
+				end
+			end
+		end
+		-- Fallback: dump oversized stacks.
+		if not changed then
+			for idx, stack in ipairs(main) do
+				if not stack:is_empty() and stack:get_count() > 90 then
+					changed = dump_stack_reserving(idx, stack)
+					-- Only dump one stack > 90 per call
+					break
+				end
 			end
 		end
 		if changed then
@@ -680,6 +739,7 @@ dump_inventory_to_chest_direct = function(self, chest_pos, inv)
 	end
 end
 
+-- ,,task
 	task = function(self)
 		local pos = self:get_pos()
 		local inv = self:get_inventory()
@@ -692,12 +752,12 @@ end
 		-- Log node names under and at current position for debugging
 		local lname = lnode and lnode.name or "nil"
 		local cname = cnode and cnode.name or "nil"
-		minetest.log("warning", "task() [maidroid:farming] lnode=" .. lname .. " cnode=" .. cname)
+		lf("farming:task", "task() [maidroid:farming] lnode=" .. lname .. " cnode=" .. cname)
 
 		-- error("dummy error")
 		if cnode.name == "air" and is_valid_soil(lnode.name) then
-			lf("task", "Convert dirt to soil at "..minetest.pos_to_string(lpos))
-			lf("task", "Before: "..cnode.name)
+			lf("farming:task", "Convert dirt to soil at "..minetest.pos_to_string(lpos))
+			lf("farming:task", "Before: "..cnode.name)
 			minetest.set_node(lpos, { name = "farming:soil" })
         else
             -- lf("task", "cannot CONVERT: "..lnode.name)
@@ -715,7 +775,7 @@ end
 		-- Ensure there is water within 3 nodes horizontally on the same y as lpos; if not, try to place a water source nearby
 		-- only if LT on standing soil
 		if lnode.name ~= "air" and cnode.name == "air" then
-			lf("task", "SPOT FOR WATER Checking for water near "..minetest.pos_to_string(lpos))
+			lf("farming:task", "SPOT FOR WATER Checking for water near "..minetest.pos_to_string(lpos))
 			local water_found = false
 			for dx = -3, 3 do
 				if water_found then break end
@@ -736,9 +796,9 @@ end
 					if not minetest.is_protected(lpos, self.owner) then
 						minetest.set_node(lpos, { name = "default:water_source" })
 						water_found = true
-						lf("task", "Placed water at "..minetest.pos_to_string(lpos).." (converted soil to water)")
+						lf("farming:task", "Placed water at "..minetest.pos_to_string(lpos).." (converted soil to water)")
 					else
-						lf("task", "Cannot place water at "..minetest.pos_to_string(lpos).." - protected")
+						lf("farming:task", "Cannot place water at "..minetest.pos_to_string(lpos).." - protected")
 					end
 				end
 			end
@@ -796,8 +856,8 @@ end
 		-- 	ll("Water already present near " .. minetest.pos_to_string(lpos) .. ", no placement needed")
 		-- end
 
-		local dest = search(pos, is_plantable, self.owner)
-		if dest then
+ 		local dest = search(pos, is_plantable, self.owner)
+ 		if dest then
 			-- local destnode = minetest.get_node(dest)
 			if not ( self.selected_seed and							-- Is there already a selected seed
 				inv:contains_item("main", self.selected_seed)) then -- in inventory
@@ -814,24 +874,27 @@ end
 
 		-- Harvesting
 		-- lf("[maidroid:farming]", "Searching for mowable plants near " .. minetest.pos_to_string(pos))
-		dest = search(pos, is_mowable, self.owner)
-		if dest then
-			-- lf("[maidroid:farming]", "Found mowable plant at " .. minetest.pos_to_string(dest))
-		else
-			lf("[maidroid:farming]", "No mowable plants found")
-		end
-		if task_base(self, mow, dest) then
-			return
-		end
+ 		dest = search(pos, is_mowable, self.owner)
+ 		if dest then
+ 			-- lf("[maidroid:farming]", "Found mowable plant at " .. minetest.pos_to_string(dest))
+ 		else
+			lf("farming:task", "No mowable plants found")
+ 		end
+ 		if task_base(self, mow, dest) then
+ 			return
+ 		end
+         lf("farming:task", "Continued after mow  plants found")
 
 		-- Plant papyrus
-		if not is_scythe(self.selected_tool) then
-			dest = search(pos, is_papyrus_soil, self.owner)
-			if inv:contains_item("main", "default:papyrus")
-				and task_base(self, plant_papyrus, dest) then
-				return
-			end
-		end
+		-- if not is_scythe(self.selected_tool) then
+		-- 	dest = search(pos, is_papyrus_soil, self.owner)
+		-- 	if inv:contains_item("main", "default:papyrus")
+		-- 		and task_base(self, plant_papyrus, dest) then
+        --         lf("farming:task", "Continued after plant papyrus")
+		-- 		return
+		-- 	end
+		-- end
+        -- lf("farming:task", "Continued after plant papyrus")
 
 		-- Harvest papyrus
 		dest = search(pos, is_papyrus, self.owner)
@@ -969,7 +1032,7 @@ local replant_after_harvest = function(self, mature_name, pos)
 		name = plantname,
 		param2 = minetest.registered_nodes[plantname].place_param2 or 1,
 	})
-    lf("replant_after_harvest", "replanted " .. plantname .. " at " .. minetest.pos_to_string(pos))
+    lf("farming:replant_after_harvest", "replanted " .. plantname .. " at " .. minetest.pos_to_string(pos))
 	if not farming_redo then
 		minetest.get_node_timer(pos):start(math.random(166, 286))
 	end
@@ -1061,122 +1124,124 @@ plant = function(self, dtime)
 	self:set_tool(self.selected_tool)
 end
 
+-- ,,mow
 mow = function(self, dtime)
 	-- lf("[maidroid:farming]", "mow() called at destination " .. minetest.pos_to_string(self.destination))
 	-- Skip until timer is ok
 	if update_action_timers(self, dtime, self.selected_tool) then return end
-	lf("mow", "start")
+	lf("farming:mow", "start")
 
 	local destnode = minetest.get_node(self.destination)
 	local mature = destnode.name
-	lf("mow2", "destination node = " .. tostring(mature) .. " at pos " .. minetest.pos_to_string(self.destination))
+	lf("farming:mow", "destination node = " .. tostring(mature) .. " at pos " .. minetest.pos_to_string(self.destination))
 
 	local in_mature_list = mature_plants[mature] ~= nil
 	local is_weed_here = is_weed(mature)
-	lf("mow", "condition mature_plants[" .. tostring(mature) .. "] ~= nil = " .. tostring(in_mature_list))
-	lf("mow", "condition is_weed(" .. tostring(mature) .. ") = " .. tostring(is_weed_here))
+	lf("farming:mow", "condition mature_plants[" .. tostring(mature) .. "] ~= nil = " .. tostring(in_mature_list))
+	lf("farming:mow", "condition is_weed(" .. tostring(mature) .. ") = " .. tostring(is_weed_here))
 	
 	if in_mature_list then
-		lf("mow", "Found mature plant: " .. tostring(mature) .. " -> crop: " .. tostring(mature_plants[mature].crop))
+		lf("farming:mow", "Found mature plant: " .. tostring(mature) .. " -> crop: " .. tostring(mature_plants[mature].crop))
 	end
 
 	if not in_mature_list and not is_weed_here then
-		lf("mow", "early return (not mature and not weed)")
+		lf("farming:mow", "early return (not mature and not weed)")
 		to_wander(self, "farming:mow_not_mature", 0, timers.change_dir_max, "mow")
 		return
 	end -- target node changed
 
 	local scythe_mode = is_scythe(self.selected_tool)
-	lf("mow", "condition is_scythe(self.selected_tool) = " .. tostring(scythe_mode))
+	lf("farming:mow", "condition is_scythe(self.selected_tool) = " .. tostring(scythe_mode))
 
 	if scythe_mode then -- Fast tool for farmers
 		local name = mature_plants[mature].crop
 		local p2 = minetest.registered_nodes[name].place_param2 or 1
 		local filters = mature
 		local stacks = {}
-		lf("mow", "scythe mode: crop name = " .. tostring(name) .. ", p2 = " .. tostring(p2))
+		lf("farming:mow", "scythe mode: crop name = " .. tostring(name) .. ", p2 = " .. tostring(p2))
 
 		local is_pepper_case = false
 		if farming_redo and mature:sub(1, -2) == "farming:pepper_" then
 			is_pepper_case = true
 			filters = { "farming:pepper_5", "farming:pepper_6", "farming:pepper_7" }
 		end
-		lf("mow", "is_pepper_case = " .. tostring(is_pepper_case))
-		lf("mow", "filters = " .. (type(filters) == "table" and table.concat(filters, ", ") or tostring(filters)))
+		lf("farming:mow", "is_pepper_case = " .. tostring(is_pepper_case))
+		lf("farming:mow", "filters = " .. (type(filters) == "table" and table.concat(filters, ", ") or tostring(filters)))
 
 		local nodes = minetest.find_nodes_in_area(
 			vector.add(self.destination, {x=-1,y=-1,z=-1}),
 			vector.add(self.destination, {x=1, y=1, z=1}),
 			filters
 		) -- Find connected nodes matching this mature plant
-		lf("mow", "find_nodes_in_area returned " .. tostring(#nodes) .. " nodes")
+		lf("farming:mow", "find_nodes_in_area returned " .. tostring(#nodes) .. " nodes")
 
 		local count = 0
 		local ok = false
 		local drops
 		for _, pos in ipairs(nodes) do
 			local cond_break = ok and count == 4
-			lf("mow", "loop pos=" .. minetest.pos_to_string(pos) .. " cond_break (ok and count==4) = " .. tostring(cond_break))
+			lf("farming:mow", "loop pos=" .. minetest.pos_to_string(pos) .. " cond_break (ok and count==4) = " .. tostring(cond_break))
 			if cond_break then -- Scythes treats 5 plants at most
-				lf("mow", "breaking loop because cond_break true")
+				lf("farming:mow", "breaking loop because cond_break true")
 				break
 			end
 
 			local cond_do = ok or count < 4 or (pos.x == self.destination.x and pos.y == self.destination.y and pos.z == self.destination.z)
-			lf("mow", "loop cond_do (ok or count<4 or pos==destination) = " .. tostring(cond_do) .. " (ok="..tostring(ok)..", count="..tostring(count)..", pos="..minetest.pos_to_string(pos)..")")
+			lf("farming:mow", "loop cond_do (ok or count<4 or pos==destination) = " .. tostring(cond_do) .. " (ok="..tostring(ok)..", count="..tostring(count)..", pos="..minetest.pos_to_string(pos)..")")
 
 			if cond_do then
 				local cond_pepper_filter = filters ~= mature
-				lf("mow", "cond_pepper_filter (filters ~= mature) = " .. tostring(cond_pepper_filter))
+				lf("farming:mow", "cond_pepper_filter (filters ~= mature) = " .. tostring(cond_pepper_filter))
 				if cond_pepper_filter then -- This pepper is hot
 					drops = minetest.get_node_drops(minetest.get_node(pos).name)
 				else
 					drops = minetest.get_node_drops(mature)
 				end
-				lf("mow", "drops for pos " .. minetest.pos_to_string(pos) .. " = " .. tostring(drops and #drops or 0))
+				lf("farming:mow", "drops for pos " .. minetest.pos_to_string(pos) .. " = " .. tostring(drops and #drops or 0))
 				table.insert_all(stacks, drops) -- Save the drops
 				minetest.set_node(pos, { name = name, param2 = p2 } )
 				count = count + 1
-				lf("mow", "after harvesting pos " .. minetest.pos_to_string(pos) .. " count = " .. tostring(count))
+				lf("farming:mow", "after harvesting pos " .. minetest.pos_to_string(pos) .. " count = " .. tostring(count))
 			end
 
 			if pos.x == self.destination.x and pos.y == self.destination.y and pos.z == self.destination.z then
 				count = count - 1
 				ok = true
-				lf("mow", "encountered target position, adjusted count = " .. tostring(count) .. ", ok set to true")
+				lf("farming:mow", "encountered target position, adjusted count = " .. tostring(count) .. ", ok set to true")
 			end
 		end
 
 		if maidroid.settings.farming_sound then
 			maidroid.helpers.emit_sound(mature, "default_dig_snappy", "dig", self.destination, 0.8)
-			lf("mow", "played scythe sound for " .. tostring(mature))
+			lf("farming:mow", "played scythe sound for " .. tostring(mature))
 		else
-			lf("mow", "farming_sound disabled")
+			lf("farming:mow", "farming_sound disabled")
 		end
 
 		self:add_items_to_main(stacks)
-		lf("mow", "added items to inventory (scythe mode), stacks count = " .. tostring(#stacks))
+		lf("farming:mow", "added items to inventory (scythe mode), stacks count = " .. tostring(#stacks))
 		to_wander(self, "farming:mow_scythe_done", 0, timers.change_dir_max, "mow")
 	else -- Normal mode
-		lf("mow", "normal mode (not scythe)")
+		lf("farming:mow", "normal mode (not scythe)")
 		local stacks = minetest.get_node_drops(mature)
-		lf("mow", "node drops count = " .. tostring(#stacks))
+		lf("farming:mow", "node drops count = " .. tostring(#stacks))
 		minetest.remove_node(self.destination)
-		lf("mow", "removed node at destination")
+		lf("farming:mow", "removed node at destination")
 		if maidroid.settings.farming_sound then
 			maidroid.helpers.emit_sound(mature, "default_dig_snappy", "dig", self.destination, 0.8)
-			lf("mow", "played normal dig sound for " .. tostring(mature))
+			lf("farming:mow", "played normal dig sound for " .. tostring(mature))
 		else
-			lf("mow", "farming_sound disabled")
+			lf("farming:mow", "farming_sound disabled")
 		end
 		self:add_items_to_main(stacks)
-		lf("mow", "added items to inventory (normal mode), stacks count = " .. tostring(#stacks))
+		lf("farming:mow", "added items to inventory (normal mode), stacks count = " .. tostring(#stacks))
 		replant_after_harvest(self, mature, self.destination)
 		to_wander(self, "farming:mow_done", 0, timers.change_dir_max, "mow")
 	end
-end
+ end
 
 collect_papyrus = function(self, dtime)
+    lf("farming:collect_papyrus", ".................... collect_papyrus enter")
 	-- Skip until timer is ok
 	if update_action_timers(self, dtime, self.selected_tool) then return end
 
@@ -1197,6 +1262,7 @@ collect_papyrus = function(self, dtime)
 		maidroid.helpers.emit_sound("default:papyrus", "default_dig_snappy", "dig", self.destination, 0.8)
 	end
 	self:add_items_to_main({"default:papyrus " .. count})
+    lf("farming:collect_papyrus", "added " .. count .. " papyrus to inventory")
 	to_wander(self, "farming:collect_papyrus_done", 0, timers.change_dir_max, "collect_papyrus")
 end
 
@@ -1313,13 +1379,13 @@ on_step = function(self, dtime, moveresult)
         local current_pos = vector.round(self:get_pos())
         local is_on_dest = self._dump_chest_pos and vector.equals(current_pos, self._dump_chest_pos)
 		if self._dump_chest_pos then
-			lf("farming", "PATH to chest for dumping at " .. minetest.pos_to_string(self._dump_chest_pos))
+			lf("farming:on_step", "PATH to chest for dumping at " .. minetest.pos_to_string(self._dump_chest_pos))
 		-- Even while following a path, still respect fences and chests by using the
 		-- same is_blocked logic; this avoids unexpectedly crossing them.
             isblocked = self:is_blocked(is_fence_or_chest, true)
 
         elseif self:is_blocked(is_fence_or_chest, true) then
-			lf("farming", "PATH blocked by fence; cancelling path")
+			lf("farming:on_step", "PATH blocked by fence; cancelling path")
 			-- Cancel any pending chest-dump path state
 			self._dump_chest_pos = nil
 			self._dump_return_pos = nil
@@ -1334,7 +1400,7 @@ on_step = function(self, dtime, moveresult)
 		end
 		maidroid.cores.path.on_step(self, dtime, moveresult)
 	elseif self.state == maidroid.states.ACT then
-        lf("farming", "ACT state")
+        lf("farming:on_step", "ACT state")
 		self.action(self, dtime)
 	end
 
@@ -1358,7 +1424,7 @@ end
 
 is_tool = function(stack)
 	local name = stack:get_name()
-	lf("[maidroid:farming]", "stack  "..name)
+	lf("farming:is_tool", "stack  "..name)
 	local istool = minetest.get_item_group(name, "hoe") > 0
 		or is_scythe(name)
 
