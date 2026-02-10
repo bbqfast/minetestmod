@@ -137,6 +137,22 @@ maidroid.cores.generic_cooker.get_max_distance_from_activation = get_max_distanc
 maidroid.set_max_distance_from_activation = set_max_distance_from_activation
 maidroid.get_max_distance_from_activation = get_max_distance_from_activation
 
+maidroid.cores.generic_cooker.get_craftable_outputs = function()
+	if type(all_farming_outputs) == "table" and #all_farming_outputs > 0 then
+		return all_farming_outputs
+	end
+	return {
+		"farming:rhubarb_pie",
+		"farming:bread",
+	}
+end
+
+maidroid.cores.generic_cooker.set_desired_craft_outputs = function(droid, outputs)
+	lf("generic_cooker", "set_desired_craft_outputs: " .. dump(outputs))
+	droid.desired_craft_outputs = outputs
+	return true
+end
+
 -- Encapsulated target info for a single chest interaction
 local GenericCookerTarget = {}
 GenericCookerTarget.__index = GenericCookerTarget
@@ -160,6 +176,7 @@ local craft_outputs = {
     "farming:bread_slice",
     "farming:rhubarb_pie"
 }
+
 
 local function lfv(verbose, ...)
 	if verbose then
@@ -1118,7 +1135,7 @@ end
 -- Helper: generic craft based on craft_outputs list.
 -- Iterates craft_outputs and performs the first craftable recipe in the maidroid's inventory.
 -- ,,cg,,craft
-local function craft_generic(droid)
+local function craft_generic(droid, craft_outputs)
     lf("action_metrics", "craft_generic called")
 	
 	-- Update action_taken_metrics
@@ -1270,7 +1287,7 @@ task = function(droid)
     elseif choice == 2 then
         lf("generic_cooker:task", "CHOICE=2: craft_generic")
         -- craft_rice_flour(droid)
-        craft_generic(droid)
+        craft_generic(droid, craft_outputs)
 	else
 		lf("generic_cooker:task", "CHOICE=3: try_get_item_from_nearby_chest for all_take_items count=" .. #all_take_items)
 	    	try_get_item_from_nearby_chest(droid, pos, all_take_items)
@@ -1397,6 +1414,7 @@ on_start = function(droid)
     lf("generic_cooker", "test")
     -- error("x")
 
+    droid.desired_craft_outputs = craft_outputs
     log_inventory(droid)
     
    

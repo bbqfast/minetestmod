@@ -107,8 +107,8 @@ end
 
 -- Growth Logic
 -- ,,hack1
-local STAGE_LENGTH_AVG = tonumber(minetest.settings:get("farming_stage_length")) or 200
--- local STAGE_LENGTH_AVG = tonumber(minetest.settings:get("farming_stage_length")) or 1
+-- local STAGE_LENGTH_AVG = tonumber(minetest.settings:get("farming_stage_length")) or 200
+local STAGE_LENGTH_AVG = tonumber(minetest.settings:get("farming_stage_length")) or 1
 local STAGE_LENGTH_DEV = STAGE_LENGTH_AVG / 6
 
 -- quick start seed timer

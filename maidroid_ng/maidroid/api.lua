@@ -1093,6 +1093,17 @@ get_formspec = function(self, player, tab)
 	if owns and self.core.name == "generic_cooker" then
 		tab_max = tab_max + 1
 		if tab == tab_max then
+			local craftable_outputs = {}
+			if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.get_craftable_outputs then
+				craftable_outputs = maidroid.cores.generic_cooker.get_craftable_outputs() or {}
+			end
+			if type(craftable_outputs) ~= "table" or #craftable_outputs == 0 then
+				craftable_outputs = {
+					"farming:rhubarb_pie",
+					"farming:bread",
+				}
+			end
+
 			-- Get current max distance setting using the getter function with fallback
 			local current_distance = 10
 			if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.get_max_distance_from_activation then
@@ -1104,25 +1115,193 @@ get_formspec = function(self, player, tab)
 				current_distance = tonumber(minetest.settings:get("maidroid.generic_cooker.max_distance_from_activation")) or 10
 			end
 			
-			form = form .. enligthen_tool(self)
-				.. "label[3,0;" .. S("Cooker Control Panel") .. "]"
-				.. "label[3,0.5;" .. S("Configure cooker behavior and view metrics") .. "]"
-				.. "label[3,1.5;" .. S("Current Task:") .. " "
+			-- form = form .. enligthen_tool(self)
+			form = form 
+				-- .. "label[3,0;" .. S("Cooker Control Panel") .. "]"
+				-- .. "label[3,0.5;" .. S("Configure cooker behavior and view metrics") .. "]"
+				.. "label[3,0.7;" .. S("Craftable Items") .. "]"
+				.. "label[6.8,0.7;" .. S("Craftables") .. ": " .. tostring(#craftable_outputs) .. "]"
+				.. "label[3,2.55;" .. S("Ingredients") .. ":]"
+				.. "label[3,2.95;" .. S("Selected Craft Items") .. ":]"
+				.. "label[3,3.45;" .. S("Current Task:") .. " "
 				.. minetest.colorize("#ACEEAC", (self.action and self.action or S("Idle"))) .. "]"
-				.. "label[3,2;" .. S("Current State:") .. " "
+				.. "label[3,3.95;" .. S("Current State:") .. " "
 				.. minetest.colorize("#ACEEAC", (self.state and tostring(self.state) or S("Unknown"))) .. "]"
-				.. "label[3,2.5;" .. S("Position:") .. " "
+				.. "label[3,4.45;" .. S("Position:") .. " "
 				.. minetest.colorize("#ACEEAC", minetest.pos_to_string(vector.round(self:get_pos()))) .. "]"
-				.. "button[3,3.5;2.5,1;toggle_cooker;" .. S("Toggle Cooker") .. "]"
-				.. "button[6,3.5;2.5,1;view_metrics;" .. S("View Metrics") .. "]"
-				.. "label[3,4.5;" .. S("Cooker Settings") .. "]"
-				.. "label[3,5;" .. S("Max Distance from Activation:") .. "]"
-				.. "field[6,5;2,1;max_distance;;" .. tostring(current_distance) .. "]"
+				.. "button[3,4.75;2.5,1;toggle_cooker;" .. S("Toggle Cooker") .. "]"
+				.. "button[6,4.75;2.5,1;view_metrics;" .. S("View Metrics") .. "]"
+				.. "label[3,5.75;" .. S("Cooker Settings") .. "]"
+				.. "label[3,6.15;" .. S("Max Distance from Activation:") .. "]"
+				.. "field[6,6.15;2,1;max_distance;;" .. tostring(current_distance) .. "]"
 				.. "field_close_on_enter[max_distance;false]"
-				.. "button[8.5,4.75;2,1;set_distance;" .. S("Set Distance") .. "]"
-				.. "checkbox[3,5.5;auto_craft;" .. S("Auto Craft") .. ";true]"
-				.. "checkbox[3,6;auto_fuel;" .. S("Auto Fuel") .. ";true]"
-				.. "checkbox[3,6.5;auto_collect;" .. S("Auto Collect") .. ";true]"
+				.. "button[8.5,5.9;2,1;set_distance;" .. S("Set Distance") .. "]"
+				.. "checkbox[3,6.65;auto_craft;" .. S("Auto Craft") .. ";true]"
+				.. "checkbox[5.5,6.65;auto_fuel;" .. S("Auto Fuel") .. ";true]"
+				.. "checkbox[7.7,6.65;auto_collect;" .. S("Auto Collect") .. ";true]"
+
+			local cell = 0.6
+			local step = 0.7
+			local grid_x0 = 3
+			local grid_y0 = 1.0
+			local max_x = 10.7
+			for i, spec in ipairs(craftable_outputs) do
+				local idx = i - 1
+				local row = idx % 3
+				local col = math.floor(idx / 3)
+				local x = grid_x0 + col * step
+				local y = grid_y0 + row * step
+				if x + cell > max_x then
+					break
+				end
+				spec = type(spec) == "string" and spec or ""
+				local stack = ItemStack(spec)
+				local itemname = stack:get_name()
+				if itemname ~= "" then
+					local escaped_item = minetest.formspec_escape(itemname)
+					local btn = "craft_sel_" .. tostring(i)
+					local is_sel = (self.selected_craft_output == itemname)
+					form = form
+						.. "box[" .. x .. "," .. y .. ";" .. cell .. "," .. cell .. ";" .. (is_sel and "#88FF8855" or "#00000055") .. "]"
+						.. "item_image_button[" .. x .. "," .. y .. ";" .. cell .. "," .. cell .. ";" .. escaped_item .. ";" .. btn .. ";]"
+				end
+			end
+
+			if not self.selected_craft_output then
+				local first = craftable_outputs[1]
+				if type(first) == "string" then
+					local st = ItemStack(first)
+					if st:get_name() ~= "" then
+						self.selected_craft_output = st:get_name()
+					end
+				end
+			end
+
+			if self.selected_craft_output and self.selected_craft_output ~= "" then
+				lf("cooker_ui", "selected_craft_output=" .. tostring(self.selected_craft_output))
+				local recipes = minetest.get_all_craft_recipes(self.selected_craft_output)
+				lf("cooker_ui", "recipes type=" .. type(recipes) .. " count=" .. tostring(type(recipes) == "table" and #recipes or 0))
+				local ingredients = {}
+				if type(recipes) == "table" and recipes[1] and type(recipes[1].items) == "table" then
+					ingredients = recipes[1].items
+				end
+				lf("cooker_ui", "recipe[1].items count=" .. tostring(type(ingredients) == "table" and #ingredients or 0))
+				if type(ingredients) == "table" and #ingredients > 0 then
+					lf("cooker_ui", "recipe[1].items=" .. dump(ingredients))
+				end
+
+				local function resolve_ingredient_itemname(it)
+					if type(it) ~= "string" or it == "" then
+						return ""
+					end
+					if it:sub(1, 6) == "group:" then
+						local groupname = it:sub(7)
+						lf("cooker_ui", "resolve group ingredient=" .. tostring(it) .. " groupname=" .. tostring(groupname))
+						if groupname ~= "" then
+							local best = ""
+							local matches = 0
+							for name, def in pairs(minetest.registered_items) do
+								if minetest.get_item_group(name, groupname) > 0 then
+									matches = matches + 1
+									if matches <= 3 then
+										lf("cooker_ui", "group candidate " .. tostring(groupname) .. ": " .. tostring(name)
+											.. " inv_img=" .. tostring(def and def.inventory_image)
+											.. " tiles=" .. tostring(def and def.tiles and def.tiles[1]))
+									end
+									if not def then
+										best = best ~= "" and best or name
+										lf("cooker_ui", "group best (no def)=" .. tostring(best))
+									elseif def.inventory_image and def.inventory_image ~= "" then
+										lf("cooker_ui", "group resolved via inventory_image: " .. tostring(name))
+										return name
+									elseif def.tiles and type(def.tiles) == "table" and def.tiles[1] and def.tiles[1] ~= "" then
+										lf("cooker_ui", "group resolved via tiles: " .. tostring(name))
+										return name
+									else
+										best = best ~= "" and best or name
+										lf("cooker_ui", "group best (fallback)=" .. tostring(best))
+									end
+								end
+							end
+							lf("cooker_ui", "group matches=" .. tostring(matches) .. " returning best=" .. tostring(best))
+							return best
+						end
+						lf("cooker_ui", "groupname empty for " .. tostring(it) .. ", cannot resolve")
+						return ""
+					end
+					return ItemStack(it):get_name()
+				end
+
+				local max_i = 0
+				for idx, _ in pairs(ingredients or {}) do
+					if type(idx) == "number" and idx > max_i then
+						max_i = idx
+					end
+				end
+				lf("cooker_ui", "ingredient indices max_i=" .. tostring(max_i))
+
+				local ix0 = 4.5
+				local iy0 = 2.45
+				local istep = 0.75
+				local k = 0
+				local rendered = 0
+				lf("cooker_ui", "ingredient layout: ix0=" .. tostring(ix0) .. " iy0=" .. tostring(iy0)
+					.. " istep=" .. tostring(istep) .. " cell=" .. tostring(cell) .. " max_x=" .. tostring(max_x))
+				for i = 1, max_i do
+					local ing = ingredients[i]
+					if ing == nil or ing == "" then
+						goto continue_ingredient
+					end
+					k = k + 1
+					local x = ix0 + (k - 1) * istep
+					if x + cell > max_x then
+						lf("cooker_ui", "ingredient row truncated at k=" .. tostring(k) .. " x=" .. tostring(x) .. " max_x=" .. tostring(max_x))
+						break
+					end
+					local itemname = resolve_ingredient_itemname(ing)
+					lf("cooker_ui", "ingredient k=" .. tostring(k) .. " pos=" .. tostring(x) .. "," .. tostring(iy0)
+						.. " raw=" .. tostring(ing) .. " resolved=" .. tostring(itemname))
+					form = form .. "box[" .. x .. "," .. iy0 .. ";" .. cell .. "," .. cell .. ";#00000055]"
+					if itemname ~= "" then
+						rendered = rendered + 1
+						form = form .. "item_image[" .. x .. "," .. iy0 .. ";" .. cell .. "," .. cell .. ";" .. minetest.formspec_escape(itemname) .. "]"
+					else
+						local t = "?"
+						if type(ing) == "string" and ing:sub(1, 6) == "group:" then
+							t = ing:sub(7, 7 + 8)
+						end
+						rendered = rendered + 1
+						form = form .. "label[" .. (x + 0.05) .. "," .. (iy0 + 0.18) .. ";" .. minetest.formspec_escape(t) .. "]"
+					end
+					::continue_ingredient::
+				end
+				lf("cooker_ui", "ingredients iterated=" .. tostring(k) .. " rendered=" .. tostring(rendered))
+			end
+
+			if type(self.selected_craft_items) ~= "table" or #self.selected_craft_items == 0 then
+				if type(self.desired_craft_outputs) == "table" and #self.desired_craft_outputs > 0 then
+					self.selected_craft_items = self.desired_craft_outputs
+				end
+			end
+			local selected_list = self.selected_craft_items
+			if type(selected_list) == "table" and #selected_list > 0 then
+				local sx0 = 4.9
+				local sy0 = 2.85
+				local sstep = 0.75
+				for i, name in ipairs(selected_list) do
+					local x = sx0 + (i - 1) * sstep
+					if x + cell > max_x then
+						break
+					end
+					name = type(name) == "string" and name or ""
+					if name ~= "" then
+						local btn = "selected_craft_sel_" .. tostring(i)
+						form = form
+							.. "box[" .. x .. "," .. sy0 .. ";" .. cell .. "," .. cell .. ";#00000055]"
+							.. "item_image_button[" .. x .. "," .. sy0 .. ";" .. cell .. "," .. cell .. ";" .. minetest.formspec_escape(name) .. ";" .. btn .. ";]"
+					end
+				end
+			end
 			return form
 		end
 	end
@@ -1898,6 +2077,75 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 			end
 		end
 		return
+	end
+	
+	for k, _ in pairs(fields) do
+		if type(k) == "string" then
+			local idx = k:match("^craft_sel_(%d+)$")
+			if idx then
+				idx = tonumber(idx)
+				local craftable_outputs = {}
+				if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.get_craftable_outputs then
+					craftable_outputs = maidroid.cores.generic_cooker.get_craftable_outputs() or {}
+				end
+				if type(craftable_outputs) ~= "table" or #craftable_outputs == 0 then
+					craftable_outputs = {
+						"farming:rhubarb_pie",
+						"farming:bread",
+					}
+				end
+				local spec = craftable_outputs[idx]
+				local st = ItemStack(type(spec) == "string" and spec or "")
+				local itemname = st:get_name()
+				if itemname ~= "" then
+					droid.selected_craft_output = itemname
+					if type(droid.selected_craft_items) ~= "table" then
+						droid.selected_craft_items = {}
+					end
+					local exists = false
+					for _, v in ipairs(droid.selected_craft_items) do
+						if v == itemname then
+							exists = true
+							break
+						end
+					end
+					if not exists then
+						table.insert(droid.selected_craft_items, itemname)
+						local max_selected = 12
+						while #droid.selected_craft_items > max_selected do
+							table.remove(droid.selected_craft_items, 1)
+						end
+					end
+					if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.set_desired_craft_outputs then
+						maidroid.cores.generic_cooker.set_desired_craft_outputs(droid, droid.selected_craft_items)
+					else
+						droid.desired_craft_outputs = droid.selected_craft_items
+					end
+				end
+				local current_tab = droid.current_tab or 1
+				minetest.show_formspec(player_name, "maidroid:gui",
+					get_formspec(droid, player, current_tab))
+				return
+			end
+			local sidx = k:match("^selected_craft_sel_(%d+)$")
+			if sidx then
+				sidx = tonumber(sidx)
+				local selected_list = droid.selected_craft_items
+				if (type(selected_list) ~= "table" or #selected_list == 0) and type(droid.desired_craft_outputs) == "table" then
+					selected_list = droid.desired_craft_outputs
+				end
+				local name = type(selected_list) == "table" and selected_list[sidx] or nil
+				name = type(name) == "string" and name or ""
+				local itemname = ItemStack(name):get_name()
+				if itemname ~= "" then
+					droid.selected_craft_output = itemname
+				end
+				local current_tab = droid.current_tab or 1
+				minetest.show_formspec(player_name, "maidroid:gui",
+					get_formspec(droid, player, current_tab))
+				return
+			end
+		end
 	end
 	
 	-- Cooker tab field handling
