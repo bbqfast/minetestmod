@@ -97,6 +97,228 @@ maidroid.registered_maidroids = {}
 maidroid.cores = {}
 
 local farming_redo = farming and farming.mod and farming.mod == "redo"
+
+-- Crafting inventory system for drag and drop (based on trader.lua)
+maidroid.crafting_inventories = {}
+
+function maidroid.crafting_allow_put(inv, listname, index, stack, player)
+	-- Don't allow putting items directly into any list
+	return 0
+end
+
+function maidroid.crafting_allow_take(inv, listname, index, stack, player)
+	lf("crafting_allow_take", "Player " .. player:get_player_name() .. " is attempting to take items from " .. listname)
+	-- Allow taking from desirable (to remove items) and craftable (though craftable should be refilled)
+	if listname == "desirable" or listname == "craftable" then
+		return 99
+	else
+		return 0
+	end
+end
+
+function maidroid.crafting_on_move(inventory, from_list, from_index, to_list, to_index, count, player)
+	lf("crafting_on_move", "Player " .. player:get_player_name() .. " is moving items from " .. from_list .. " to " .. to_list)
+	if from_list == "craftable" and to_list == "desirable" then
+		local inv = inventory
+		local moved = inv:get_stack(to_list, to_index)
+		local itemname = moved:get_name()
+		local elements = moved:get_count()
+		
+		if elements > count then
+			-- Split stack if needed
+			inv:set_stack("desirable", to_index, itemname .. " " .. tostring(count))
+			inv:set_stack("craftable", from_index, itemname .. " " .. tostring(elements - count))
+		end
+		
+		-- Update the maidroid's selected_craft_items
+		local player_name = player:get_player_name()
+		local droid = maidroid.get_maidroid_by_player(player_name)
+		if droid then
+			if type(droid.selected_craft_items) ~= "table" then
+				droid.selected_craft_items = {}
+			end
+			
+			-- Check if item already exists
+			local exists = false
+			for _, v in ipairs(droid.selected_craft_items) do
+				if v == itemname then
+					exists = true
+					break
+				end
+			end
+			
+			-- Add item if not already present
+			if not exists then
+				table.insert(droid.selected_craft_items, itemname)
+				local max_selected = 6  -- Updated to match 6x1 grid
+				while #droid.selected_craft_items > max_selected do
+					table.remove(droid.selected_craft_items, 1)
+				end
+			end
+			
+			-- Update the desired craft outputs
+			if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.set_desired_craft_outputs then
+				maidroid.cores.generic_cooker.set_desired_craft_outputs(droid, droid.selected_craft_items)
+			else
+				droid.desired_craft_outputs = droid.selected_craft_items
+			end
+		end
+		
+	elseif from_list == "desirable" and to_list == "craftable" then
+		local inv = inventory
+		local moved = inv:get_stack(to_list, to_index)
+		local itemname = moved:get_name()
+		local elements = moved:get_count()
+		
+		if elements > count then
+			-- Split stack if needed
+			inv:set_stack("craftable", to_index, itemname .. " " .. tostring(count))
+			inv:set_stack("desirable", from_index, itemname .. " " .. tostring(elements - count))
+		end
+		
+		-- Update the maidroid's selected_craft_items (remove the item)
+		local player_name = player:get_player_name()
+		local droid = maidroid.get_maidroid_by_player(player_name)
+		if droid and type(droid.selected_craft_items) == "table" then
+			-- Remove item from selection
+			for i, v in ipairs(droid.selected_craft_items) do
+				if v == itemname then
+					table.remove(droid.selected_craft_items, i)
+					break
+				end
+			end
+			
+			-- Update the desired craft outputs
+			if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.set_desired_craft_outputs then
+				maidroid.cores.generic_cooker.set_desired_craft_outputs(droid, droid.selected_craft_items)
+			else
+				droid.desired_craft_outputs = droid.selected_craft_items
+			end
+		end
+	end
+end
+
+-- ,,ci2
+-- function maidroid.create_crafting_inventory(droid)
+-- 	-- Create unique inventory ID for this maidroid
+-- 	if not droid.crafting_inventory_id then
+-- 		droid.crafting_inventory_id = "maidroid_crafting_" .. tostring(droid.object) .. "_" .. (math.random(1, 1000) * math.random(1, 10000))
+-- 		lf("create_crafting_inventory", "Created new inventory ID: " .. droid.crafting_inventory_id)
+-- 	end
+	
+-- 	local unique_entity_id = droid.crafting_inventory_id
+-- 	lf("create_crafting_inventory", "Using inventory ID: " .. unique_entity_id)
+-- 	local is_inventory = minetest.get_inventory({type="detached", name=unique_entity_id})
+	
+-- 	if is_inventory == nil then
+-- 		lf("create_crafting_inventory", "Inventory does not exist, creating new one")
+-- 		local inv = minetest.create_detached_inventory(unique_entity_id, {
+-- 			allow_move = function(inv, from_list, from_index, to_list, to_index, count, player)
+-- 				lf("crafting_allow_move", "TEST: allow_move called!")
+-- 				return count
+-- 			end,
+-- 		})
+		
+-- 		maidroid.crafting_inventories[unique_entity_id] = inv
+-- 		lf("create_crafting_inventory", "Created detached inventory with callbacks")
+		
+-- 		-- Use the stored inventory reference like trader.lua does
+-- 		local stored_inv = maidroid.crafting_inventories[unique_entity_id]
+-- 		stored_inv:set_size("craftable", 12)  -- 6x2 grid = 12 slots
+-- 		stored_inv:set_size("selection", 6)   -- 6x1 grid = 6 slots
+-- 		lf("create_crafting_inventory", "Set inventory sizes")
+		
+-- 		-- Populate craftable items
+-- 		maidroid.populate_craftable_items(inv, droid)
+-- 		lf("create_crafting_inventory", "Populated craftable items")
+		
+-- 		-- Test if callback works by trying to manually trigger it
+-- 		lf("create_crafting_inventory", "Testing callback manually...")
+-- 		local test_stack = ItemStack("default:stone")
+-- 		local result = inv:is_empty("craftable")
+-- 		lf("create_crafting_inventory", "Inventory test result: " .. tostring(result))
+-- 	else
+-- 		lf("create_crafting_inventory", "Inventory already exists, reusing")
+-- 		-- The inventory should already have callbacks from when it was first created
+-- 		local inv = maidroid.crafting_inventories[unique_entity_id]
+-- 		if inv then
+-- 			lf("create_crafting_inventory", "Found existing inventory reference, checking lists")
+-- 			if inv:get_list("craftable") then
+-- 				lf("create_crafting_inventory", "Craftable list exists")
+-- 			else
+-- 				lf("create_crafting_inventory", "Craftable list missing, setting up")
+-- 				inv:set_size("craftable", 12)
+-- 			end
+-- 			if inv:get_list("selection") then
+-- 				lf("create_crafting_inventory", "Selection list exists")
+-- 			else
+-- 				lf("create_crafting_inventory", "Selection list missing, setting up")
+-- 				inv:set_size("selection", 6)
+-- 			end
+-- 		else
+-- 			lf("create_crafting_inventory", "ERROR: Could not find existing inventory reference!")
+-- 		end
+-- 	end
+	
+-- 	lf("create_crafting_inventory", "Returning inventory ID: " .. unique_entity_id)
+-- 	return unique_entity_id
+-- end
+
+function maidroid.populate_craftable_items(inv, droid)
+	-- Get craftable outputs from generic_cooker
+	local craftable_outputs = {}
+	if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.get_craftable_outputs then
+		craftable_outputs = maidroid.cores.generic_cooker.get_craftable_outputs() or {}
+	end
+	
+	-- Fallback to specific items if no outputs found
+	if type(craftable_outputs) ~= "table" or #craftable_outputs == 0 then
+		craftable_outputs = {
+			"farming:rhubarb_pie",
+			"farming:bread_slice", 
+			"farming:flour",
+		}
+	end
+	
+	-- Fill craftable inventory
+	for i = 1, math.min(#craftable_outputs, 12) do -- 6x2 = 12 slots max
+		local spec = craftable_outputs[i]
+		if type(spec) == "string" and spec ~= "" then
+            lf("api:populate_craftable_items", "populate_craftable_items: " .. tostring(spec))
+			inv:set_stack("craftable", i, spec)
+		end
+	end
+end
+
+function maidroid.update_selection_inventory(inv, droid)
+	-- Clear desirable inventory
+	inv:set_list("desirable", {})
+	
+	-- Populate from droid.desired_craft_outputs (set by generic_cooker)
+	local desired_items = {}
+	if type(droid.desired_craft_outputs) == "table" then
+		desired_items = droid.desired_craft_outputs
+	elseif type(droid.selected_craft_items) == "table" then
+		-- Fallback to old selected_craft_items if desired_craft_outputs not set
+		desired_items = droid.selected_craft_items
+	end
+	
+	-- Populate desirable list (max 6 for 6x1 grid)
+	for i, itemname in ipairs(desired_items) do
+		if i <= 6 and type(itemname) == "string" and itemname ~= "" then
+			inv:set_stack("desirable", i, itemname)
+		end
+	end
+	
+	lf("update_selection_inventory", "Populated desirable with: " .. dump(desired_items))
+end
+
+function maidroid.get_maidroid_by_player(player_name)
+	if maidroid_buf[player_name] and maidroid_buf[player_name].self then
+		return maidroid_buf[player_name].self
+	end
+	return nil
+end
 local control_item = "default:paper"
 if farming_redo then
 	control_item = "farming:sugar"
@@ -872,8 +1094,10 @@ maidroid.generate_texture = function(index)
 end
 
 -- create_inventory return a new inventory.
-local function create_inventory(self)
-	self.inventory_name = generate_unique_manufacturing_id()
+-- ,,ci1
+local function create_inventory(self, inventory_name)
+	self.inventory_name = inventory_name
+    -- ,,cdi2
 	local inventory = minetest.create_detached_inventory(self.inventory_name, {
 		on_put = function(_, listname)
 			if listname == "main" then
@@ -982,6 +1206,136 @@ local function create_inventory(self)
 	return inventory
 end
 
+-- create_cooker_inventory return a new crafting inventory.
+local function create_cooker_inventory(self, inventory_name)
+	self.crafting_inventory_id = inventory_name
+	local inventory = minetest.create_detached_inventory(self.crafting_inventory_id, {
+		on_put = function(_, listname)
+			lf("cooker_inventory", "on_put called for list: " .. tostring(listname))
+		end,
+
+		allow_put = function(inv, listname, index, stack, player)
+			lf("cooker_inventory", "allow_put called by " .. player:get_player_name() .. " for list: " .. tostring(listname) .. ", item: " .. stack:get_name())
+			return 0
+		end,
+
+		on_take = function(_, listname)
+			lf("cooker_inventory", "on_take called for list: " .. tostring(listname))
+		end,
+
+		allow_take = function(inv, listname, index, stack, player)
+			lf("cooker_inventory", "allow_take called by " .. player:get_player_name() .. " for list: " .. tostring(listname) .. ", item: " .. stack:get_name())
+			return 99
+		end,
+
+		on_move = function(_, from_list, _, to_list)
+			lf("cooker_inventory", "on_move called from " .. tostring(from_list) .. " to " .. tostring(to_list))
+			
+			-- Handle moving from craftable to desirable
+			if from_list == "craftable" and to_list == "desirable" then
+				lf("cooker_inventory", "Item moved from craftable to desirable, updating desired craft outputs")
+				
+				-- Get the maidroid this inventory belongs to
+				local droid = self
+--                 lf("cooker_inventory", "Looking for maidroid with crafting_inventory_id: " .. tostring(inventory_name))
+--                 lf("cooker_inventory", "maidroid_buf: " .. dump(maidroid_buf))
+--                 lf("cooker_inventory", "self.crafting_inventory_id: " .. tostring(self.crafting_inventory_id))
+-- lf("cooker_inventory", "Self object dump: " .. dump(self))
+                
+
+				-- for maidroid_id, maidroid_obj in pairs(maidroid_buf) do
+				-- 	if maidroid_obj.crafting_inventory_id == self.crafting_inventory_id then
+				-- 		droid = maidroid_obj
+				-- 		break
+				-- 	end
+				-- end
+				
+				if droid then
+					-- Get all items from desirable list
+					local crafting_inv = maidroid.crafting_inventories[self.crafting_inventory_id]
+					local selected_items = {}
+					
+					for i = 1, 6 do -- desirable has 6 slots
+						local stack = crafting_inv:get_stack("desirable", i)
+						if not stack:is_empty() then
+							table.insert(selected_items, stack:get_name())
+						end
+					end
+					
+					-- Update generic_cooker's desired craft outputs
+					if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.set_desired_craft_outputs then
+						maidroid.cores.generic_cooker.set_desired_craft_outputs(droid, selected_items)
+					else
+						droid.desired_craft_outputs = selected_items
+					end
+					
+					lf("cooker_inventory", "Updated desired craft outputs: " .. dump(selected_items))
+				else
+					lf("cooker_inventory", "ERROR: Could not find maidroid for inventory " .. tostring(self.crafting_inventory_id))
+				end
+			
+			-- Handle moving from desirable to craftable
+			elseif from_list == "desirable" and to_list == "craftable" then
+				lf("cooker_inventory", "Item moved from desirable to craftable")
+				
+				-- Get the maidroid this inventory belongs to
+				local droid = self
+				
+				if droid then
+					local crafting_inv = maidroid.crafting_inventories[self.crafting_inventory_id]
+					
+					-- Check all craftable slots for duplicates and remove them
+					local items_seen = {}
+					for i = 1, 12 do -- craftable has 12 slots
+						local stack = crafting_inv:get_stack("craftable", i)
+						if not stack:is_empty() then
+							local item_name = stack:get_name()
+							if items_seen[item_name] then
+								-- This is a duplicate, remove it
+								crafting_inv:set_stack("craftable", i, "")
+								lf("cooker_inventory", "Removed duplicate " .. item_name .. " from craftable slot " .. i)
+							else
+								-- First time seeing this item
+								items_seen[item_name] = true
+							end
+						end
+					end
+					
+					-- Update desired craft outputs (remove this item from desirable)
+					local selected_items = {}
+					for i = 1, 6 do -- desirable has 6 slots
+						local stack = crafting_inv:get_stack("desirable", i)
+						if not stack:is_empty() then
+							table.insert(selected_items, stack:get_name())
+						end
+					end
+					
+					-- Update generic_cooker's desired craft outputs
+					if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.set_desired_craft_outputs then
+						maidroid.cores.generic_cooker.set_desired_craft_outputs(droid, selected_items)
+					else
+						droid.desired_craft_outputs = selected_items
+					end
+					
+					lf("cooker_inventory", "Updated desired craft outputs after removal: " .. dump(selected_items))
+				else
+					lf("cooker_inventory", "ERROR: Could not find maidroid for inventory " .. tostring(self.crafting_inventory_id))
+				end
+			end
+		end,
+
+		allow_move = function(inv, from_list, from_index, to_list, to_index, count, player)
+			lf("cooker_inventory", "allow_move called by " .. player:get_player_name() .. " from " .. tostring(from_list) .. " to " .. tostring(to_list) .. ", count: " .. tostring(count))
+			return count
+		end,
+	})
+
+	inventory:set_size("craftable", 12)
+	inventory:set_size("desirable", 6)
+
+	return inventory
+end
+
 local enligthen_tool = function(droid)
 	if not droid.selected_tool then
 		return ""
@@ -999,6 +1353,7 @@ local enligthen_tool = function(droid)
 end
 
 -- get_formspec returns a string that represents a formspec definition.
+-- ,,form
 get_formspec = function(self, player, tab)
 	local owns = self:player_can_control(player)
 	local form = "size[11,7.4]"
@@ -1093,215 +1448,40 @@ get_formspec = function(self, player, tab)
 	if owns and self.core.name == "generic_cooker" then
 		tab_max = tab_max + 1
 		if tab == tab_max then
-			local craftable_outputs = {}
-			if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.get_craftable_outputs then
-				craftable_outputs = maidroid.cores.generic_cooker.get_craftable_outputs() or {}
-			end
-			if type(craftable_outputs) ~= "table" or #craftable_outputs == 0 then
-				craftable_outputs = {
-					"farming:rhubarb_pie",
-					"farming:bread",
-				}
-			end
-
-			-- Get current max distance setting using the getter function with fallback
-			local current_distance = 10
-			if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.get_max_distance_from_activation then
-				current_distance = maidroid.cores.generic_cooker.get_max_distance_from_activation()
-			elseif maidroid.get_max_distance_from_activation then
-				current_distance = maidroid.get_max_distance_from_activation()
-			else
-				-- Last resort: read directly from settings
-				current_distance = tonumber(minetest.settings:get("maidroid.generic_cooker.max_distance_from_activation")) or 10
+			-- Create and update crafting inventory
+			if not self.crafting_inventory_id then
+				-- Use the new create_cooker_inventory function
+				local crafting_inventory = create_cooker_inventory(self, generate_unique_manufacturing_id())
+				maidroid.crafting_inventories[self.crafting_inventory_id] = crafting_inventory
+				maidroid.populate_craftable_items(crafting_inventory, self)
+				lf("cooker_tab", "Created crafting inventory with ID: " .. self.crafting_inventory_id)
 			end
 			
-			-- form = form .. enligthen_tool(self)
-			form = form 
-				-- .. "label[3,0;" .. S("Cooker Control Panel") .. "]"
-				-- .. "label[3,0.5;" .. S("Configure cooker behavior and view metrics") .. "]"
-				.. "label[3,0.7;" .. S("Craftable Items") .. "]"
-				.. "label[6.8,0.7;" .. S("Craftables") .. ": " .. tostring(#craftable_outputs) .. "]"
-				.. "label[3,2.55;" .. S("Ingredients") .. ":]"
-				.. "label[3,2.95;" .. S("Selected Craft Items") .. ":]"
-				.. "label[3,3.45;" .. S("Current Task:") .. " "
+			local crafting_inv_id = self.crafting_inventory_id
+			local crafting_inv = maidroid.crafting_inventories[crafting_inv_id]
+			if crafting_inv then
+				lf("cooker_tab", "Found crafting inventory, updating selection")
+				maidroid.update_selection_inventory(crafting_inv, self)
+			else
+				lf("cooker_tab", "ERROR: Could not find crafting inventory!")
+			end
+			
+			-- Shop-style layout for cooker
+			form = form .. enligthen_tool(self)
+				.. "label[3,0;" .. S("Craftables") .. "]"
+				.. "list[detached:" .. crafting_inv_id .. ";craftable;3,0.5;6,2;]"
+				.. "label[3,3.5;" .. S("Desirable Craft") .. "]"
+				.. "list[detached:" .. crafting_inv_id .. ";desirable;4,4.25;6,1;]"
+			
+			-- Add cooker controls below the lists
+			form = form
+				.. "button[3,6;2.5,1;toggle_cooker;" .. S("Toggle Cooker") .. "]"
+				.. "button[6,6;2.5,1;view_metrics;" .. S("View Metrics") .. "]"
+				.. "label[3,7;" .. S("Current Task:") .. " "
 				.. minetest.colorize("#ACEEAC", (self.action and self.action or S("Idle"))) .. "]"
-				.. "label[3,3.95;" .. S("Current State:") .. " "
+				.. "label[6,7;" .. S("State:") .. " "
 				.. minetest.colorize("#ACEEAC", (self.state and tostring(self.state) or S("Unknown"))) .. "]"
-				.. "label[3,4.45;" .. S("Position:") .. " "
-				.. minetest.colorize("#ACEEAC", minetest.pos_to_string(vector.round(self:get_pos()))) .. "]"
-				.. "button[3,4.75;2.5,1;toggle_cooker;" .. S("Toggle Cooker") .. "]"
-				.. "button[6,4.75;2.5,1;view_metrics;" .. S("View Metrics") .. "]"
-				.. "label[3,5.75;" .. S("Cooker Settings") .. "]"
-				.. "label[3,6.15;" .. S("Max Distance from Activation:") .. "]"
-				.. "field[6,6.15;2,1;max_distance;;" .. tostring(current_distance) .. "]"
-				.. "field_close_on_enter[max_distance;false]"
-				.. "button[8.5,5.9;2,1;set_distance;" .. S("Set Distance") .. "]"
-				.. "checkbox[3,6.65;auto_craft;" .. S("Auto Craft") .. ";true]"
-				.. "checkbox[5.5,6.65;auto_fuel;" .. S("Auto Fuel") .. ";true]"
-				.. "checkbox[7.7,6.65;auto_collect;" .. S("Auto Collect") .. ";true]"
-
-			local cell = 0.6
-			local step = 0.7
-			local grid_x0 = 3
-			local grid_y0 = 1.0
-			local max_x = 10.7
-			for i, spec in ipairs(craftable_outputs) do
-				local idx = i - 1
-				local row = idx % 3
-				local col = math.floor(idx / 3)
-				local x = grid_x0 + col * step
-				local y = grid_y0 + row * step
-				if x + cell > max_x then
-					break
-				end
-				spec = type(spec) == "string" and spec or ""
-				local stack = ItemStack(spec)
-				local itemname = stack:get_name()
-				if itemname ~= "" then
-					local escaped_item = minetest.formspec_escape(itemname)
-					local btn = "craft_sel_" .. tostring(i)
-					local is_sel = (self.selected_craft_output == itemname)
-					form = form
-						.. "box[" .. x .. "," .. y .. ";" .. cell .. "," .. cell .. ";" .. (is_sel and "#88FF8855" or "#00000055") .. "]"
-						.. "item_image_button[" .. x .. "," .. y .. ";" .. cell .. "," .. cell .. ";" .. escaped_item .. ";" .. btn .. ";]"
-				end
-			end
-
-			if not self.selected_craft_output then
-				local first = craftable_outputs[1]
-				if type(first) == "string" then
-					local st = ItemStack(first)
-					if st:get_name() ~= "" then
-						self.selected_craft_output = st:get_name()
-					end
-				end
-			end
-
-			if self.selected_craft_output and self.selected_craft_output ~= "" then
-				lf("cooker_ui", "selected_craft_output=" .. tostring(self.selected_craft_output))
-				local recipes = minetest.get_all_craft_recipes(self.selected_craft_output)
-				lf("cooker_ui", "recipes type=" .. type(recipes) .. " count=" .. tostring(type(recipes) == "table" and #recipes or 0))
-				local ingredients = {}
-				if type(recipes) == "table" and recipes[1] and type(recipes[1].items) == "table" then
-					ingredients = recipes[1].items
-				end
-				lf("cooker_ui", "recipe[1].items count=" .. tostring(type(ingredients) == "table" and #ingredients or 0))
-				if type(ingredients) == "table" and #ingredients > 0 then
-					lf("cooker_ui", "recipe[1].items=" .. dump(ingredients))
-				end
-
-				local function resolve_ingredient_itemname(it)
-					if type(it) ~= "string" or it == "" then
-						return ""
-					end
-					if it:sub(1, 6) == "group:" then
-						local groupname = it:sub(7)
-						lf("cooker_ui", "resolve group ingredient=" .. tostring(it) .. " groupname=" .. tostring(groupname))
-						if groupname ~= "" then
-							local best = ""
-							local matches = 0
-							for name, def in pairs(minetest.registered_items) do
-								if minetest.get_item_group(name, groupname) > 0 then
-									matches = matches + 1
-									if matches <= 3 then
-										lf("cooker_ui", "group candidate " .. tostring(groupname) .. ": " .. tostring(name)
-											.. " inv_img=" .. tostring(def and def.inventory_image)
-											.. " tiles=" .. tostring(def and def.tiles and def.tiles[1]))
-									end
-									if not def then
-										best = best ~= "" and best or name
-										lf("cooker_ui", "group best (no def)=" .. tostring(best))
-									elseif def.inventory_image and def.inventory_image ~= "" then
-										lf("cooker_ui", "group resolved via inventory_image: " .. tostring(name))
-										return name
-									elseif def.tiles and type(def.tiles) == "table" and def.tiles[1] and def.tiles[1] ~= "" then
-										lf("cooker_ui", "group resolved via tiles: " .. tostring(name))
-										return name
-									else
-										best = best ~= "" and best or name
-										lf("cooker_ui", "group best (fallback)=" .. tostring(best))
-									end
-								end
-							end
-							lf("cooker_ui", "group matches=" .. tostring(matches) .. " returning best=" .. tostring(best))
-							return best
-						end
-						lf("cooker_ui", "groupname empty for " .. tostring(it) .. ", cannot resolve")
-						return ""
-					end
-					return ItemStack(it):get_name()
-				end
-
-				local max_i = 0
-				for idx, _ in pairs(ingredients or {}) do
-					if type(idx) == "number" and idx > max_i then
-						max_i = idx
-					end
-				end
-				lf("cooker_ui", "ingredient indices max_i=" .. tostring(max_i))
-
-				local ix0 = 4.5
-				local iy0 = 2.45
-				local istep = 0.75
-				local k = 0
-				local rendered = 0
-				lf("cooker_ui", "ingredient layout: ix0=" .. tostring(ix0) .. " iy0=" .. tostring(iy0)
-					.. " istep=" .. tostring(istep) .. " cell=" .. tostring(cell) .. " max_x=" .. tostring(max_x))
-				for i = 1, max_i do
-					local ing = ingredients[i]
-					if ing == nil or ing == "" then
-						goto continue_ingredient
-					end
-					k = k + 1
-					local x = ix0 + (k - 1) * istep
-					if x + cell > max_x then
-						lf("cooker_ui", "ingredient row truncated at k=" .. tostring(k) .. " x=" .. tostring(x) .. " max_x=" .. tostring(max_x))
-						break
-					end
-					local itemname = resolve_ingredient_itemname(ing)
-					lf("cooker_ui", "ingredient k=" .. tostring(k) .. " pos=" .. tostring(x) .. "," .. tostring(iy0)
-						.. " raw=" .. tostring(ing) .. " resolved=" .. tostring(itemname))
-					form = form .. "box[" .. x .. "," .. iy0 .. ";" .. cell .. "," .. cell .. ";#00000055]"
-					if itemname ~= "" then
-						rendered = rendered + 1
-						form = form .. "item_image[" .. x .. "," .. iy0 .. ";" .. cell .. "," .. cell .. ";" .. minetest.formspec_escape(itemname) .. "]"
-					else
-						local t = "?"
-						if type(ing) == "string" and ing:sub(1, 6) == "group:" then
-							t = ing:sub(7, 7 + 8)
-						end
-						rendered = rendered + 1
-						form = form .. "label[" .. (x + 0.05) .. "," .. (iy0 + 0.18) .. ";" .. minetest.formspec_escape(t) .. "]"
-					end
-					::continue_ingredient::
-				end
-				lf("cooker_ui", "ingredients iterated=" .. tostring(k) .. " rendered=" .. tostring(rendered))
-			end
-
-			if type(self.selected_craft_items) ~= "table" or #self.selected_craft_items == 0 then
-				if type(self.desired_craft_outputs) == "table" and #self.desired_craft_outputs > 0 then
-					self.selected_craft_items = self.desired_craft_outputs
-				end
-			end
-			local selected_list = self.selected_craft_items
-			if type(selected_list) == "table" and #selected_list > 0 then
-				local sx0 = 4.9
-				local sy0 = 2.85
-				local sstep = 0.75
-				for i, name in ipairs(selected_list) do
-					local x = sx0 + (i - 1) * sstep
-					if x + cell > max_x then
-						break
-					end
-					name = type(name) == "string" and name or ""
-					if name ~= "" then
-						local btn = "selected_craft_sel_" .. tostring(i)
-						form = form
-							.. "box[" .. x .. "," .. sy0 .. ";" .. cell .. "," .. cell .. ";#00000055]"
-							.. "item_image_button[" .. x .. "," .. sy0 .. ";" .. cell .. "," .. cell .. ";" .. minetest.formspec_escape(name) .. ";" .. btn .. ";]"
-					end
-				end
-			end
+			
 			return form
 		end
 	end
@@ -1321,7 +1501,7 @@ local function on_activate(self, staticdata)
 	-- parse the staticdata, and compose a inventory.
 	if staticdata == "" then
 		lf("api", "*************************  on_activate null staticdata")
-		create_inventory(self)
+		create_inventory(self, generate_unique_manufacturing_id())
 	else
 		lf("api", "*************************  on_activate has staticdata")
 		-- Clone and remove object if it is an "old maidroid"
@@ -1361,7 +1541,7 @@ local function on_activate(self, staticdata)
 		self.owner = data.owner_name
 		self.tbchannel = data.tbchannel or ""
 
-		local inventory = create_inventory(self)
+		local inventory = create_inventory(self, generate_unique_manufacturing_id())
 		for list_name, list in pairs(data.inventory) do
 			inventory:set_list(list_name, list)
 		end
@@ -2077,75 +2257,6 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 			end
 		end
 		return
-	end
-	
-	for k, _ in pairs(fields) do
-		if type(k) == "string" then
-			local idx = k:match("^craft_sel_(%d+)$")
-			if idx then
-				idx = tonumber(idx)
-				local craftable_outputs = {}
-				if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.get_craftable_outputs then
-					craftable_outputs = maidroid.cores.generic_cooker.get_craftable_outputs() or {}
-				end
-				if type(craftable_outputs) ~= "table" or #craftable_outputs == 0 then
-					craftable_outputs = {
-						"farming:rhubarb_pie",
-						"farming:bread",
-					}
-				end
-				local spec = craftable_outputs[idx]
-				local st = ItemStack(type(spec) == "string" and spec or "")
-				local itemname = st:get_name()
-				if itemname ~= "" then
-					droid.selected_craft_output = itemname
-					if type(droid.selected_craft_items) ~= "table" then
-						droid.selected_craft_items = {}
-					end
-					local exists = false
-					for _, v in ipairs(droid.selected_craft_items) do
-						if v == itemname then
-							exists = true
-							break
-						end
-					end
-					if not exists then
-						table.insert(droid.selected_craft_items, itemname)
-						local max_selected = 12
-						while #droid.selected_craft_items > max_selected do
-							table.remove(droid.selected_craft_items, 1)
-						end
-					end
-					if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.set_desired_craft_outputs then
-						maidroid.cores.generic_cooker.set_desired_craft_outputs(droid, droid.selected_craft_items)
-					else
-						droid.desired_craft_outputs = droid.selected_craft_items
-					end
-				end
-				local current_tab = droid.current_tab or 1
-				minetest.show_formspec(player_name, "maidroid:gui",
-					get_formspec(droid, player, current_tab))
-				return
-			end
-			local sidx = k:match("^selected_craft_sel_(%d+)$")
-			if sidx then
-				sidx = tonumber(sidx)
-				local selected_list = droid.selected_craft_items
-				if (type(selected_list) ~= "table" or #selected_list == 0) and type(droid.desired_craft_outputs) == "table" then
-					selected_list = droid.desired_craft_outputs
-				end
-				local name = type(selected_list) == "table" and selected_list[sidx] or nil
-				name = type(name) == "string" and name or ""
-				local itemname = ItemStack(name):get_name()
-				if itemname ~= "" then
-					droid.selected_craft_output = itemname
-				end
-				local current_tab = droid.current_tab or 1
-				minetest.show_formspec(player_name, "maidroid:gui",
-					get_formspec(droid, player, current_tab))
-				return
-			end
-		end
 	end
 	
 	-- Cooker tab field handling

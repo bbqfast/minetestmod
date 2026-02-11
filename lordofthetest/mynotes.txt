@@ -98,8 +98,39 @@ mob spawn
 
 
 worldedit
-======================================
+=====================================
 
 execute_worldedit_command("save", name, gui_filename[name])
 
 worldedit.register_command("save", {
+
+
+=====================================
+- if farmer core, make sure y axis doesn't go up or down, if detected y axis go up or down, set it back to pervious Y
+- if farmer core, do not jump
+- turn around if see fence
+
+
+prompts
+=====================================
+
+add a new row after Ingredients line in the UI for cooker 
+title is selected craft items and a list of squares contains selected craftable items
+if user clicks an item on Craftables
+it adds to selected craft items
+
+
+now update cooker Tab
+
+shrink the top list from 8x3 to 6x2
+add a text says "craftables"
+Initialize the craftables with
+ 
+ farming:rhubarb_pie
+ farming:bread_slice
+ farming:flour
+
+wrong section, 
+there are 3 sections, 
+the 2x6 (top section)
+we sholud put craftable on top of top section, then fill it will craftable item
