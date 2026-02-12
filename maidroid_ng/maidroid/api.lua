@@ -10,6 +10,10 @@ local mods = maidroid.mods
 local lf = maidroid.lf
 lf("api", "*************************  maidroid API")
 
+-- Pagination constants
+local DESIRABLE_ITEMS_PER_PAGE = 6
+local CRAFTABLE_ITEMS_PER_PAGE = 12
+
 -- Default craftable outputs for generic_cooker
 -- local init_craftable_outputs = {
 -- 	"farming:rhubarb_pie",
@@ -218,6 +222,25 @@ end
 -- 		end
 -- 	end
 -- end
+
+--- calculate_pagination calculates total pages and current page
+--- Returns: total_pages, current_page
+--- Parameters: self, items_list, items_per_page, min_pages (optional), page_field_name
+local function calculate_pagination(self, items_list, items_per_page, min_pages, page_field_name)
+	min_pages = min_pages or 1
+	local total_pages = math.max(min_pages, math.ceil(#items_list / items_per_page))
+	local current_page = (self[page_field_name] or 1)
+	if current_page > total_pages then current_page = total_pages end
+	if current_page < 1 then current_page = 1 end
+	return total_pages, current_page
+end
+
+--- calculate_desirable_pagination calculates total pages and current page for desirable items
+--- Returns: total_pages, current_page
+local function calculate_desirable_pagination(self, desirable_outputs, desirable_items_per_page)
+	-- Always show at least 2 pages when there are desirable items (for drag-and-drop)
+	return calculate_pagination(self, desirable_outputs, desirable_items_per_page, 2, "desirable_page")
+end
 
 function maidroid.populate_items_page(inv, droid, page_items, list_name, slot_count)
 	-- Clear inventory list first
@@ -1746,11 +1769,7 @@ get_formspec = function(self, player, tab)
 			-- end
 			
 			-- Craftable pagination variables
-			local craftable_items_per_page = 12
-			local craftable_total_pages = math.ceil(#craftable_outputs / craftable_items_per_page)
-			local craftable_current_page = (self.craftable_page or 1)
-			if craftable_current_page > craftable_total_pages then craftable_current_page = craftable_total_pages end
-			if craftable_current_page < 1 then craftable_current_page = 1 end
+			local craftable_total_pages, craftable_current_page = calculate_pagination(self, craftable_outputs, CRAFTABLE_ITEMS_PER_PAGE, 1, "craftable_page")
             -- local craftable_start_idx = (craftable_current_page - 1) * craftable_items_per_page + 1
             -- local craftable_end_idx = math.min(craftable_start_idx + craftable_items_per_page - 1, #craftable_outputs)
             -- ,,x3
@@ -1758,7 +1777,7 @@ get_formspec = function(self, player, tab)
                 maidroid.init_craftable_pageitems(self, init_craftable_outputs)
             end			
 			-- Get current craftable page items
-			local craftable_page_items = populate_current_page(self, craftable_current_page, craftable_items_per_page, craftable_outputs, "craftable_page_items", "craftable")
+			local craftable_page_items = populate_current_page(self, craftable_current_page, CRAFTABLE_ITEMS_PER_PAGE, craftable_outputs, "craftable_page_items", "craftable")
 			-- local craftable_page_items = populate_current_craftable_page(self, craftable_current_page, craftable_items_per_page, craftable_page_items)
 			
 			-- Update craftable inventory with current page items
@@ -1782,15 +1801,10 @@ get_formspec = function(self, player, tab)
 				desirable_outputs = {}
 			end
 			
-			local desirable_items_per_page = 6
-			-- Always show at least 2 pages when there are desirable items (for drag-and-drop)
-			local desirable_total_pages = math.max(2, math.ceil(#desirable_outputs / desirable_items_per_page))
-			local desirable_current_page = (self.desirable_page or 1)
-			if desirable_current_page > desirable_total_pages then desirable_current_page = desirable_total_pages end
-			if desirable_current_page < 1 then desirable_current_page = 1 end
+			local desirable_total_pages, desirable_current_page = calculate_desirable_pagination(self, desirable_outputs, DESIRABLE_ITEMS_PER_PAGE)
 			
 			-- Get current desirable page items (from actual desirable outputs)
-			local desirable_page_items = populate_current_page(self, desirable_current_page, desirable_items_per_page, desirable_outputs, "desirable_page_items", "desirable")
+			local desirable_page_items = populate_current_page(self, desirable_current_page, DESIRABLE_ITEMS_PER_PAGE, desirable_outputs, "desirable_page_items", "desirable")
 			
 			-- Update desirable inventory with current page items
 			maidroid.populate_items_page(crafting_inv, self, desirable_page_items, "desirable", 6)
@@ -1834,7 +1848,7 @@ get_formspec = function(self, player, tab)
 	end
 end
 
--- on_activate is a callback function that is called when the object is created or recreated.
+--- on_activate is a callback function that is called when the object is created or recreated.
 local function on_activate(self, staticdata)
 	all_maidroid_metrics.total_activated = (all_maidroid_metrics.total_activated or 0) + 1
 	-- Check if we've already spawned the maximum number of maidroids
