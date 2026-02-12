@@ -17,14 +17,14 @@ lf("api", "*************************  maidroid API")
 -- 	"farming:flour",
 -- }
 local init_craftable_outputs = {
-    "farming:flour", "farming:flour_multigrain", "farming:bread_slice 5", "farming:toast_sandwich", "farming:garlic_clove 8", "farming:garlic", "farming:garlic 9", "farming:popcorn", "farming:cornstarch",
-    "farming:bottle_ethanol", "farming:coffee_cup", "farming:chocolate_dark", "farming:chocolate_block", "farming:chocolate_dark 9", "farming:chili_powder", "farming:chili_bowl", "farming:carrot_juice", "farming:blueberry_pie", "farming:muffin_blueberry 2", "farming:tomato_soup",
-    "farming:glass_water 4", "farming:sugar_cube", "farming:salt 9", "farming:salt_crystal", "farming:mayonnaise", "farming:rose_water", "farming:turkish_delight 4", "farming:garlic_bread", "farming:donut 3", "farming:donut_chocolate",
-    "farming:donut_apple", "farming:porridge", "farming:jaffa_cake 3", "farming:apple_pie", "farming:cactus_juice", "farming:pasta", "farming:mac_and_cheese", "farming:spaghetti", "farming:bibimbap", "farming:burger", "farming:salad", "farming:smoothie_berry",
-    "farming:spanish_potatoes", "farming:potato_omelet", "farming:paella", "farming:flan", "farming:cheese_vegan", "farming:butter_vegan", "farming:onigiri", "farming:gyoza 4", "farming:mochi", "farming:gingerbread_man 3", "farming:mint_tea", "farming:onion_soup",
-    "farming:pea_soup", "farming:pepper_ground", "farming:pineapple_ring 5", "farming:pineapple_juice", "farming:pineapple_juice 2", "farming:potato_salad", "farming:melon_8", "farming:melon_slice 4", "farming:pumpkin", "farming:pumpkin_slice 4", "farming:pumpkin_dough",
+    "farming:flour", "farming:flour_multigrain", "farming:bread_slice", "farming:toast_sandwich", "farming:garlic_clove", "farming:garlic", "farming:popcorn", "farming:cornstarch",
+    "farming:bottle_ethanol", "farming:coffee_cup", "farming:chocolate_dark", "farming:chocolate_block", "farming:chili_powder", "farming:chili_bowl", "farming:carrot_juice", "farming:blueberry_pie", "farming:muffin_blueberry", "farming:tomato_soup",
+    "farming:glass_water", "farming:sugar_cube", "farming:salt", "farming:salt_crystal", "farming:mayonnaise", "farming:rose_water", "farming:turkish_delight", "farming:garlic_bread", "farming:donut", "farming:donut_chocolate",
+    "farming:donut_apple", "farming:porridge", "farming:jaffa_cake", "farming:apple_pie", "farming:cactus_juice", "farming:pasta", "farming:mac_and_cheese", "farming:spaghetti", "farming:bibimbap", "farming:burger", "farming:salad", "farming:smoothie_berry",
+    "farming:spanish_potatoes", "farming:potato_omelet", "farming:paella", "farming:flan", "farming:cheese_vegan", "farming:butter_vegan", "farming:onigiri", "farming:gyoza", "farming:mochi", "farming:gingerbread_man", "farming:mint_tea", "farming:onion_soup",
+    "farming:pea_soup", "farming:pepper_ground", "farming:pineapple_ring", "farming:pineapple_juice", "farming:potato_salad", "farming:melon", "farming:melon_slice", "farming:pumpkin", "farming:pumpkin_slice", "farming:pumpkin_dough",
     "farming:smoothie_raspberry", "farming:rhubarb_pie", "farming:rice_flour", "farming:soy_sauce", "farming:soy_milk", "farming:tofu", "farming:vanilla_extract", "farming:jerusalem_artichokes",
-    "farming:cookie 8", "farming:carrot_gold", "farming:beetroot_soup", "farming:sunflower_oil", "farming:sunflower_bread", "farming:bowl 4"
+    "farming:cookie", "farming:carrot_gold", "farming:beetroot_soup", "farming:sunflower_oil", "farming:sunflower_bread", "farming:bowl"
 }
 
 -- Track spawned maidroid names to prevent duplicates
@@ -137,8 +137,29 @@ function maidroid.crafting_on_move(inventory, from_list, from_index, to_list, to
 	lf("crafting_on_move", "Player " .. player:get_player_name() .. " is moving items from " .. from_list .. " to " .. to_list)
 	if from_list == "craftable" and to_list == "desirable" then
 		local inv = inventory
-		local moved = inv:get_stack(to_list, to_index)
+		local moved = inv:get_stack(from_list, from_index)  -- Check source stack before move
 		local itemname = moved:get_name()
+		
+		-- Check if item already exists in desirable before allowing the move
+		local player_name = player:get_player_name()
+		local droid = maidroid.get_maidroid_by_player(player_name)
+		local already_exists = false
+		
+		if droid and type(droid.desired_craft_outputs) == "table" then
+			for _, v in ipairs(droid.desired_craft_outputs) do
+				if v == itemname then
+					already_exists = true
+					break
+				end
+			end
+		end
+		
+		-- Prevent the move if item already exists in desirable
+		if already_exists then
+			lf("crafting_on_move", "Prevented move: " .. itemname .. " already exists in desirable")
+			return
+		end
+		
 		local elements = moved:get_count()
 		
 		if elements > count then
@@ -148,29 +169,16 @@ function maidroid.crafting_on_move(inventory, from_list, from_index, to_list, to
 		end
 		
 		-- Update the maidroid's desired_craft_outputs
-		local player_name = player:get_player_name()
-		local droid = maidroid.get_maidroid_by_player(player_name)
 		if droid then
 			if type(droid.desired_craft_outputs) ~= "table" then
 				droid.desired_craft_outputs = {}
 			end
 			
-			-- Check if item already exists
-			local exists = false
-			for _, v in ipairs(droid.desired_craft_outputs) do
-				if v == itemname then
-					exists = true
-					break
-				end
-			end
-			
-			-- Add item if not already present
-			if not exists then
-				table.insert(droid.desired_craft_outputs, itemname)
-				local max_selected = 6  -- Updated to match 6x1 grid
-				while #droid.desired_craft_outputs > max_selected do
-					table.remove(droid.desired_craft_outputs, 1)
-				end
+			-- Add item (we already know it doesn't exist)
+			table.insert(droid.desired_craft_outputs, itemname)
+			local max_selected = 6  -- Updated to match 6x1 grid
+			while #droid.desired_craft_outputs > max_selected do
+				table.remove(droid.desired_craft_outputs, 1)
 			end
 			
 			-- Update the desired craft outputs
@@ -215,11 +223,14 @@ function maidroid.populate_desirable_items_page(inv, droid, page_items)
 	-- Clear desirable inventory first
 	inv:set_list("desirable", {})
 	
-	-- Fill desirable inventory with current page items
-	for i, spec in ipairs(page_items) do
+	-- Fill desirable inventory with current page items, preserving positions
+	for i = 1, 6 do -- desirable has 6 slots
+		local spec = page_items[i]
 		if type(spec) == "string" and spec ~= "" then
-            lf("api:populate_desirable_items_page", "populate_desirable_items_page: " .. tostring(spec))
+            lf("api:populate_desirable_items_page", "Setting slot " .. i .. " to: " .. tostring(spec))
 			inv:set_stack("desirable", i, spec)
+		else
+            lf("api:populate_desirable_items_page", "Leaving slot " .. i .. " empty")
 		end
 	end
 end
@@ -237,17 +248,58 @@ function maidroid.populate_craftable_items_page(inv, droid, page_items)
 	end
 end
 
-function maidroid.populate_craftable_items(inv, droid)
-	-- Get craftable outputs from generic_cooker
-	local craftable_outputs = {}
-	if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.get_craftable_outputs then
-		craftable_outputs = maidroid.cores.generic_cooker.get_craftable_outputs() or {}
+-- Function to convert craftable outputs array to a sparse array
+-- Takes the output from maidroid.cores.generic_cooker.get_craftable_outputs()
+-- and returns a sparse array where indices represent item positions
+function maidroid.convert_craftable_outputs_to_sparse_array(craftable_outputs)
+    lf("api:convert_craftable_outputs_to_sparse_array", "convert_craftable_outputs_to_sparse_array: " .. dump(craftable_outputs))
+	if type(craftable_outputs) ~= "table" then
+        lf("api:convert_craftable_outputs_to_sparse_array", "convert_craftable_outputs_to_sparse_array: " .. tostring(craftable_outputs))
+		return {}
 	end
 	
-	-- Fallback to default items if no outputs found
-	if type(craftable_outputs) ~= "table" or #craftable_outputs == 0 then
-		craftable_outputs = init_craftable_outputs
+	local sparse_array = {}
+	
+	-- Convert each item string to a sparse array entry
+	for i, item_spec in ipairs(craftable_outputs) do
+        lf("api:convert_craftable_outputs_to_sparse_array", "convert_craftable_outputs_to_sparse_array: " .. tostring(item_spec))
+		if type(item_spec) == "string" and item_spec ~= "" then
+            lf("api:convert_craftable_outputs_to_sparse_array", "convert_craftable_outputs_to_sparse_array: " .. tostring(item_spec))
+			-- Use the original index as the key in the sparse array
+			-- This preserves the original ordering while creating a sparse structure
+			sparse_array[i] = item_spec
+		end
 	end
+	
+	return sparse_array
+end
+
+-- ,,x2
+-- Convenience function that gets craftable outputs and converts to sparse array
+-- This is a wrapper that combines get_craftable_outputs() and convert_craftable_outputs_to_sparse_array()
+function maidroid.get_craftable_outputs_as_sparse_array()
+	local craftable_outputs = {}
+	-- if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.get_craftable_outputs then
+	-- 	craftable_outputs = maidroid.cores.generic_cooker.get_craftable_outputs() or {}
+    --     lf("api:get_craftable_outputs_as_sparse_array", "get_craftable_outputs_as_sparse_array: " .. dump(craftable_outputs))
+    -- else
+    --     error("maidroid.cores.generic_cooker.get_craftable_outputs is not a function")
+    -- end
+	
+	return maidroid.convert_craftable_outputs_to_sparse_array(init_craftable_outputs)
+end
+
+function maidroid.populate_craftable_items(inv, droid, craftable_outputs)
+	-- Get craftable outputs from generic_cooker
+	-- local craftable_outputs = {}
+	-- if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.get_craftable_outputs then
+	-- 	craftable_outputs = maidroid.cores.generic_cooker.get_craftable_outputs() or {}
+	-- end
+	
+	-- -- Fallback to default items if no outputs found
+	-- if type(craftable_outputs) ~= "table" or #craftable_outputs == 0 then
+	-- 	craftable_outputs = init_craftable_outputs
+	-- end
 	
 	-- Fill craftable inventory
 	for i = 1, math.min(#craftable_outputs, 12) do -- 6x2 = 12 slots max
@@ -265,7 +317,6 @@ function maidroid.update_selection_inventory(inv, droid)
 	inv:set_list("desirable", {})
 	-- Calculate desirable pagination (based on page items tracking)
 	local desirable_outputs = {}
-	-- local droid = self
 	
 	-- Build complete list from all pages
 
@@ -305,7 +356,101 @@ function maidroid.update_selection_inventory(inv, droid)
 
 end
 
+-- ,,c2d
+-- Helper function to handle moving items between craftable and desirable lists
+function maidroid.handle_craftable_to_desirable_move(droid)
+	lf("cooker_inventory", "Item moved from craftable to desirable, updating desired craft outputs")
+	
+	if not droid then
+		lf("cooker_inventory", "ERROR: Could not find maidroid for inventory " .. tostring(droid.crafting_inventory_id))
+		return
+	end
+	
+	-- Get all items from desirable list (current inventory state)
+	local crafting_inv = maidroid.crafting_inventories[droid.crafting_inventory_id]
+	local page_data = {} -- Store both items and empty positions
+	
+	for i = 1, 6 do -- desirable has 6 slots
+		local stack = crafting_inv:get_stack("desirable", i)
+		if not stack:is_empty() then
+			page_data[i] = stack:get_name() -- Store item at its position
+		else
+			page_data[i] = nil -- Explicitly mark empty slot
+		end
+	end
+	
+	-- Get current page
+	local current_page = (droid.desirable_page or 1)
+	
+	-- Initialize page items tracking if not exists
+	if not droid.desirable_page_items then
+		droid.desirable_page_items = {}
+	end
+	
+	-- Store current page data with positions preserved
+	droid.desirable_page_items[current_page] = page_data
+	
+	-- Build complete list from all pages using helper function
+	local all_desired_items = maidroid.build_complete_desirable_list(droid)
+	
+	-- Update generic_cooker's desired craft outputs
+	if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.set_desired_craft_outputs then
+		maidroid.cores.generic_cooker.set_desired_craft_outputs(droid, all_desired_items)
+	else
+		droid.desired_craft_outputs = all_desired_items
+	end
+	
+	lf("cooker_inventory", "Updated desired craft outputs: " .. dump(all_desired_items))
+end
+
+-- Helper function to handle moving items from desirable to craftable list
+function maidroid.handle_change_desirable(droid)
+	lf("cooker_inventory", "Item moved from desirable to craftable, updating desired craft outputs")
+	
+	if not droid then
+		lf("cooker_inventory", "ERROR: Could not find maidroid for inventory " .. tostring(droid.crafting_inventory_id))
+		return
+	end
+	
+	-- Get all items from desirable list (current inventory state)
+	local crafting_inv = maidroid.crafting_inventories[droid.crafting_inventory_id]
+	local page_data = {} -- Store both items and empty positions
+	
+	for i = 1, 6 do -- desirable has 6 slots
+		local stack = crafting_inv:get_stack("desirable", i)
+		if not stack:is_empty() then
+			page_data[i] = stack:get_name() -- Store item at its position
+		else
+			page_data[i] = nil -- Explicitly mark empty slot
+		end
+	end
+	
+	-- Get current page
+	local current_page = (droid.desirable_page or 1)
+	
+	-- Initialize page items tracking if not exists
+	if not droid.desirable_page_items then
+		droid.desirable_page_items = {}
+	end
+	
+	-- Store current page data with positions preserved
+	droid.desirable_page_items[current_page] = page_data
+	
+	-- Build complete list from all pages using helper function
+	local all_desired_items = maidroid.build_complete_desirable_list(droid)
+	
+	-- Update generic_cooker's desired craft outputs
+	if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.set_desired_craft_outputs then
+		maidroid.cores.generic_cooker.set_desired_craft_outputs(droid, all_desired_items)
+	else
+		droid.desired_craft_outputs = all_desired_items
+	end
+	
+	lf("cooker_inventory", "Updated desired craft outputs: " .. dump(all_desired_items))
+end
+
 -- Helper function to build complete desirable items list from all pages
+-- ,,desire
 function maidroid.build_complete_desirable_list(droid)
     lf("api:build_complete_desirable_list", "build_complete_desirable_list: " .. dump(droid))
 	local all_desired_items = {}
@@ -1246,6 +1391,7 @@ local function create_cooker_inventory(self, inventory_name)
 			return 99
 		end,
 
+        -- ,,move
 		on_move = function(_, from_list, _, to_list)
 			lf("cooker_inventory", "on_move called from " .. tostring(from_list) .. " to " .. tostring(to_list))
 			
@@ -1256,55 +1402,16 @@ local function create_cooker_inventory(self, inventory_name)
 				-- Get the maidroid this inventory belongs to
 				local droid = self
 				
-				if droid then
-					-- Get all items from desirable list (current inventory state)
-					local crafting_inv = maidroid.crafting_inventories[self.crafting_inventory_id]
-					local selected_items = {}
-					
-					for i = 1, 6 do -- desirable has 6 slots
-						local stack = crafting_inv:get_stack("desirable", i)
-						if not stack:is_empty() then
-							table.insert(selected_items, stack:get_name())
-						end
-					end
-					
-					-- Get current page
-					local current_page = (droid.desirable_page or 1)
-					
-					-- Initialize page items tracking if not exists
-					if not droid.desirable_page_items then
-						droid.desirable_page_items = {}
-					end
-					
-					-- Store current page items
-					droid.desirable_page_items[current_page] = selected_items
-					
-					-- Build complete list from all pages using helper function
-					local all_desired_items = maidroid.build_complete_desirable_list(droid)
-					
-					-- Update generic_cooker's desired craft outputs
-					if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.set_desired_craft_outputs then
-						maidroid.cores.generic_cooker.set_desired_craft_outputs(droid, all_desired_items)
-					else
-						droid.desired_craft_outputs = all_desired_items
-					end
-					
-					lf("cooker_inventory", "Updated desired craft outputs: " .. dump(all_desired_items))
-				else
-					lf("cooker_inventory", "ERROR: Could not find maidroid for inventory " .. tostring(self.crafting_inventory_id))
-				end
 			
+                maidroid.handle_change_desirable(self)
 			-- Handle moving from desirable to craftable
 			elseif from_list == "desirable" and to_list == "craftable" then
-				lf("cooker_inventory", "Item moved from desirable to craftable")
+				maidroid.handle_change_desirable(self)
 				
-				-- Get the maidroid this inventory belongs to
+				-- Check all craftable slots for duplicates and remove them
 				local droid = self
-				
 				if droid then
 					local crafting_inv = maidroid.crafting_inventories[self.crafting_inventory_id]
-					
-					-- Check all craftable slots for duplicates and remove them
 					local items_seen = {}
 					for i = 1, 12 do -- craftable has 12 slots
 						local stack = crafting_inv:get_stack("craftable", i)
@@ -1320,40 +1427,6 @@ local function create_cooker_inventory(self, inventory_name)
 							end
 						end
 					end
-					
-					-- Get current page items (after removal)
-					local selected_items = {}
-					for i = 1, 6 do -- desirable has 6 slots
-						local stack = crafting_inv:get_stack("desirable", i)
-						if not stack:is_empty() then
-							table.insert(selected_items, stack:get_name())
-						end
-					end
-					
-					-- Get current page
-					local current_page = (droid.desirable_page or 1)
-					
-					-- Initialize page items tracking if not exists
-					if not droid.desirable_page_items then
-						droid.desirable_page_items = {}
-					end
-					
-					-- Update current page items
-					droid.desirable_page_items[current_page] = selected_items
-					
-					-- Build complete list from all pages using helper function
-					local all_desired_items = maidroid.build_complete_desirable_list(droid)
-					
-					-- Update generic_cooker's desired craft outputs
-					if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.set_desired_craft_outputs then
-						maidroid.cores.generic_cooker.set_desired_craft_outputs(droid, all_desired_items)
-					else
-						droid.desired_craft_outputs = all_desired_items
-					end
-					
-					lf("cooker_inventory", "Updated desired craft outputs after removal: " .. dump(all_desired_items))
-				else
-					lf("cooker_inventory", "ERROR: Could not find maidroid for inventory " .. tostring(self.crafting_inventory_id))
 				end
 			end
 		end,
@@ -1479,6 +1552,7 @@ get_formspec = function(self, player, tab)
 	end
 	
 	-- Cooker tab for generic_cooker core
+    -- ,,tab
 	if owns and self.core.name == "generic_cooker" then
 		tab_max = tab_max + 1
 		if tab == tab_max then
@@ -1487,7 +1561,7 @@ get_formspec = function(self, player, tab)
 				-- Use the new create_cooker_inventory function
 				local crafting_inventory = create_cooker_inventory(self, generate_unique_manufacturing_id())
 				maidroid.crafting_inventories[self.crafting_inventory_id] = crafting_inventory
-				maidroid.populate_craftable_items(crafting_inventory, self)
+				maidroid.populate_craftable_items(crafting_inventory, self, init_craftable_outputs)
 				lf("cooker_tab", "Created crafting inventory with ID: " .. self.crafting_inventory_id)
 			end
 			
@@ -1503,12 +1577,21 @@ get_formspec = function(self, player, tab)
 			-- Shop-style layout for cooker with pagination
 			-- Calculate current page and total pages for craftable items
 			local craftable_outputs = {}
-			if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.get_craftable_outputs then
-				craftable_outputs = maidroid.cores.generic_cooker.get_craftable_outputs() or {}
-			end
-			if type(craftable_outputs) ~= "table" or #craftable_outputs == 0 then
-				craftable_outputs = init_craftable_outputs
-			end
+            craftable_outputs = init_craftable_outputs
+            -- ,,x3
+            self.craftable_outputs_ui = maidroid.get_craftable_outputs_as_sparse_array()
+            
+            lf("cooker_tab", "self.craftable_outputs_ui: " .. dump(self.craftable_outputs_ui))
+            lf("cooker_tab", "self.craftable_page: " .. tostring(self.craftable_page))
+            -- error("")
+
+			-- if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.get_craftable_outputs then
+			-- 	craftable_outputs = maidroid.cores.generic_cooker.get_craftable_outputs() or {}
+			-- end
+            
+			-- if type(craftable_outputs) ~= "table" or #craftable_outputs == 0 then
+			-- 	craftable_outputs = init_craftable_outputs
+			-- end
 			
 			-- Craftable pagination variables
 			local craftable_items_per_page = 12
@@ -1558,14 +1641,29 @@ get_formspec = function(self, player, tab)
 			local desirable_end_idx = math.min(desirable_start_idx + desirable_items_per_page - 1, #desirable_outputs)
 			local desirable_page_items = {}
 			
-			-- If we're on page 2 or beyond and there are no actual items for this page, show empty slots
-			if desirable_current_page > 1 and desirable_start_idx > #desirable_outputs then
+			-- Check if we have stored page data for this page with preserved positions
+			local stored_page_data = nil
+			if droid.desirable_page_items and droid.desirable_page_items[desirable_current_page] then
+				stored_page_data = droid.desirable_page_items[desirable_current_page]
+				lf("cooker_tab", "Found stored page data for page " .. desirable_current_page .. ": " .. dump(stored_page_data))
+			end
+			
+			if stored_page_data then
+				-- Restore items to their exact positions from stored data
+				for i = 1, desirable_items_per_page do
+					if stored_page_data[i] then
+						desirable_page_items[i] = stored_page_data[i]
+					else
+						desirable_page_items[i] = "" -- Empty slot
+					end
+				end
+			elseif desirable_current_page > 1 and desirable_start_idx > #desirable_outputs then
 				-- Show empty page for drag-and-drop
 				for i = 1, desirable_items_per_page do
 					table.insert(desirable_page_items, "")
 				end
 			else
-				-- Show actual items for this page
+				-- Show actual items for this page (no stored data)
 				for i = desirable_start_idx, desirable_end_idx do
 					table.insert(desirable_page_items, desirable_outputs[i])
 				end
@@ -2421,6 +2519,7 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 		return
 	end
 	
+    -- ,,x1
 	if fields.craftable_next then
 		-- Go to next page
 		local current_page = droid.craftable_page or 1

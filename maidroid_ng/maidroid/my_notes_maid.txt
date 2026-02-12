@@ -30,6 +30,32 @@ tail -n0 -F debug.txt | tr -d '\000'
 
 
 
+------------------------------
+create a function 
+
+remaining_craftable_output takes the following argument
+craftable_outputs
+desired_outputs
+
+Returns 
+craftable_outputs minus everything in 
+
+---------------------------
+create a function that takes
+1. craftable_outputs
+
+output a structure that can represent craftable output
+that can be used to fill the formspec
+note that it need to be able to track which slot is empty because user can drag item out of craftable inventory
+
+something that like an array like
+{item1, item2, <empty>, item3, item4}
+
+
+
+---------------------------
+
+
 
 Updates:
 - consolidate log stmt
