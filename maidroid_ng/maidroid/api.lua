@@ -315,97 +315,38 @@ function maidroid.populate_craftable_items(inv, droid, craftable_outputs)
 	end
 end
 
-function populate_current_desirable_page(self, desirable_current_page, desirable_items_per_page, desirable_outputs)
-	local desirable_start_idx = (desirable_current_page - 1) * desirable_items_per_page + 1
-	local desirable_end_idx = math.min(desirable_start_idx + desirable_items_per_page - 1, #desirable_outputs)
-	local desirable_page_items = {}
+function populate_current_page(self, current_page, items_per_page, outputs, page_storage_key, log_prefix)
+	local start_idx = (current_page - 1) * items_per_page + 1
+	local end_idx = math.min(start_idx + items_per_page - 1, #outputs)
+	local page_items = {}
 	
 	-- Check if we have stored page data for this page with preserved positions
 	local stored_page_data = nil
-    lf("cooker_tab", "1 desirable_current_page: " .. desirable_current_page.. " desirable_page_items: " .. dump(self.desirable_page_items) .. " desirable_outputs: " .. dump(desirable_outputs))
-	if self.desirable_page_items and self.desirable_page_items[desirable_current_page] then
-		stored_page_data = self.desirable_page_items[desirable_current_page]
-		lf("cooker_tab", "3 Found stored page data for page " .. desirable_current_page .. ": " .. dump(stored_page_data))
+    lf("cooker_tab", "1 " .. log_prefix .. "_current_page: " .. current_page.. " " .. log_prefix .. "_page_items: " .. dump(self[page_storage_key]) .. " " .. log_prefix .. "_outputs: " .. dump(outputs))
+	if self[page_storage_key] and self[page_storage_key][current_page] then
+		stored_page_data = self[page_storage_key][current_page]
+		lf("cooker_tab", "3 Found stored " .. log_prefix .. " page data for page " .. current_page .. ": " .. dump(stored_page_data))
     else
-        lf("cooker_tab", "4 No stored page data for page " .. desirable_current_page)
+        lf("cooker_tab", "4 No stored " .. log_prefix .. " page data for page " .. current_page)
 	end
     
     -- ,,x4
 	if stored_page_data then
-		lf("cooker_tab", "5 Restoring items from stored page data for page " .. desirable_current_page)
+		lf("cooker_tab", "5 Restoring " .. log_prefix .. " items from stored page data for page " .. current_page)
 		-- Restore items to their exact positions from stored data
-		for i = 1, desirable_items_per_page do
+		for i = 1, items_per_page do
 			if stored_page_data[i] then
-				desirable_page_items[i] = stored_page_data[i]
+				page_items[i] = stored_page_data[i]
 			else
-				desirable_page_items[i] = "" -- Empty slot
+				page_items[i] = "" -- Empty slot
 			end
 		end
     end
-	-- elseif desirable_current_page > 1 and desirable_start_idx > #desirable_outputs then
-	-- 	lf("cooker_tab", "6 Showing empty page for drag-and-drop on page " .. desirable_current_page)
-	-- 	-- Show empty page for drag-and-drop
-	-- 	for i = 1, desirable_items_per_page do
-	-- 		table.insert(desirable_page_items, "")
-	-- 	end
-	-- else
-	-- 	lf("cooker_tab", "7 Showing actual items for page " .. desirable_current_page .. " from index " .. desirable_start_idx .. " to " .. desirable_end_idx)
-	-- 	-- Show actual items for this page (no stored data)
-	-- 	for i = desirable_start_idx, desirable_end_idx do
-	-- 		table.insert(desirable_page_items, desirable_outputs[i])
-	-- 	end
-	-- end
 	
-	return desirable_page_items
+	return page_items
 end
 
-function populate_current_craftable_page(self, craftable_current_page, craftable_items_per_page, craftable_outputs)
-	local craftable_start_idx = (craftable_current_page - 1) * craftable_items_per_page + 1
-	local craftable_end_idx = math.min(craftable_start_idx + craftable_items_per_page - 1, #craftable_outputs)
-	local craftable_page_items = {}
-	
-	-- Check if we have stored page data for this page with preserved positions
-	local stored_page_data = nil
-    lf("cooker_tab", "1 craftable_current_page: " .. craftable_current_page.. " craftable_page_items: " .. dump(self.craftable_page_items) .. " craftable_outputs: " .. dump(craftable_outputs))
-	if self.craftable_page_items and self.craftable_page_items[craftable_current_page] then
-		stored_page_data = self.craftable_page_items[craftable_current_page]
-		lf("cooker_tab", "3 Found stored craftable page data for page " .. craftable_current_page .. ": " .. dump(stored_page_data))
-    else
-        lf("cooker_tab", "4 No stored craftable page data for page " .. craftable_current_page)
-		-- Initialize craftable page items if not exists
-		if not self.craftable_page_items then
-			maidroid.init_craftable_pageitems(self, craftable_outputs)
-		end
-	end
-    
-    -- ,,x4
-	if stored_page_data then
-		lf("cooker_tab", "5 Restoring craftable items from stored page data for page " .. craftable_current_page)
-		-- Restore items to their exact positions from stored data
-		for i = 1, craftable_items_per_page do
-			if stored_page_data[i] then
-				craftable_page_items[i] = stored_page_data[i]
-			else
-				craftable_page_items[i] = "" -- Empty slot
-			end
-		end
-    end
-	-- elseif craftable_current_page > 1 and craftable_start_idx > #craftable_outputs then
-	-- 	lf("cooker_tab", "6 Showing empty craftable page for drag-and-drop on page " .. craftable_current_page)
-	-- 	-- Show empty page for drag-and-drop
-	-- 	for i = 1, craftable_items_per_page do
-	-- 		table.insert(craftable_page_items, "")
-	-- 	end
-	-- else
-	-- 	lf("cooker_tab", "7 Showing actual craftable items for page " .. craftable_current_page .. " from index " .. craftable_start_idx .. " to " .. craftable_end_idx)
-	-- 	-- Show actual items for this page (no stored data)
-	-- 	for i = craftable_start_idx, craftable_end_idx do
-	-- 		table.insert(craftable_page_items, craftable_outputs[i])
-	-- 	end
-	-- end
-	
-	return craftable_page_items
-end
+
 
 -- ,,
 function maidroid.update_selection_inventory(inv, droid)
@@ -1833,7 +1774,7 @@ get_formspec = function(self, player, tab)
                 maidroid.init_craftable_pageitems(self, init_craftable_outputs)
             end			
 			-- Get current craftable page items
-			local craftable_page_items = populate_current_craftable_page(self, craftable_current_page, craftable_items_per_page, craftable_outputs)
+			local craftable_page_items = populate_current_page(self, craftable_current_page, craftable_items_per_page, craftable_outputs, "craftable_page_items", "craftable")
 			-- local craftable_page_items = populate_current_craftable_page(self, craftable_current_page, craftable_items_per_page, craftable_page_items)
 			
 			-- Update craftable inventory with current page items
@@ -1865,7 +1806,7 @@ get_formspec = function(self, player, tab)
 			if desirable_current_page < 1 then desirable_current_page = 1 end
 			
 			-- Get current desirable page items (from actual desirable outputs)
-			local desirable_page_items = populate_current_desirable_page(self, desirable_current_page, desirable_items_per_page, desirable_outputs)
+			local desirable_page_items = populate_current_page(self, desirable_current_page, desirable_items_per_page, desirable_outputs, "desirable_page_items", "desirable")
 			
 			-- Update desirable inventory with current page items
 			maidroid.populate_desirable_items_page(crafting_inv, self, desirable_page_items)
