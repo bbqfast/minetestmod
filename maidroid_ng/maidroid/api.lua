@@ -219,38 +219,22 @@ end
 -- 	end
 -- end
 
-function maidroid.populate_desirable_items_page(inv, droid, page_items)
-	-- Clear desirable inventory first
-	inv:set_list("desirable", {})
+function maidroid.populate_items_page(inv, droid, page_items, list_name, slot_count)
+	-- Clear inventory list first
+	inv:set_list(list_name, {})
 	
-	-- Fill desirable inventory with current page items, preserving positions
-	for i = 1, 6 do -- desirable has 6 slots
+	-- Fill inventory with current page items, preserving positions
+	for i = 1, slot_count do
 		local spec = page_items[i]
 		if type(spec) == "string" and spec ~= "" then
-            lf("api:populate_desirable_items_page", "Setting slot " .. i .. " to: " .. tostring(spec))
-			inv:set_stack("desirable", i, spec)
+            lf("api:populate_items_page", "Setting " .. list_name .. " slot " .. i .. " to: " .. tostring(spec))
+			inv:set_stack(list_name, i, spec)
 		else
-            lf("api:populate_desirable_items_page", "Leaving slot " .. i .. " empty")
+            lf("api:populate_items_page", "Leaving " .. list_name .. " slot " .. i .. " empty")
 		end
 	end
 end
 
-function maidroid.populate_craftable_items_page(inv, droid, page_items)
-	-- Clear craftable inventory first
-	inv:set_list("craftable", {})
-    lf("api:populate_craftable_items_page", "zzzzzzzzzz input: " .. dump(page_items))
-	
-	-- Fill craftable inventory with current page items, preserving positions
-	for i = 1, 12 do -- craftable has 12 slots
-		local spec = page_items[i]
-		if type(spec) == "string" and spec ~= "" then
-            lf("api:populate_craftable_items_page", "Setting slot " .. i .. " to: " .. tostring(spec))
-			inv:set_stack("craftable", i, spec)
-		else
-            lf("api:populate_craftable_items_page", "Leaving slot " .. i .. " empty")
-		end
-	end
-end
 
 -- Function to convert craftable outputs array to a sparse array
 -- Takes the output from maidroid.cores.generic_cooker.get_craftable_outputs()
@@ -1778,7 +1762,7 @@ get_formspec = function(self, player, tab)
 			-- local craftable_page_items = populate_current_craftable_page(self, craftable_current_page, craftable_items_per_page, craftable_page_items)
 			
 			-- Update craftable inventory with current page items
-			maidroid.populate_craftable_items_page(crafting_inv, self, craftable_page_items)
+			maidroid.populate_items_page(crafting_inv, self, craftable_page_items, "craftable", 12)
 			
             local droid = self  
 			-- Calculate desirable pagination (based on page items tracking)
@@ -1809,7 +1793,7 @@ get_formspec = function(self, player, tab)
 			local desirable_page_items = populate_current_page(self, desirable_current_page, desirable_items_per_page, desirable_outputs, "desirable_page_items", "desirable")
 			
 			-- Update desirable inventory with current page items
-			maidroid.populate_desirable_items_page(crafting_inv, self, desirable_page_items)
+			maidroid.populate_items_page(crafting_inv, self, desirable_page_items, "desirable", 6)
 			
 			form = form .. enligthen_tool(self)
 				.. "label[3,0;" .. S("Craftables") .. "]"
