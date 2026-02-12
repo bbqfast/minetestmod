@@ -329,7 +329,7 @@ function populate_current_page(self, current_page, items_per_page, outputs, page
 	
 	-- Check if we have stored page data for this page with preserved positions
 	local stored_page_data = nil
-    lf("cooker_tab", "1 " .. log_prefix .. "_current_page: " .. current_page.. " " .. log_prefix .. "_page_items: " .. dump(self[page_storage_key]) .. " " .. log_prefix .. "_outputs: " .. dump(outputs))
+    -- lf("cooker_tab", "1 " .. log_prefix .. "_current_page: " .. current_page.. " " .. log_prefix .. "_page_items: " .. dump(self[page_storage_key]) .. " " .. log_prefix .. "_outputs: " .. dump(outputs))
 	if self[page_storage_key] and self[page_storage_key][current_page] then
 		stored_page_data = self[page_storage_key][current_page]
 		lf("cooker_tab", "3 Found stored " .. log_prefix .. " page data for page " .. current_page .. ": " .. dump(stored_page_data))
@@ -1836,11 +1836,6 @@ get_formspec = function(self, player, tab)
 			-- Calculate current page and total pages for craftable items
 			local craftable_outputs = {}
             craftable_outputs = init_craftable_outputs
-            self.craftable_outputs_ui = maidroid.get_craftable_outputs_as_sparse_array()
-            
-            lf("cooker_tab", "self.craftable_outputs_ui: " .. dump(self.craftable_outputs_ui))
-            lf("cooker_tab", "self.craftable_page: " .. tostring(self.craftable_page))
-            -- error("")
 
 			-- if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.get_craftable_outputs then
 			-- 	craftable_outputs = maidroid.cores.generic_cooker.get_craftable_outputs() or {}
@@ -2019,6 +2014,11 @@ local function on_activate(self, staticdata)
 			self.object:set_properties({textures = { data.textures }})
 		end
 		self.home = data.home
+		-- Load activation position for generic_cooker core to retain last spawned position
+		if data.activation_pos then
+			self._activation_pos = data.activation_pos
+			lf("api", "Loaded saved activation position: " .. minetest.pos_to_string(self._activation_pos))
+		end
 	end
 
 	self.object:set_nametag_attributes({ text = self.nametag, color = { a=255, r=96, g=224, b=96 }})
@@ -2030,9 +2030,11 @@ local function on_activate(self, staticdata)
 	if not self.home then
 		self.home = self:get_pos()
 	end
-	-- Store activation position for distance checking
-	self._activation_pos = self:get_pos()
-	lf("api", "Stored activation position: " .. minetest.pos_to_string(self._activation_pos))
+	-- Store activation position for distance checking (only if not already loaded from saved data)
+	if not self._activation_pos then
+		self._activation_pos = self:get_pos()
+		lf("api", "Stored activation position: " .. minetest.pos_to_string(self._activation_pos))
+	end
 	self.t_health = minetest.get_gametime()
 	self.timers = {}
 	self.timers.walk = 0
@@ -2138,6 +2140,10 @@ local get_staticdata = function(self, captured)
 
 	if not captured then
 		data.home = self.home
+		-- Save activation position for generic_cooker core to retain last spawned position
+		if self._activation_pos then
+			data.activation_pos = self._activation_pos
+		end
 	end
 
 
@@ -2167,7 +2173,7 @@ local get_staticdata = function(self, captured)
         log("Inner pcall caught:", msg)
     end
 	local dumptext = ok and ser or tostring(data)
-	lf("api", "maidroid staticdata dump: " .. dumptext)
+	-- lf("api", "maidroid staticdata dump: " .. dumptext)
 
 	local worldpath = minetest.get_worldpath() or "."
 

@@ -1405,6 +1405,14 @@ on_start = function(droid)
     -- tests()
     lf("generic_cooker", "------------------------------------------------on_start------------------------------------------------")
     
+    -- Store activation position if not already set (retain last spawned position)
+    if not droid._activation_pos then
+        droid._activation_pos = droid:get_pos()
+        lf("generic_cooker", "Stored activation position: " .. minetest.pos_to_string(droid._activation_pos))
+    else
+        lf("generic_cooker", "Using existing activation position: " .. minetest.pos_to_string(droid._activation_pos))
+    end
+    
     for _, item_name in ipairs(all_take_item_names) do
         table.insert(all_take_items, { item_name = item_name, quantity = 5 })
     end
