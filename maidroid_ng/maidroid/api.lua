@@ -1546,26 +1546,26 @@ local function create_cooker_inventory(self, inventory_name)
 	self.crafting_inventory_id = inventory_name
 	local inventory = minetest.create_detached_inventory(self.crafting_inventory_id, {
 		on_put = function(_, listname)
-			lf("cooker_inventory", "on_put called for list: " .. tostring(listname))
+			lf("on_put", "on_put called for list: " .. tostring(listname))
 		end,
 
 		allow_put = function(inv, listname, index, stack, player)
-			lf("cooker_inventory", "allow_put called by " .. player:get_player_name() .. " for list: " .. tostring(listname) .. ", item: " .. stack:get_name())
+			lf("allow_put", "allow_put called by " .. player:get_player_name() .. " for list: " .. tostring(listname) .. ", item: " .. stack:get_name())
 			return 0
 		end,
 
 		on_take = function(_, listname)
-			lf("cooker_inventory", "on_take called for list: " .. tostring(listname))
+			lf("on_take", "on_take called for list: " .. tostring(listname))
 		end,
 
 		allow_take = function(inv, listname, index, stack, player)
-			lf("cooker_inventory", "allow_take called by " .. player:get_player_name() .. " for list: " .. tostring(listname) .. ", item: " .. stack:get_name())
+			lf("allow_take", "allow_take called by " .. player:get_player_name() .. " for list: " .. tostring(listname) .. ", item: " .. stack:get_name())
 			return 99
 		end,
 
         -- ,,move
 		on_move = function(_, from_list, _, to_list)
-			lf("cooker_inventory", "on_move called from " .. tostring(from_list) .. " to " .. tostring(to_list))
+			lf("on_move", "on_move called from " .. tostring(from_list) .. " to " .. tostring(to_list))
 			
 			-- Handle moving from craftable to desirable
 			if from_list == "craftable" and to_list == "desirable" then
@@ -1605,7 +1605,7 @@ local function create_cooker_inventory(self, inventory_name)
 		end,
 
 		allow_move = function(inv, from_list, from_index, to_list, to_index, count, player)
-			lf("cooker_inventory", "allow_move called by " .. player:get_player_name() .. " from " .. tostring(from_list) .. " to " .. tostring(to_list) .. ", count: " .. tostring(count))
+			lf("allow_move", "allow_move called by " .. player:get_player_name() .. " from " .. tostring(from_list) .. " to " .. tostring(to_list) .. ", count: " .. tostring(count))
 			return count
 		end,
 	})
@@ -1825,6 +1825,8 @@ get_formspec = function(self, player, tab)
 			form = form
 				.. "label[3,3.5;" .. S("Desirable Craft") .. "]"
 				.. "list[detached:" .. crafting_inv_id .. ";desirable;4,4.25;6,1;]"
+                .. "listring[detached:".. crafting_inv_id .. ";craftable]"
+                .. "listring[detached:".. crafting_inv_id .. ";desirable]"
 				
 			-- Add desirable pagination buttons if there are desirable items (not just multiple pages)
 			if #desirable_outputs > 0 then
