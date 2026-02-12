@@ -648,6 +648,53 @@ function maidroid.build_complete_desirable_list(droid)
 	return all_desired_items
 end
 
+-- Format recipe display for UI with item images
+function maidroid.format_recipe_display(item_name)
+		lf("RECIPE_DEBUG: format_recipe_display", ". . . . . . format_recipe_display: " .. item_name)
+	if not item_name or item_name == "" then
+		return ""
+	end
+	
+	local recipe = minetest.get_craft_recipe(item_name)
+	if not recipe or not recipe.items then
+		return "label[3.2,5.5;" .. minetest.colorize("#CCCCCC", S("No recipe found")) .. "]"
+	end
+	
+	local display = ""
+	local y_pos = 5.5
+	
+	-- Display recipe title
+	display = display .. "label[3.2," .. y_pos .. ";" .. minetest.colorize("#FFFF00", S("Recipe for") .. " " .. item_name) .. "]"
+	y_pos = y_pos + 0.6
+	
+	-- Display recipe items in a single row with smaller images
+	if recipe.items then
+		local x_offset = 3.2
+		local item_size = 0.5  -- Much smaller size
+		local spacing = 0.85  -- Tighter spacing for 9 items
+		
+		for i, item in ipairs(recipe.items) do
+			if item and item ~= "" then
+				-- Calculate position in single row
+				local x = x_offset + (i - 1) * spacing
+				local y = y_pos
+				
+				-- Display item image
+				display = display .. "item_image[" .. x .. "," .. y .. ";" .. item_size .. "," .. item_size .. ";" .. item .. "]"
+				
+				-- Display item name below image (cleaned up)
+				local item_display = item
+				if string.find(item, ":") then
+					item_display = string.gsub(item, ".*:", "") -- Remove mod prefix
+				end
+				display = display .. "label[" .. x .. "," .. (y + item_size + 0.05) .. ";" .. minetest.colorize("#FFFFFF", item_display) .. "]"
+			end
+		end
+	end
+	
+	return display
+end
+
 function maidroid.get_maidroid_by_player(player_name)
 	if maidroid_buf[player_name] and maidroid_buf[player_name].self then
 		return maidroid_buf[player_name].self
@@ -1564,20 +1611,55 @@ local function create_cooker_inventory(self, inventory_name)
 		end,
 
         -- ,,move
-		on_move = function(_, from_list, _, to_list)
-			lf("on_move", "on_move called from " .. tostring(from_list) .. " to " .. tostring(to_list))
+		on_move = function(_, from_list, from_index, to_list, to_index, count, player)
+			lf("RECIPE_DEBUG: on_move", "on_move called from " .. tostring(from_list) .. " to " .. tostring(to_list))
 			
 			-- Handle moving from craftable to desirable
 			if from_list == "craftable" and to_list == "desirable" then
-				lf("cooker_inventory", "Item moved from craftable to desirable, updating desired craft outputs")
+				lf("RECIPE_DEBUG: cooker_inventory", "Item moved from craftable to desirable, updating desired craft outputs")
 				
 				-- Get the maidroid this inventory belongs to
 				local droid = self
+				lf("RECIPE_DEBUG: cooker_inventory", "Droid object: " .. tostring(droid))
+				
+				-- Capture the moved item for recipe display
+				local crafting_inv = maidroid.crafting_inventories[self.crafting_inventory_id]
+				lf("RECIPE_DEBUG: cooker_inventory", "Crafting inventory ID: " .. tostring(self.crafting_inventory_id))
+				lf("RECIPE_DEBUG: cooker_inventory", "Crafting inventory: " .. tostring(crafting_inv))
+				
+				if crafting_inv then
+					local moved_stack = crafting_inv:get_stack(to_list, to_index)
+					lf("RECIPE_DEBUG: cooker_inventory", "Moved stack: " .. tostring(moved_stack))
+					if moved_stack and not moved_stack:is_empty() then
+						local item_name = moved_stack:get_name()
+						droid.selected_recipe_item = item_name
+						lf("RECIPE_DEBUG: cooker_inventory", "Selected recipe item: " .. item_name)
+						lf("RECIPE_DEBUG: cooker_inventory", "Droid.selected_recipe_item set to: " .. tostring(droid.selected_recipe_item))
+					else
+						lf("RECIPE_DEBUG: cooker_inventory", "Moved stack is empty or nil")
+					end
+				else
+					lf("RECIPE_DEBUG: cooker_inventory", "Crafting inventory not found")
+				end
 				
 				maidroid.handle_change_desirable(self)
 				maidroid.handle_craftable(self)
+				
+				-- Refresh the UI AFTER inventory operations are complete
+				if player and player:is_player() then
+					local current_tab = droid.current_tab or 2
+					lf("RECIPE_DEBUG: cooker_inventory", "Before refresh - current_tab: " .. tostring(droid.current_tab))
+					minetest.show_formspec(player:get_player_name(), "maidroid:gui", get_formspec(droid, player, current_tab))
+					lf("RECIPE_DEBUG: cooker_inventory", "After refresh - current_tab: " .. tostring(droid.current_tab))
+					lf("RECIPE_DEBUG: cooker_inventory", "Refreshed UI for recipe display")
+				end
 			-- Handle moving from desirable to craftable
 			elseif from_list == "desirable" and to_list == "craftable" then
+				-- Clear the selected recipe item when moving back
+				local droid = self
+				droid.selected_recipe_item = nil
+				lf("RECIPE_DEBUG: cooker_inventory", "Cleared selected recipe item")
+				
 				maidroid.handle_change_desirable(self)
 				maidroid.handle_craftable(self)
 				
@@ -1813,36 +1895,51 @@ get_formspec = function(self, player, tab)
 				.. "label[3,0;" .. S("Craftables") .. "]"
 				.. "list[detached:" .. crafting_inv_id .. ";craftable;3,0.5;6,2;]"
 				
-			-- Add craftable pagination buttons if needed
+			-- Add craftable pagination buttons on the right side if needed
             -- ,,button,,page
 			if craftable_total_pages > 1 then
 				form = form
-					.. "button[3,2.8;1,0.5;craftable_prev;<]"
-					.. "label[4.2,2.8;" .. S("Page") .. " " .. craftable_current_page .. "/" .. craftable_total_pages .. "]"
-					.. "button[6,2.8;1,0.5;craftable_next;>]"
+					.. "button[9.2,0.5;0.8,0.3;craftable_prev;<]"
+					.. "label[9.2,1.0;" .. craftable_current_page .. "/" .. craftable_total_pages .. "]"
+					.. "button[9.2,1.5;0.8,0.3;craftable_next;>]"
 			end
 			
 			form = form
-				.. "label[3,3.5;" .. S("Desirable Craft") .. "]"
-				.. "list[detached:" .. crafting_inv_id .. ";desirable;4,4.25;6,1;]"
+				.. "label[3,2.8;" .. S("Desirable Craft") .. "]"
+				.. "list[detached:" .. crafting_inv_id .. ";desirable;3,3.55;6,1;]"
                 .. "listring[detached:".. crafting_inv_id .. ";craftable]"
                 .. "listring[detached:".. crafting_inv_id .. ";desirable]"
 				
-			-- Add desirable pagination buttons if there are desirable items (not just multiple pages)
+			-- Add desirable pagination buttons on the right side if there are desirable items
 			if #desirable_outputs > 0 then
 				form = form
-					.. "button[3,5.3;1,0.5;desirable_prev;<]"
-					.. "label[4.2,5.3;" .. S("Page") .. " " .. desirable_current_page .. "/" .. desirable_total_pages .. "]"
-					.. "button[6,5.3;1,0.5;desirable_next;>]"
+					.. "button[9.2,3.55;0.8,0.3;desirable_prev;<]"
+					.. "label[9.2,3.9;" .. desirable_current_page .. "/" .. desirable_total_pages .. "]"
+					.. "button[9.2,4.25;0.8,0.3;desirable_next;>]"
 			end
+			
+			-- Add recipe display area below desirable section
+			local recipe_display = ""
+			lf("RECIPE_DEBUG: cooker_ui", "Checking for recipe display, selected_recipe_item: " .. tostring(self.selected_recipe_item))
+			if self.selected_recipe_item then
+				lf("RECIPE_DEBUG: cooker_ui", "Calling format_recipe_display for: " .. self.selected_recipe_item)
+				recipe_display = maidroid.format_recipe_display(self.selected_recipe_item)
+			else
+				lf("RECIPE_DEBUG: cooker_ui", "No selected recipe item found")
+			end
+			
+			form = form
+				.. "label[3,5.1;" .. S("Recipe") .. "]"
+				.. "box[3,5.3;8,1.8;#000000]"
+				.. recipe_display
 			
 			-- Add cooker controls below the lists
 			form = form
-				.. "button[3,6;2.5,1;toggle_cooker;" .. S("Toggle Cooker") .. "]"
-				.. "button[6,6;2.5,1;view_metrics;" .. S("View Metrics") .. "]"
-				.. "label[3,7;" .. S("Current Task:") .. " "
+				.. "button[3,7.5;2.5,1;toggle_cooker;" .. S("Toggle Cooker") .. "]"
+				.. "button[6,7.5;2.5,1;view_metrics;" .. S("View Metrics") .. "]"
+				.. "label[3,8.5;" .. S("Current Task:") .. " "
 				.. minetest.colorize("#ACEEAC", (self.action and self.action or S("Idle"))) .. "]"
-				.. "label[6,7;" .. S("State:") .. " "
+				.. "label[6,8.5;" .. S("State:") .. " "
 				.. minetest.colorize("#ACEEAC", (self.state and tostring(self.state) or S("Unknown"))) .. "]"
 			
 			return form
