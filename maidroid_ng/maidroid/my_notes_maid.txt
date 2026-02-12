@@ -29,6 +29,8 @@ tail -n0 -F debug.txt | tr -d '\000'
 
 
 
+
+
 Updates:
 - consolidate log stmt
 - farmer core now only need 1 layer fence
