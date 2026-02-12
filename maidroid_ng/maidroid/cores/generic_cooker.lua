@@ -139,6 +139,7 @@ maidroid.get_max_distance_from_activation = get_max_distance_from_activation
 
 maidroid.cores.generic_cooker.get_craftable_outputs = function()
 	if type(all_farming_outputs) == "table" and #all_farming_outputs > 0 then
+        error("maidroid.cores.generic_cooker.get_craftable_outputs: all_farming_outputs is not a table or is empty")
 		return all_farming_outputs
 	end
 	return {
