@@ -1718,36 +1718,53 @@ end
 -- ,,form
 get_formspec = function(self, player, tab)
 	local owns = self:player_can_control(player)
-	local form = "size[11,7.4]"
-		.. "box[0.2,3.9;2.3,2.7;black]"
-		.. "box[0.3,4;2.1,2.5;#343848]"
-		-- .. "model[0.2,4;3,3;3d;maidroid.b3d;"
-		.. "model[0.2,4;3,3;3d;character.b3d;"
-		.. minetest.formspec_escape(self.textures[1])
-		.. ";0,180;false;true;200,219;7.5]" -- ]model
-		.. "label[0,6.6;" .. S("Health") .. "]"
-		.. "label[0,0;" .. S("this maidroid is ") .. "]"
-		.. "label[0.5,0.75;" .. self.core.description .. "]"
-		.. "tabheader[0,0;tabheader;" .. S("Inventory")
-		.. ( owns and "," .. S("Flush") or "")
-		.. ( self.core.can_sell and "," .. S("Shop") or "" )
-		.. ( (owns and self.core.doc) and "," .. S("Doc") or "" )
-		.. ( (self.core.name == "generic_cooker" and owns) and "," .. S("Cooker") or "" )
-		.. ";" .. tab .. ";false;true]"
+	lf("get_formspec", "get_formspec called by " .. player:get_player_name() .. " for tab: " .. tostring(tab))
+	-- Skip left panel for cooker tab (tab 5)
+	local is_cooker_tab = (tab == 5)
+	lf("get_formspec", "is_cooker_tab: " .. tostring(is_cooker_tab))
+	
+	-- Use different form size for cooker tab to utilize full width
+	local form = is_cooker_tab and "size[14,7.4]" or "size[11,7.4]"
+	
+	if not is_cooker_tab then
+		form = form .. "box[0.2,3.9;2.3,2.7;black]"
+			.. "box[0.3,4;2.1,2.5;#343848]"
+			-- .. "model[0.2,4;3,3;3d;maidroid.b3d;"
+			.. "model[0.2,4;3,3;3d;character.b3d;"
+			.. minetest.formspec_escape(self.textures[1])
+			.. ";0,180;false;true;200,219;7.5]" -- ]model
+			.. "label[0,6.6;" .. S("Health") .. "]"
+			.. "label[0,0;" .. S("this maidroid is ") .. "]"
+			.. "label[0.5,0.75;" .. self.core.description .. "]"
+	end
+	
+    form = form .. "model[0.2,4;3,3;3d;character.b3d;"
+	.. minetest.formspec_escape(self.textures[1])
+	.. ";0,180;false;true;200,219;7.5]"
+	-- Adjust tabheader position for cooker tab
+	local tabheader_pos = is_cooker_tab and "tabheader[0,0;tabheader;" or "tabheader[0,0;tabheader;"
+	form = form .. tabheader_pos .. S("Inventory")
+	.. ( owns and "," .. S("Flush") or "")
+	.. ( self.core.can_sell and "," .. S("Shop") or "" )
+	.. ( (owns and self.core.doc) and "," .. S("Doc") or "" )
+	.. ( (self.core.name == "generic_cooker" and owns) and "," .. S("Cooker") or "" )
+	.. ";" .. tab .. ";false;true]"
 	self.current_tab = tab
 
-	if self.owner ~= player:get_player_name() then
+	if not is_cooker_tab and self.owner ~= player:get_player_name() then
 		form = form .. "label[0,1.5;" .. S("Owner") .. ":]"
 			.. "label[0.5,2.25;" .. self.owner .. "]"
 	end
 
-	-- Eggs bar: health view
-	local hp = self.object:get_hp() * 8 / self.hp_max
-	for i = 0, 8 do
-		if i <= hp then
-			form = form .. "item_image[" .. i * 0.3 .. ",7.1;0.3,0.3;maidroid:maidroid_egg]"
-		else
-			form = form .. "image["      .. i * 0.3 .. ",7.1;0.3,0.3;maidroid_empty_egg.png]"
+	-- Eggs bar: health view (only show if not cooker tab)
+	if not is_cooker_tab then
+		local hp = self.object:get_hp() * 8 / self.hp_max
+		for i = 0, 8 do
+			if i <= hp then
+				form = form .. "item_image[" .. i * 0.3 .. ",7.1;0.3,0.3;maidroid:maidroid_egg]"
+			else
+				form = form .. "image["      .. i * 0.3 .. ",7.1;0.3,0.3;maidroid_empty_egg.png]"
+			end
 		end
 	end
 
@@ -1887,30 +1904,30 @@ get_formspec = function(self, player, tab)
 			maidroid.populate_items_page(crafting_inv, self, desirable_page_items, "desirable", 6)
 			
 			form = form .. enligthen_tool(self)
-				.. "label[3,0;" .. S("Craftables") .. "]"
-				.. "list[detached:" .. crafting_inv_id .. ";craftable;3,0.5;6,2;]"
+				.. "label[0.5,0;" .. S("Craftables") .. "]"
+				.. "label[2.5,0;" .. craftable_current_page .. "/" .. craftable_total_pages .. "]"
+				.. "list[detached:" .. crafting_inv_id .. ";craftable;0.5,0.5;6,2;]"
 				
 			-- Add craftable pagination buttons on the right side if needed
             -- ,,button,,page
 			if craftable_total_pages > 1 then
 				form = form
-					.. "button[9.2,0.5;0.8,0.3;craftable_prev;<]"
-					.. "label[9.2,1.0;" .. craftable_current_page .. "/" .. craftable_total_pages .. "]"
-					.. "button[9.2,1.5;0.8,0.3;craftable_next;>]"
+					.. "button[6.5,0.6;0.4,0.1;craftable_prev;<]"
+					.. "button[6.5,1.4;0.4,0.1;craftable_next;>]"
 			end
 			
 			form = form
-				.. "label[3,2.8;" .. S("Desirable Craft") .. "]"
-				.. "list[detached:" .. crafting_inv_id .. ";desirable;3,3.55;6,1;]"
+				.. "label[0.5,2.8;" .. S("Desirable Craft") .. "]"
+				.. "label[2.5,2.8;" .. desirable_current_page .. "/" .. desirable_total_pages .. "]"
+				.. "list[detached:" .. crafting_inv_id .. ";desirable;0.5,3.55;6,1;]"
                 .. "listring[detached:".. crafting_inv_id .. ";craftable]"
                 .. "listring[detached:".. crafting_inv_id .. ";desirable]"
 				
 			-- Add desirable pagination buttons on the right side if there are desirable items
 			if #desirable_outputs > 0 then
 				form = form
-					.. "button[9.2,3.55;0.8,0.3;desirable_prev;<]"
-					.. "label[9.2,3.9;" .. desirable_current_page .. "/" .. desirable_total_pages .. "]"
-					.. "button[9.2,4.25;0.8,0.3;desirable_next;>]"
+					.. "button[6.5,3.65;0.4,0.1;desirable_prev;<]"
+					.. "button[6.5,4.15;0.4,0.1;desirable_next;>]"
 			end
 			
 			-- Add recipe display area below desirable section
@@ -1924,17 +1941,17 @@ get_formspec = function(self, player, tab)
 			end
 			
 			form = form
-				.. "label[3,5.1;" .. S("Recipe") .. "]"
-				.. "box[3,5.3;8,1.8;#000000]"
+				.. "label[0.5,5.1;" .. S("Recipe") .. "]"
+				.. "box[0.5,5.3;8,1.8;#000000]"
 				.. recipe_display
 			
 			-- Add cooker controls below the lists
 			form = form
-				.. "button[3,7.5;2.5,1;toggle_cooker;" .. S("Toggle Cooker") .. "]"
-				.. "button[6,7.5;2.5,1;view_metrics;" .. S("View Metrics") .. "]"
-				.. "label[3,8.5;" .. S("Current Task:") .. " "
+				.. "button[0.5,7.5;2.5,1;toggle_cooker;" .. S("Toggle Cooker") .. "]"
+				.. "button[3.5,7.5;2.5,1;view_metrics;" .. S("View Metrics") .. "]"
+				.. "label[0.5,8.5;" .. S("Current Task:") .. " "
 				.. minetest.colorize("#ACEEAC", (self.action and self.action or S("Idle"))) .. "]"
-				.. "label[6,8.5;" .. S("State:") .. " "
+				.. "label[3.5,8.5;" .. S("State:") .. " "
 				.. minetest.colorize("#ACEEAC", (self.state and tostring(self.state) or S("Unknown"))) .. "]"
 			
 			return form
