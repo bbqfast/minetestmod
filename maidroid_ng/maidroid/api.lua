@@ -873,6 +873,20 @@ function maidroid.build_complete_cooklist_list(droid)
 	return all_cooklist_items
 end
 
+-- Helper function to resolve group items to actual items for display
+local function resolve_item_for_display(item)
+	if string.find(item, "group:", 1, true) then
+		-- This is a group item, get actual items from the group
+		local group_items = maidroid.cores.generic_cooker.get_items_in_group(item)
+		if group_items and #group_items > 0 then
+			-- Return the first item from the group for display
+			return group_items[1]
+		end
+	end
+	-- Return the original item if it's not a group or group resolution failed
+	return item
+end
+
 -- Format recipe display for UI with item images
 function maidroid.format_recipe_display(item_name)
 		lf("format_recipe_display", ". . . . . . format_recipe_display: " .. item_name)
@@ -882,11 +896,11 @@ function maidroid.format_recipe_display(item_name)
 	
 	local recipe = minetest.get_craft_recipe(item_name)
 	if not recipe or not recipe.items then
-		return "label[3.2,5.5;" .. minetest.colorize("#CCCCCC", S("No recipe found")) .. "]"
+		return "label[3.2,4.8;" .. minetest.colorize("#CCCCCC", S("No recipe found")) .. "]"
 	end
 	
 	local display = ""
-	local y_pos = 5.5
+	local y_pos = 4.8
 	
 	-- Display recipe title
 	display = display .. "label[3.2," .. y_pos .. ";" .. minetest.colorize("#FFFF00", S("Recipe for") .. " " .. item_name) .. "]"
@@ -904,15 +918,18 @@ function maidroid.format_recipe_display(item_name)
 				local x = x_offset + (i - 1) * spacing
 				local y = y_pos
 				
-				-- Display item image
-				display = display .. "item_image[" .. x .. "," .. y .. ";" .. item_size .. "," .. item_size .. ";" .. item .. "]"
+				-- Resolve group items to actual items for display
+				local display_item = resolve_item_for_display(item)
 				
-				-- Display item name below image (cleaned up)
-				local item_display = item
-				if string.find(item, ":") then
-					item_display = string.gsub(item, ".*:", "") -- Remove mod prefix
+				-- Display item image with tooltip
+				display = display .. "item_image[" .. x .. "," .. y .. ";" .. item_size .. "," .. item_size .. ";" .. display_item .. "]"
+				
+				-- Add tooltip showing the original item name (group or actual item)
+				local tooltip_text = item
+				if item ~= display_item then
+					tooltip_text = item .. " -> " .. display_item
 				end
-				display = display .. "label[" .. x .. "," .. (y + item_size + 0.05) .. ";" .. minetest.colorize("#FFFFFF", item_display) .. "]"
+				display = display .. "tooltip[" .. x .. "," .. y .. ";" .. item_size .. "," .. item_size .. ";" .. minetest.formspec_escape(tooltip_text) .. ";#FFFFFF;#000000]"
 			end
 		end
 	end
@@ -2079,10 +2096,7 @@ get_formspec = function(self, player, tab)
 			.. "label[0.5,0.75;" .. self.core.description .. "]"
 	end
 	
-    form = form .. "model[0.2,4;3,3;3d;character.b3d;"
-	.. minetest.formspec_escape(self.textures[1])
-	.. ";0,180;false;true;200,219;7.5]"
-	-- Adjust tabheader position for cooker tab
+    	-- Adjust tabheader position for cooker tab
 	local tabheader_pos = is_cooker_tab and "tabheader[0,0;tabheader;" or "tabheader[0,0;tabheader;"
 	form = form .. tabheader_pos .. S("Inventory")
 	.. ( owns and "," .. S("Flush") or "")
@@ -2296,8 +2310,8 @@ get_formspec = function(self, player, tab)
             -- ,,button,,page
 			if craftable_total_pages > 1 then
 				form = form
-					.. "button[6.5,0.6;0.4,0.1;craftable_prev;<]"
-					.. "button[6.5,1.4;0.4,0.1;craftable_next;>]"
+					.. "button[6.5,0.6;0.6,0.1;craftable_prev;<]"
+					.. "button[6.5,1.4;0.6,0.1;craftable_next;>]"
 			end
 			
 			-- Right column - Cookables (furnace inputs)
@@ -2309,8 +2323,8 @@ get_formspec = function(self, player, tab)
 			-- Add cookable pagination buttons on the far right if needed
 			if cookable_total_pages > 1 then
 				form = form
-					.. "button[13.5,0.6;0.4,0.1;cookable_prev;<]"
-					.. "button[13.5,1.4;0.4,0.1;cookable_next;>]"
+					.. "button[13.5,0.6;0.6,0.1;cookable_prev;<]"
+					.. "button[13.5,1.4;0.6,0.1;cookable_next;>]"
 			end
 			
 			-- Cooklist section (below cookables)
@@ -2348,8 +2362,8 @@ get_formspec = function(self, player, tab)
 			-- Add cooklist pagination buttons on the far right if needed
 			if cooklist_total_pages > 1 then
 				form = form
-					.. "button[13.5,3.15;0.4,0.1;cooklist_prev;<]"
-					.. "button[13.5,3.65;0.4,0.1;cooklist_next;>]"
+					.. "button[13.5,3.15;0.6,0.1;cooklist_prev;<]"
+					.. "button[13.5,3.65;0.6,0.1;cooklist_next;>]"
 			end
 			
 			form = form
@@ -2365,8 +2379,8 @@ get_formspec = function(self, player, tab)
 			-- Add desirable pagination buttons on the right side if there are desirable items
 			if #desirable_outputs > 0 then
 				form = form
-					.. "button[6.5,3.65;0.4,0.1;desirable_prev;<]"
-					.. "button[6.5,4.15;0.4,0.1;desirable_next;>]"
+					.. "button[6.5,3.65;0.6,0.1;desirable_prev;<]"
+					.. "button[6.5,4.15;0.6,0.1;desirable_next;>]"
 			end
 			
 			-- Add recipe display area below desirable section
@@ -2380,9 +2394,12 @@ get_formspec = function(self, player, tab)
 			end
 			
 			form = form
-				.. "label[0.5,5.1;" .. S("Recipe") .. "]"
-				.. "box[0.5,5.3;8,1.8;#000000]"
+				.. "label[0.5,4.4;" .. S("Recipe") .. "]"
+				.. "box[0.5,4.6;8,1.8;#000000]"
 				.. recipe_display
+				.. "model[9,4.6;3,3;3d;character.b3d;"
+				.. minetest.formspec_escape(self.textures[1])
+				.. ";0,180;false;true;200,219;7.5]"
 			
 			-- Add cooker controls below the lists
 			form = form
