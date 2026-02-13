@@ -577,7 +577,7 @@ local function feed_furnace_from_inventory_generic2(droid, pos, items)
 			-- Check if this item is in our desired items list or is a cookable tool
 			local desired_count = desired_items[item_name]
 			local is_tool = is_cookable_tool(item_name)
-            lf("generic_cooker", "ISTOOL feed_furnace_from_inventory_generic2: item_name=" .. item_name .. " desired_count=" .. tostring(desired_count) .. " available_count=" .. tostring(available_count) .. " is_tool=" .. tostring(is_tool))
+            -- lf("generic_cooker", "ISTOOL feed_furnace_from_inventory_generic2: item_name=" .. item_name .. " desired_count=" .. tostring(desired_count) .. " available_count=" .. tostring(available_count) .. " is_tool=" .. tostring(is_tool))
 			if (desired_count and available_count > 5) or is_tool then
 				local listname = (item_name == "default:coal_lump") and "fuel" or "src"
 				
@@ -1117,8 +1117,12 @@ local function tests()
     -- test_get_replacement()
     -- test_get_items_in_groups()
     -- test_get_craft_requirements()
-    local cookable_inputs = get_all_cookable_furnace_inputs()
-    lf("tests", "cookable_inputs=" .. dump(cookable_inputs).."total=" .. #cookable_inputs)
+    -- local cookable_inputs = get_all_cookable_furnace_inputs()
+    -- lf("tests", "cookable_inputs=" .. dump(cookable_inputs).."total=" .. #cookable_inputs)
+    -- lf("tests", "")
+
+    local cookable_items = maidroid.cores.generic_cooker.get_cookable_items()
+    lf("tests", "cookable_items=" .. dump(cookable_items).."total=" .. #cookable_items)
     lf("tests", "")
     error("tests")
 end
@@ -1495,11 +1499,11 @@ on_start = function(droid)
         table.insert(all_take_items, { item_name = item_name, quantity = 5 })
     end
 
-    lf("generic_cooker", "all_take_items=" .. dump(all_take_items))
+    -- lf("generic_cooker", "all_take_items=" .. dump(all_take_items))
     
 
+    -- tests()
     lf("generic_cooker", "test")
-    -- error("x")
 
     droid.desired_craft_outputs = craft_outputs
     
@@ -1588,6 +1592,27 @@ maidroid.cores.generic_cooker.set_cooklist = function(droid, cooklist)
     for _, item_name in ipairs(cooklist) do
         table.insert(droid.cooklist, { item_name = item_name, count = 5 })
     end
+end
+
+maidroid.cores.generic_cooker.get_cookable_items = function()
+    
+    -- Get all furnace inputs from cooker_items.lua
+    local cookable_items = {}
+    
+    -- Filter all_furnace_inputs to exclude tools
+    for _, item_name in ipairs(all_furnace_inputs) do
+        -- Check if this item is NOT a tool
+        if not is_cookable_tool(item_name) then
+            table.insert(cookable_items, item_name)
+            lf("get_cookable_items", "Added cookable item: " .. item_name)
+        else
+            lf("get_cookable_items", "Excluded tool item: " .. item_name)
+        end
+    end
+    
+    lf("get_cookable_items", "Total cookable items found: " .. #cookable_items)
+    
+    return cookable_items
 end
 
 -- Test command to verify the function works

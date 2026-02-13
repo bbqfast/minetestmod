@@ -51,6 +51,7 @@ local all_furnace_inputs = {
     "darkage:schist",
 }
 
+
 local cookable_inputs = {
     "farming:flour",
     "farming:rice_flour",
@@ -2239,6 +2240,7 @@ get_formspec = function(self, player, tab)
 			
 			------------------ Calculate cookable pagination variables
             -- ,,x2
+            all_furnace_inputs = maidroid.cores.generic_cooker.get_cookable_items()
             if not self.cookable_page_items then
                 maidroid.init_cookable_pageitems(self, all_furnace_inputs)
             end
