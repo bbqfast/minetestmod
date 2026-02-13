@@ -54,6 +54,14 @@ something that like an array like
 
 
 ---------------------------
+similar to craftable
+create another list furance_input on the right side of craftable, which should be using different detached inventory than the one with craftable, 
+
+reuse the same code as much as possible for scrolling, pagination, position memory
+---------------------------
+create new list  on the right side of craftable call cookable, that attach to cooking inventory
+---------------------------
+---------------------------
 
 
 

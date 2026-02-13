@@ -128,31 +128,7 @@ if not maidroid.cores.generic_cooker then
 	maidroid.cores.generic_cooker = {}
 end
 
--- Expose the configurable distance threshold and setter function
-maidroid.cores.generic_cooker.max_distance_from_activation = max_distance_from_activation
-maidroid.cores.generic_cooker.set_max_distance_from_activation = set_max_distance_from_activation
-maidroid.cores.generic_cooker.get_max_distance_from_activation = get_max_distance_from_activation
-
--- Also expose directly to maidroid table as fallback
-maidroid.set_max_distance_from_activation = set_max_distance_from_activation
-maidroid.get_max_distance_from_activation = get_max_distance_from_activation
-
-maidroid.cores.generic_cooker.get_craftable_outputs = function()
-	if type(all_farming_outputs) == "table" and #all_farming_outputs > 0 then
-        error("maidroid.cores.generic_cooker.get_craftable_outputs: all_farming_outputs is not a table or is empty")
-		return all_farming_outputs
-	end
-	return {
-		"farming:rhubarb_pie",
-		"farming:bread",
-	}
-end
-
-maidroid.cores.generic_cooker.set_desired_craft_outputs = function(droid, outputs)
-	lf("generic_cooker", "set_desired_craft_outputs: " .. dump(outputs))
-	droid.desired_craft_outputs = outputs
-	return true
-end
+-- Custom functions will be added after core registration to prevent overwriting
 
 -- Encapsulated target info for a single chest interaction
 local GenericCookerTarget = {}
@@ -477,6 +453,7 @@ end
 -- has room will be fed into the correct list (fuel/src).
 -- ,,fg3
 local function feed_furnace_from_inventory_generic(droid, pos, items)
+    lf("generic_cooker", "feed_furnace_from_inventory_generic: items=" .. dump(items))
 	if not pos then
 		return false
 	end
@@ -633,7 +610,8 @@ local function feed_get_from_furnace__generic(droid, pos)
     add_coal_fuel_if_needed(droid, pos, finv)
 
 	-- return feed_furnace_from_inventory_generic(droid, pos, all_cookable_items)
-	return feed_furnace_from_inventory_generic(droid, pos, all_furnace_inputs)
+	-- return feed_furnace_from_inventory_generic(droid, pos, all_furnace_inputs)
+	return feed_furnace_from_inventory_generic(droid, pos, droid.cooklist)
 end
 
 -- ,,fg1,,fur
@@ -1280,7 +1258,7 @@ task = function(droid)
 	-- : randomly pick one of two furnace actions, with choice 1 being twice as likely as choice 2
 	-- Use math.random(3): values 1 and 2 map to choice 1, value 3 maps to choice 2
 	local choice = math.random(3)
-    -- choice = 2
+    choice = 1
 
 	if choice == 1 then
 		lf("generic_cooker:task", "CHOICE=1: try_feed_get_from_furnace__generic for ")
@@ -1465,6 +1443,43 @@ maidroid.register_core("generic_cooker", {
 	can_sell = true,
 	doc = doc,
 })
+
+-- Add custom functions after core registration to prevent overwriting
+-- Expose the configurable distance threshold and setter function
+maidroid.cores.generic_cooker.max_distance_from_activation = max_distance_from_activation
+maidroid.cores.generic_cooker.set_max_distance_from_activation = set_max_distance_from_activation
+maidroid.cores.generic_cooker.get_max_distance_from_activation = get_max_distance_from_activation
+
+-- Also expose directly to maidroid table as fallback
+maidroid.set_max_distance_from_activation = set_max_distance_from_activation
+maidroid.get_max_distance_from_activation = get_max_distance_from_activation
+
+maidroid.cores.generic_cooker.get_craftable_outputs = function()
+	if type(all_farming_outputs) == "table" and #all_farming_outputs > 0 then
+        error("maidroid.cores.generic_cooker.get_craftable_outputs: all_farming_outputs is not a table or is empty")
+		return all_farming_outputs
+	end
+	return {
+		"farming:rhubarb_pie",
+		"farming:bread",
+	}
+end
+
+maidroid.cores.generic_cooker.set_desired_craft_outputs = function(droid, outputs)
+	lf("generic_cooker", "set_desired_craft_outputs: " .. dump(outputs))
+	droid.desired_craft_outputs = outputs
+	return true
+end
+
+maidroid.cores.generic_cooker.set_cooklist = function(droid, cooklist)
+	lf("generic_cooker", "set_cooklist: " .. dump(cooklist))
+    -- error("test")
+	droid.cooklist = {}
+
+    for _, item_name in ipairs(cooklist) do
+        table.insert(droid.cooklist, { item_name = item_name, count = 5 })
+    end
+end
 
 -- Test command to verify the function works
 minetest.register_chatcommand("test_cookable_inputs", {
