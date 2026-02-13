@@ -31,6 +31,7 @@ local all_cookable_items = cooker_items.all_cookable_items
 local all_farming_outputs = cooker_items.all_farming_outputs
 local all_take_item_names = cooker_items.all_take_item_names
 local all_furnace_inputs = cooker_items.all_furnace_inputs
+local is_cookable_tool = cooker_items.is_cookable_tool
 
 -- Metrics table to track items taken from chests
 local chest_taken_metrics = {}
@@ -459,7 +460,7 @@ local function feed_furnace_from_inventory_generic(droid, pos, items)
 	end
 
 	if type(items) ~= "table" then
-		lf("generic_cooker:feed_furnace_from_inventory_generic", "items must be a table of specs")
+        lf("generic_cooker:feed_furnace_from_inventory_generic", "items=" .. dump(items))
 		return false
 	end
 
@@ -512,6 +513,105 @@ local function feed_furnace_from_inventory_generic(droid, pos, items)
 	end
 
 	lf("generic_cooker:feed_furnace_from_inventory_generic", "no matching items or no room in furnace")
+	return false
+end
+
+-- More efficient version: iterate through player's inventory instead of input items
+-- This avoids unnecessary iterations when maidroid has limited items
+-- ,,fg4
+local function feed_furnace_from_inventory_generic2(droid, pos, items)
+    lf("generic_cooker", "feed_furnace_from_inventory_generic2: items=" .. dump(items))
+	if not pos then
+		return false
+	end
+
+	if type(items) ~= "table" then
+		lf("ERROR generic_cooker:feed_furnace_from_inventory_generic", "ERROR items must be a table of specs")
+        
+		return false
+	end
+
+	local node = minetest.get_node(pos)
+	if node.name ~= "default:furnace" and node.name ~= "default:furnace_active" then
+	    local furnace_pos = minetest.find_node_near(pos, 5, "default:furnace")
+	    if not furnace_pos then
+			lf("generic_cooker:feed_furnace_from_inventory_generic2", "pos is not a furnace: " .. node.name .. " at " .. minetest.pos_to_string(pos))
+			return false
+		end
+	    pos = furnace_pos
+	end
+
+	local meta = minetest.get_meta(pos)
+	local finv = meta:get_inventory()
+	local inv = droid:get_inventory()
+	
+	-- Create a lookup table for desired items for O(1) access
+	local desired_items = {}
+	for _, spec in ipairs(items) do
+		local name, count
+		if type(spec) == "table" then
+			name = spec.item_name or spec.name or spec[1]
+			count = spec.count or spec[2] or 1
+		elseif type(spec) == "string" then
+			name = spec
+			count = 99
+		end
+		if name and count and count > 0 then
+			desired_items[name] = count
+		end
+	end
+	
+	-- Get maidroid's inventory and iterate through it
+	local main_list = inv:get_list("main")
+	if not main_list then
+		lf("generic_cooker:feed_furnace_from_inventory_generic2", "no main inventory list")
+		return false
+	end
+	
+	-- Iterate through each slot in maidroid's inventory
+	for _, stack in ipairs(main_list) do
+		if not stack:is_empty() then
+			local item_name = stack:get_name()
+			local available_count = stack:get_count()
+			
+			-- Check if this item is in our desired items list or is a cookable tool
+			local desired_count = desired_items[item_name]
+			local is_tool = is_cookable_tool(item_name)
+            lf("generic_cooker", "ISTOOL feed_furnace_from_inventory_generic2: item_name=" .. item_name .. " desired_count=" .. tostring(desired_count) .. " available_count=" .. tostring(available_count) .. " is_tool=" .. tostring(is_tool))
+			if (desired_count and available_count > 5) or is_tool then
+				local listname = (item_name == "default:coal_lump") and "fuel" or "src"
+				
+				-- Calculate how many to take
+				local take_count
+				if is_tool then
+					-- For tools, take all available (but keep 1 if possible)
+					take_count = available_count
+				else
+					-- For desired items, use existing logic
+					take_count = math.min(desired_count, available_count - 5)
+				end
+				
+				if take_count > 0 then
+					local want = item_name .. " " .. tostring(take_count)
+					
+					-- Try to remove the items
+					local removed_stack = inv:remove_item("main", want)
+					if not removed_stack:is_empty() then
+						if not finv:room_for_item(listname, removed_stack) then
+							-- Not enough room; put items back
+							inv:add_item("main", removed_stack)
+						else
+							finv:add_item(listname, removed_stack)
+							lf("generic_cooker", "feed_furnace_from_inventory_generic2: added " .. tostring(removed_stack:get_count()) .. " " .. item_name .. " to " .. listname .. " at " .. minetest.pos_to_string(pos))
+							return true
+						end
+					end
+				end
+			end
+		end
+	end
+
+	lf("generic_cooker:feed_furnace_from_inventory_generic2", "no matching items or no room in furnace")
 	return false
 end
 
@@ -611,7 +711,7 @@ local function feed_get_from_furnace__generic(droid, pos)
 
 	-- return feed_furnace_from_inventory_generic(droid, pos, all_cookable_items)
 	-- return feed_furnace_from_inventory_generic(droid, pos, all_furnace_inputs)
-	return feed_furnace_from_inventory_generic(droid, pos, droid.cooklist)
+	return feed_furnace_from_inventory_generic2(droid, pos, droid.cooklist)
 end
 
 -- ,,fg1,,fur
@@ -1402,6 +1502,15 @@ on_start = function(droid)
     -- error("x")
 
     droid.desired_craft_outputs = craft_outputs
+    
+    -- Initialize cooklist with cookable_inputs from api.lua
+    if maidroid.cookable_inputs then
+        maidroid.cores.generic_cooker.set_cooklist(droid, maidroid.cookable_inputs)
+        lf("generic_cooker", "Initialized cooklist with cookable_inputs: " .. dump(maidroid.cookable_inputs))
+    else
+        lf("generic_cooker", "Warning: maidroid.cookable_inputs not available")
+    end
+    
     log_inventory(droid)
     
    

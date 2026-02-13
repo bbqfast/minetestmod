@@ -1,6 +1,6 @@
 -- Cooker items configuration
 -- This file contains item lists used by the generic cooker core
-
+local lf = maidroid.lf
 local all_cookable_items = {
     { item_name = "farming:flour_multigrain", count = 5 },
     { item_name = "farming:bread_slice",      count = 5 },
@@ -27,6 +27,118 @@ local all_farming_outputs = {
     "farming:smoothie_raspberry", "farming:rhubarb_pie", "farming:rice_flour", "farming:soy_sauce", "farming:soy_milk", "farming:tofu", "farming:vanilla_extract", "farming:jerusalem_artichokes",
     "farming:cookie 8", "farming:carrot_gold", "farming:beetroot_soup", "farming:sunflower_oil", "farming:sunflower_bread", "farming:bowl 4"
 }
+
+local all_tools = {
+    "default:axe_bronze",
+    "default:axe_steel",
+    "default:pick_bronze",
+    "default:pick_steel",
+    "default:sword_bronze",
+    "default:sword_steel",
+    "lottores:copperaxe",
+    "lottores:copperpick",
+    "lottores:coppersword",
+    "lottores:galvornaxe",
+    "lottores:galvornpick",
+    "lottores:galvornsword",
+    "lottores:goldaxe",
+    "lottores:goldpick",
+    "lottores:goldsword",
+    "lottores:mithrilaxe",
+    "lottores:mithrilpick",
+    "lottores:mithrilsword",
+    "lottores:silveraxe",
+    "lottores:silverpick",
+    "lottores:silversword",
+    "lottores:tinaxe",
+    "lottores:tinpick",
+    "lottores:tinsword",
+    "lottweapons:bronze_battleaxe",
+    "lottweapons:bronze_spear",
+    "lottweapons:bronze_warhammer",
+    "lottweapons:copper_battleaxe",
+    "lottweapons:copper_spear",
+    "lottweapons:copper_warhammer",
+    "lottweapons:elven_sword",
+    "lottweapons:galvorn_battleaxe",
+    "lottweapons:galvorn_spear",
+    "lottweapons:galvorn_warhammer",
+    "lottweapons:gold_battleaxe",
+    "lottweapons:gold_spear",
+    "lottweapons:gold_warhammer",
+    "lottweapons:mithril_battleaxe",
+    "lottweapons:mithril_spear",
+    "lottweapons:mithril_warhammer",
+    "lottweapons:orc_sword",
+    "lottweapons:silver_battleaxe",
+    "lottweapons:silver_spear",
+    "lottweapons:silver_warhammer",
+    "lottweapons:steel_battleaxe",
+    "lottweapons:steel_spear",
+    "lottweapons:steel_warhammer",
+    "lottweapons:stone_battleaxe",
+    "lottweapons:stone_spear",
+    "lottweapons:stone_warhammer",
+    "lottweapons:tin_battleaxe",
+    "lottweapons:tin_spear",
+    "lottweapons:tin_warhammer",
+    "lottarmor:boots_bronze",
+    "lottarmor:boots_copper",
+    "lottarmor:boots_galvorn",
+    "lottarmor:boots_gold",
+    "lottarmor:boots_mithril",
+    "lottarmor:boots_silver",
+    "lottarmor:boots_steel",
+    "lottarmor:boots_tin",
+    "lottarmor:chestplate_bronze",
+    "lottarmor:chestplate_copper",
+    "lottarmor:chestplate_galvorn",
+    "lottarmor:chestplate_gold",
+    "lottarmor:chestplate_mithril",
+    "lottarmor:chestplate_silver",
+    "lottarmor:chestplate_steel",
+    "lottarmor:chestplate_tin",
+    "lottarmor:helmet_bronze",
+    "lottarmor:helmet_copper",
+    "lottarmor:helmet_galvorn",
+    "lottarmor:helmet_gold",
+    "lottarmor:helmet_mithril",
+    "lottarmor:helmet_silver",
+    "lottarmor:helmet_steel",
+    "lottarmor:helmet_tin",
+    "lottarmor:leggings_bronze",
+    "lottarmor:leggings_copper",
+    "lottarmor:leggings_galvorn",
+    "lottarmor:leggings_gold",
+    "lottarmor:leggings_mithril",
+    "lottarmor:leggings_silver",
+    "lottarmor:leggings_steel",
+    "lottarmor:leggings_tin",
+    "lottarmor:shield_bronze",
+    "lottarmor:shield_copper",
+    "lottarmor:shield_galvorn",
+    "lottarmor:shield_gold",
+    "lottarmor:shield_mithril",
+    "lottarmor:shield_silver",
+    "lottarmor:shield_steel",
+    "lottarmor:shield_tin"
+}
+
+-- Function to detect if an item name follows cookable tool naming patterns
+local function is_cookable_tool(tool_name)
+    if not tool_name or type(tool_name) ~= "string" then
+        return false
+    end
+    
+    -- Exact lookup - check if the tool is in our all_tools list
+    for _, tool in ipairs(all_tools) do
+        if tool == tool_name then
+            return true
+        end
+    end
+    
+    return false
+end
 
 local all_furnace_inputs = {
     "basic_materials:oil_extract",
@@ -323,7 +435,9 @@ return {
     all_cookable_items = all_cookable_items,
     all_farming_outputs = all_farming_outputs,
     all_furnace_inputs = all_furnace_inputs,
-    all_take_item_names = all_take_item_names
+    all_tools = all_tools,
+    all_take_item_names = all_take_item_names,
+    is_cookable_tool = is_cookable_tool
 }
 
 

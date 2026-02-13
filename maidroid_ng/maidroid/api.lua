@@ -56,6 +56,9 @@ local cookable_inputs = {
     "farming:rice_flour",
 }
 
+-- Expose cookable_inputs globally for access by other modules
+maidroid.cookable_inputs = cookable_inputs
+
 
 -- Track spawned maidroid names to prevent duplicates
 local spawned_maidroid_names = {}
@@ -775,8 +778,6 @@ function maidroid.handle_craftable(droid)
 	droid.craftable_page_items[current_page] = page_data
 	
 	lf("cooker_inventory", "Updated craftable page data for page " .. current_page .. ": " .. dump(page_data))
-	lf("cooker_inventory", "Updated craftable page data for page " .. current_page .. ": " .. dump(page_data))
-    error("test")
 end
 
 -- Helper function to handle tracking item positions for cookable list
