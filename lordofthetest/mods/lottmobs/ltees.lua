@@ -1018,8 +1018,10 @@ minetest.register_on_punchplayer(function(player, hitter, time_from_last_punch, 
 		z = player_pos.z - look_dir.z * follow_distance,
 	}
 	npc:set_pos(target_pos)
+	lf("on_punchplayer", "Player " .. name .. " was hit by " .. (hitter and (hitter:is_player() and hitter:get_player_name() or (hitter:get_luaentity() and hitter:get_luaentity().name or "unknown entity")) or "unknown"))
+    
 	lf("npc:on_punch:set_pos", "teleported behind player to: " .. minetest.pos_to_string(target_pos))
-	npc:set_velocity({x = 0, y = 0, z = 0})
+	npc:set_velocity(vector.multiply(dir or {x = 0, y = 0, z = 1}, 2.5))
 	lua:set_animation("stand")
 end)
 

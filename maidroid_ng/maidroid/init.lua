@@ -35,6 +35,7 @@ maidroid.lf = function(func, msg)
 	black_list["mow"] = true
 	black_list["follow:on_step"] = true
 	black_list["maidroid.globalstep"] = true
+	black_list["farming:dump_inventory_to_chest_direct"] = true
 	-- black_list["digger:on_step"] = true
 
 	if black_list[func] ~= nil then

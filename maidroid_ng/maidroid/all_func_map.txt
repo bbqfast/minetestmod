@@ -1,0 +1,351 @@
+# Maidroid NG Mod - Complete Function Mapping
+# Generated: 2026-02-14
+
+## MAIN CONFIGURATION FILES
+
+### init.lua (413 lines)
+- maidroid.lf(func, msg) - Main logging function with duplicate detection and rate limiting
+- append_maidroid_positions_from_storage(res) - Load maidroid positions from mod storage
+- append_maidroid_positions_from_file(out) - Fallback position loading from text file
+- save_maidroid_pos_fallback(nametag, pos_str) - Save maidroid positions to fallback file
+- Global step function - Position tracking and inactive maidroid monitoring
+- Chat Commands:
+  - /maidroid_list or /mr_list - Lists all maidroid positions
+  - /maidroid_tp or /mr_tp - Teleport to named maidroid
+  - /maidroid_surface - Teleport to surface at current X/Z
+  - /mr_surface - Vertical movement teleportation
+
+### mod.conf (5 lines)
+- Mod metadata configuration
+- name = maidroid
+- description = Cute droids working for you
+- optional_depends = better_farming, cucina_vegana, dye, ethereal, farming, pie
+- min_minetest_version = 5.3
+
+## CORE API FILES
+
+### api.lua (3,483 lines)
+- maidroid.animation - Animation frame definitions
+  - STAND = {x = 1, y = 78}
+  - SIT = {x = 81, y = 81}
+  - LAY = {x = 162, y = 165}
+  - WALK = {x = 168, y = 187}
+  - MINE = {x = 189, y = 198}
+  - WALK_MINE = {x = 200, y = 219}
+- maidroid.format_recipe_display(item_name) - Recipe formatting for UI display
+- get_formspec() - Main UI generation for maidroid interface
+- Inventory management functions:
+  - Cooking inventory system
+  - Recipe display integration
+  - Pagination for craftable items (12 per page)
+  - Pagination for cookable items (12 per page)
+- Maidroid spawning and registration functions
+- Metrics tracking system:
+  - all_maidroid_metrics.total_activated
+  - all_maidroid_metrics.total_deactivated
+- Constants:
+  - DESIRABLE_ITEMS_PER_PAGE = 6
+  - CRAFTABLE_ITEMS_PER_PAGE = 12
+- Item arrays:
+  - init_craftable_outputs - Default cooking outputs
+  - all_furnace_inputs - Furnace-compatible materials
+  - cookable_inputs - Cooking-specific inputs
+
+### api copy.lua (68,057 bytes)
+- Backup/alternate version of main API
+- Contains duplicate functionality from api.lua
+
+### ~api.lua (37,845 bytes)
+- Development version of API
+- Possibly contains experimental features
+
+## CORE BEHAVIOR SYSTEMS
+
+### cores.lua (48 lines)
+- Core module loader
+- Loads behavior modules in dependency order:
+  1. wander.lua - Always first
+  2. path.lua - Uses to_wander
+  3. follow.lua
+  4. basic.lua - Uses wander and follow
+  5. Job-specific cores (conditional loading)
+
+### helpers.lua (123 lines)
+- maidroid.helpers.search_surrounding(pos, pred, name, range) - Area search with voxel optimization
+- maidroid.helpers.random_pos_near(pos) - Random position generation
+- maidroid.helpers.emit_sound(name, sound, event, pos, gain) - Sound emission
+- maidroid.helpers.is_fence(name) - Fence detection including mod-specific fences
+- maidroid.helpers.is_walkable(name) - Walkable node detection
+- Internal functions:
+  - insert_voxel() - Voxel insertion with duplicate checking
+  - init_voxels(range) - Initialize voxel search patterns
+
+## CORE BEHAVIOR MODULES (cores/ directory)
+
+### basic.lua (156 lines)
+- Core interface functions:
+  - on_start(self) - Initialize basic behavior
+  - on_stop(self) - Stop and reset to idle state
+  - on_pause(self) - Pause and sit animation
+- seek_tamer(self, range, item_name) - Find player with taming item
+- Taming system integration
+- State management for idle/active modes
+
+### wander.lua (3,157 lines)
+- Movement and exploration behavior
+- Pathfinding algorithms
+- Obstacle avoidance
+- Random wandering patterns
+- Direction change timers
+- Walk timeout management
+
+### follow.lua (2,856 lines)
+- Player following behavior
+- Target tracking system
+- Pursuit logic
+- Distance calculations
+- Follow range management
+
+### path.lua (3,945 lines)
+- Pathfinding system
+- Navigation algorithms
+- Route planning
+- Path optimization
+- to_wander() - Transition to wandering behavior
+
+### farming.lua (51,270 lines)
+- Agricultural operations:
+  - plant(self, pos) - Plant seeds/crops
+  - mow(self, pos) - Harvest mature crops
+  - collect_papyrus(self, pos) - Harvest papyrus
+  - plant_papyrus(self, pos) - Plant papyrus
+  - dump_inventory_to_chest(self) - Move items to chest
+  - dump_inventory_to_chest_direct(self, chest_pos) - Direct chest dumping
+  - dump_at_chest(self, pos) - Dump items at specific chest
+  - maybe_dump_to_nearby_chest(self) - Find and dump to nearby chest
+  - craft_seeds(self) - Craft seeds from materials
+  - select_seed(self) - Choose appropriate seed for planting
+  - task(self) - Main farming task execution
+  - task_base(self) - Base task framework
+- Helper functions:
+  - is_seed(name) - Seed detection
+  - is_plantable(name) - Plantable item detection
+  - is_papyrus(name) - Papyrus detection
+  - is_papyrus_soil(name) - Papyrus soil detection
+  - is_mowable(name) - Mowable crop detection
+  - is_scythe(name) - Scythe tool detection
+- Multi-mod support: farming, better_farming, cucina_vegana, lottfarming
+
+### digger.lua (25,391 lines)
+- Mining and digging operations
+- Automated resource extraction
+- Tool selection and usage
+- Digging patterns and strategies
+- Inventory management for mined items
+
+### torcher.lua (5,657 lines)
+- Lighting automation
+- Torch placement logic
+- Darkness detection
+- Light level monitoring
+- Torch inventory management
+
+### stockbreeder.lua (15,700 lines)
+- Animal breeding management
+- Feeding and care systems
+- Breeding pair selection
+- Animal monitoring
+- Multi-mod support: animalia, petz, mobs_animal
+
+### generic_cooker.lua (63,409 lines)
+- Automated cooking/furnace operations
+- Furnace feeding system
+- Fuel management
+- Cooking queue management
+- Item selection for cooking
+- Recipe automation
+
+### cooker_items.lua (13,789 bytes)
+- Cooking recipes database
+- Item definitions for cooking
+- Recipe compatibility tables
+
+### waffler.lua (12,099 lines)
+- Waffle making automation
+- Batter preparation
+- Waffle cooking process
+- Requires waffles mod integration
+
+### ocr.lua (5,392 lines)
+- Optical character recognition functionality
+- Text reading from signs/items
+- Requires pdisc mod
+
+## TOOLS (tools/ directory)
+
+### nametag.lua (3,452 bytes)
+- Maidroid naming system
+- Name assignment interface
+- Name validation and management
+- Nametag crafting recipe
+
+### capture_rod.lua (8,882 bytes)
+- Maidroid capture tool
+- Capture mechanics
+- Maidroid storage and release
+- Durability/wear system
+- Capture rod crafting recipe
+
+### robbery_stick.lua (1,819 bytes)
+- Item transfer tool
+- Inventory manipulation
+- Item moving between containers
+- Transfer interface
+
+## SUPPORT SYSTEMS
+
+### settings.lua (111 lines)
+- Configuration management:
+  - Mod compatibility detection
+  - Timer settings for various behaviors
+  - Optional feature toggles
+  - Performance tuning parameters
+- Compatibility checks for:
+  - pipeworks, better_farming, farming, cucina_vegana
+  - ethereal, sickles, animal mods
+  - pie, waffles, pdisc mods
+- Timer configurations:
+  - find_path_max, change_dir_max, walk_max
+  - place_torch_max, action_max
+  - stockbreeder_pause settings
+
+### register.lua (86 lines)
+- Item and entity registration:
+  - maidroid:maidroid_egg - Spawn egg
+  - maidroid_tool:nametag - Naming tool
+  - maidroid_tool:capture_rod - Capture tool
+  - maidroid:wield_item - Wield item entity
+  - maidroid:hand - Empty hand texture
+  - maidroid:spatula - Waffler tool
+- Crafting recipes for all tools
+- Privilege registration: maidroid privilege
+- Entity cleanup for old formats
+
+### pie.lua (88 lines)
+- Maidroid pie integration
+- pie:maidroid_pie_0 - Golden pie for taming
+- Crafting recipe for maidroid pie
+- Hunger system compatibility:
+  - hunger, hbhunger, stamina, mcl_hunger mods
+- Custom eating effects and sounds
+
+### trader.lua (316 lines)
+- Trading interface system
+- Based on mobf trader framework
+- Inventory management for trading:
+  - allow_move() - Item movement permissions
+  - Trading logic and validation
+- Price management system
+- Goods and selection lists
+
+## DEVELOPMENT FILES
+
+### maidroid_todo.txt (24 lines)
+- Development task tracking
+- Feature implementation status
+- Known issues and bugs
+- TODO items for future development
+
+### my_func_map.txt (1,349 bytes)
+- Function mapping documentation
+- Development reference
+
+### my_notes_maid.txt (2,602 bytes)
+- Development notes and observations
+- Code documentation
+- Implementation details
+
+### test_shift_click.lua (2,208 bytes)
+- Testing utilities
+- Shift-click functionality testing
+- Development debugging tools
+
+### .luacheckrc (379 bytes)
+- Lua code quality configuration
+- Static analysis rules
+- Code style enforcement
+
+## ASSET DIRECTORIES
+
+### locale/ (4 files)
+- Translation files:
+  - maidroid.fr.tr - French translation
+  - maidroid.zh_CN.tr - Simplified Chinese
+  - maidroid.zh_TW.tr - Traditional Chinese
+  - template.txt - Translation template
+
+### models/ (4 files)
+- 3D model files:
+  - maidroid.b3d - Main maidroid model
+  - maidroid_hat_cook.obj - Cooking hat
+  - maidroid_hat_farming.obj - Farming hat
+  - maidroid_hat_stockbreeder.obj - Stockbreeder hat
+
+### sounds/ (3 files)
+- Audio assets:
+  - maidroid_beep.ogg - Notification sound
+  - maidroid_tool_capture_rod_open_egg.ogg - Egg opening sound
+  - maidroid_tool_capture_rod_use.ogg - Capture rod usage sound
+
+### textures/ (42+ files)
+- Visual assets:
+  - maidroid_base.png - Base texture
+  - 3maidroid_base.png - Alternative base
+  - character_Dave_Lt_mt.png - Character skin
+  - Various item icons and UI elements
+  - Hat textures for different professions
+
+## DOCUMENTATION
+
+### LICENSE (26,461 bytes)
+- Full license text and legal information
+
+### settingtypes.txt (1,471 bytes)
+- Settings configuration for Minetest menu
+- User-configurable options
+- Default values and descriptions
+
+## GLOBAL CONSTANTS AND VARIABLES
+
+### Core Constants
+- MAX_MAIDROIDS_ALLOWED = 3
+- maidroid.jump_velocity = 2.6
+- maidroid.tame_item - Taming item (pie or gold block)
+
+### State Management
+- maidroid.states - Behavior states (IDLE, etc.)
+- Animation states and transitions
+
+### Metrics and Tracking
+- spawned_maidroid_names - Name tracking
+- total_maidroids_spawned - Spawn counter
+- maidroid_metrics_log_timer - Logging timer
+
+## COMPATIBILITY INTEGRATIONS
+
+### Supported Mods
+- Farming: farming, better_farming, cucina_vegana, lottfarming
+- Animals: animalia, petz, mobs_animal
+- Technical: pipeworks, pdisc
+- Food: pie, waffles
+- Environment: ethereal, sickles
+
+### Optional Features
+- Torcher automation
+- Digger automation
+- OCR functionality
+- Stockbreeding
+- Waffle making
+- Trading system
+
+This comprehensive mapping covers all major functions, behaviors, and systems within the Maidroid NG mod.

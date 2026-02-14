@@ -42,6 +42,26 @@ local furnace_taken_metrics = {}
 local metrics_log_timer = 0
 local metrics_log_interval = 35 -- seconds
 
+local all_cookable_items_short = {
+    { item_name = "farming:seed_rice",  count = 5 },
+    { item_name = "default:sand",       count = 5 },
+    { item_name = "farming:rice_flour", count = 5 },
+}
+
+local all_take_items = {
+	{ item_name = "farming:seed_rice",  quantity = 5 },
+	{ item_name = "farming:wheat",  quantity = 5 },
+	{ item_name = "farming:rice_flour", quantity = 5 },
+	{ item_name = "default:papyrus", quantity = 5 },
+}
+
+local craft_outputs = {
+    "farming:flour",
+    "farming:rice_flour",
+    "farming:bread_slice",
+    "farming:rhubarb_pie"
+}
+
 -- Configurable distance threshold for teleporting back to activation position
 -- This can be set via minetest.settings or externally
 local max_distance_from_activation = tonumber(minetest.settings:get("maidroid.generic_cooker.max_distance_from_activation")) or 10
@@ -121,6 +141,16 @@ end
 maidroid.get_all_cookable_furnace_inputs = get_all_cookable_furnace_inputs
 maidroid.get_chest_taken_metrics = function() return chest_taken_metrics end
 
+
+-- Expose the take items function globally
+-- Maintain backward compatibility for calls without droid parameter
+maidroid.get_all_take_items = function(droid)
+    if not droid then
+        return all_take_items
+    end
+    return get_all_take_items(droid)
+end
+
 -- Create the cores table if it doesn't exist
 if not maidroid.cores then
 	maidroid.cores = {}
@@ -135,25 +165,7 @@ end
 local GenericCookerTarget = {}
 GenericCookerTarget.__index = GenericCookerTarget
 
-local all_cookable_items_short = {
-    { item_name = "farming:seed_rice",  count = 5 },
-    { item_name = "default:sand",       count = 5 },
-    { item_name = "farming:rice_flour", count = 5 },
-}
 
-local all_take_items = {
-	{ item_name = "farming:seed_rice",  quantity = 5 },
-	{ item_name = "farming:wheat",  quantity = 5 },
-	{ item_name = "farming:rice_flour", quantity = 5 },
-	{ item_name = "default:papyrus", quantity = 5 },
-}
-
-local craft_outputs = {
-    "farming:flour",
-    "farming:rice_flour",
-    "farming:bread_slice",
-    "farming:rhubarb_pie"
-}
 
 
 local function lfv(verbose, ...)
@@ -996,6 +1008,50 @@ local function get_all_required_craft_items(outputs, verbose)
 	return list
 end
 
+-- ,,take all ingredient
+function get_combined_take_items(droid)
+    return all_take_items
+end
+
+-- combine short list of take items with the ingredients from player selected recipe
+function get_combined_take_items2(droid)
+    local take_items = {}
+    
+    lf("generic_cooker:get_combined_take_items", "droid=" .. dump(all_take_items))
+    -- Add default take items
+    for _, item in ipairs(short_take_items_take_items) do
+        take_items[#take_items + 1] = item
+    end
+    
+    -- Add ingredients from desired_craft_outputs if available
+    if droid and type(droid.desired_craft_outputs) == "table" then
+        lf("generic_cooker:get_combined_take_items", "droid.desired_craft_outputs=" .. dump(droid.desired_craft_outputs))
+        local required_items = get_all_required_craft_items(droid.desired_craft_outputs, false)
+        lf("generic_cooker:get_combined_take_items", "found " .. #required_items .. " required items from desired_craft_outputs")
+        
+        -- Add required items to take_items list with default quantity of 5
+        for _, item_name in ipairs(required_items) do
+            -- Check if item is already in the list to avoid duplicates
+            local found = false
+            for _, existing in ipairs(take_items) do
+                if existing.item_name == item_name then
+                    found = true
+                    break
+                end
+            end
+            if not found then
+                take_items[#take_items + 1] = { item_name = item_name, quantity = 5 }
+                lf("generic_cooker:get_combined_take_items", " added ingredient " .. item_name .. " with quantity 5")
+            end
+        end
+    end
+    
+
+    lf("generic_cooker:get_combined_take_items", ": returning " .. dump(take_items))
+
+    return take_items
+end
+
 -- Helper: craft rice flour directly in the maidroid's inventory.
 -- Consumes a fixed number of rice items and adds one rice flour if possible.
 local function craft_rice_flour(droid)
@@ -1323,7 +1379,7 @@ act = function(droid, dtime)
 			take_item_from_chest(
 				droid,
 				target.pos,
-				all_take_items
+				get_combined_take_items(droid)
 			)
         else
             lf("generic_cooker:act", "generic_cooker_take_item: no target")
@@ -1362,7 +1418,7 @@ task = function(droid)
 	-- : randomly pick one of two furnace actions, with choice 1 being twice as likely as choice 2
 	-- Use math.random(3): values 1 and 2 map to choice 1, value 3 maps to choice 2
 	local choice = math.random(3)
-    choice = 1
+    -- choice = 3
 
 	if choice == 1 then
 		lf("generic_cooker:task", "CHOICE=1: try_feed_get_from_furnace__generic for ")

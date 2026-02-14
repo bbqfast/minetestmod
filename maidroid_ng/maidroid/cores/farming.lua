@@ -456,26 +456,37 @@ papyrus_neighbors["lottmapgen:gondor_grass"] = true
 -- ,,x1
 
 
--- ,,ispapyrus
+-- ,,pap3
 is_papyrus = function(pos, name)
 	if minetest.is_protected(pos, name) then
 		return false
 	end
 
 	local node = minetest.get_node(pos)
+	local node_above = minetest.get_node(vector.add(pos, {x=0, y=1, z=0}))
+	local node_below = minetest.get_node(vector.add(pos, {x=0, y=-1, z=0}))
 	if node.name ~= "default:papyrus" then
 		return false
 	end
 	node = minetest.get_node(vector.add(pos, {x=0, y=1, z=0}))
 	if node.name ~= "default:papyrus" then
-		return false
-	end
-	node = minetest.get_node(vector.add(pos, {x=0, y=-1, z=0}))
-	if papyrus_neighbors[node.name] then
-		return true
-	end
+    	lf("farming:is_papyrus", "nodes - current="..node.name.." above="..node_above.name.." below="..node_below.name)
 
-    lf("farming:is_papyrus", "node.name="..node.name)
+        -- lf("farming:is_papyrus", "FALSE 1 node.name="..node.name)
+		return false
+    else
+        lf("farming:is_papyrus", "nodes - current="..node.name.." above="..node_above.name.." below="..node_below.name)
+
+        return true
+    end
+
+    -- soil detection doesn't work well with dense farms
+    -- node = minetest.get_node(vector.add(pos, {x=0, y=-1, z=0}))
+	-- if papyrus_neighbors[node.name] then
+	-- 	return true
+	-- end
+
+    lf("farming:is_papyrus", "FALSE 2 node.name="..node.name)
 	return false
 end
 
@@ -880,9 +891,10 @@ end
  		else
 			lf("farming:task", "No mowable plants found")
  		end
- 		if task_base(self, mow, dest) then
- 			return
- 		end
+ 		task_base(self, mow, dest) 
+ 		-- if task_base(self, mow, dest) then
+ 		-- 	return
+ 		-- end
          lf("farming:task", "Continued after mow  plants found")
 
 		-- Plant papyrus
@@ -1240,10 +1252,11 @@ mow = function(self, dtime)
 	end
  end
 
+--  ,,pap2
 collect_papyrus = function(self, dtime)
     lf("farming:collect_papyrus", ".................... collect_papyrus enter")
 	-- Skip until timer is ok
-	if update_action_timers(self, dtime, self.selected_tool) then return end
+	-- if update_action_timers(self, dtime, self.selected_tool) then return end
 
 	if not is_papyrus(self.destination) then
 		to_wander(self, "farming:collect_papyrus_not_papyrus", 0, timers.change_dir_max, "collect_papyrus")
@@ -1328,7 +1341,7 @@ on_step = function(self, dtime, moveresult)
 	-- Pause if too far from home (more than 20 blocks)
 	if self.home then
 		local distance = vector.distance(self:get_pos(), self.home)
-		if distance > 20 then
+		if distance > 10 then
 			if not self.pause then
 				self.pause = true
 				self._distance_paused = true

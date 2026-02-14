@@ -39,3 +39,7 @@ Game item:
 - food boost damage
 - food boost defend
 - fix hoes to work with lottsoil
+
+
+Armor to fix
+mithril chest plate - mess up graphics
