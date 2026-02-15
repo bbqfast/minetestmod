@@ -29,6 +29,26 @@ local core_path = maidroid.cores.path
 
 local search = maidroid.helpers.search_surrounding
 
+-- Metrics table to track harvested crops
+local harvest_metrics = {}
+-- Timer for periodic metrics logging
+local metrics_log_timer = 0
+local metrics_log_interval = 35 -- seconds
+
+-- Function to log harvest metrics
+local function log_harvest_metrics()
+	lf("harvest_metrics", "**************** Farming Metrics ****************")
+	if next(harvest_metrics) == nil then
+		lf("harvest_metrics", "No crops harvested yet.")
+	else
+		local harvest_parts = {}
+		for crop_name, count in pairs(harvest_metrics) do
+			table.insert(harvest_parts, string.format("%s:%d", crop_name, count))
+		end
+		lf("harvest_metrics", "Harvested Crops: " .. table.concat(harvest_parts, ", "))
+	end
+end
+
 -- Treat chests as blocking for farming movement, similar to fences,
 -- so the maidroid does not walk past chests while pathing or wandering.
 local function is_fence_or_chest(name)
@@ -64,12 +84,71 @@ local ll = function(msg)
 	minetest.log("warning", pre..msg)
 end
 
+-- Configurable distance threshold for teleporting back to activation position
+-- This can be set via minetest.settings or externally
+local max_distance_from_activation = tonumber(minetest.settings:get("maidroid.farming.max_distance_from_activation")) or 10
+
+-- Function to get the current distance threshold (allows external modification)
+local function get_max_distance_from_activation()
+	-- Check if settings value has been updated
+	local settings_value = tonumber(minetest.settings:get("maidroid.farming.max_distance_from_activation"))
+	if settings_value then
+		max_distance_from_activation = settings_value
+	end
+	return maidroid.cores.farming.max_distance_from_activation or max_distance_from_activation
+end
+
+-- Function to set the distance threshold
+local function set_max_distance_from_activation(distance)
+	if distance and distance > 0 and distance <= 100 then
+		max_distance_from_activation = distance
+		maidroid.cores.farming.max_distance_from_activation = distance
+		-- Also save to minetest settings for persistence
+		minetest.settings:set("maidroid.farming.max_distance_from_activation", tostring(distance))
+		return true
+	end
+	return false
+end
+
 local lf = maidroid.lf
 
 -- ,,x1
 local function extract_before_underscore(str)
     -- return str:match("([^_]*)")
     return str:match("(.*)_[0-9]+")
+end
+
+--- Check for water near position and place water source if needed
+local function check_and_place_water(self, lpos, lnode, cnode)
+    if lnode.name ~= "air" and cnode.name == "air" then
+        lf("farming:task", "SPOT FOR WATER Checking for water near "..minetest.pos_to_string(lpos))
+        local water_found = false
+        for dx = -3, 3 do
+            if water_found then break end
+            for dz = -3, 3 do
+                local p = vector.add(lpos, { x = dx, y = 0, z = dz }) -- keep same y as lpos
+                local nodename = minetest.get_node(p).name
+                if nodename == "default:water_source" or minetest.get_item_group(nodename, "water") > 0 then
+                    water_found = true
+                    break
+                end
+            end
+        end
+
+        if not water_found then
+            local under_name = minetest.get_node(lpos).name
+            -- If the node under is dirt/soil, place a water source (unless protected)
+            if is_valid_soil(under_name) or minetest.get_item_group(under_name, "soil") > 0 then
+                if not minetest.is_protected(lpos, self.owner) then
+                    minetest.set_node(lpos, { name = "default:water_source" })
+                    water_found = true
+                    lf("farming:task", "Placed water at "..minetest.pos_to_string(lpos).." (converted soil to water)")
+                else
+                    lf("farming:task", "Cannot place water at "..minetest.pos_to_string(lpos).." - protected")
+                end
+            end
+        end
+    end
 end
 
 weed_plants["default:grass"] = {chance=1, crop="default:grass_1"}
@@ -601,6 +680,14 @@ end
 on_start = function(self)
 	self.path = nil
 	wander_core.on_start(self)
+	
+	-- Store activation position if not already set (retain last spawned position)
+	if not self._activation_pos then
+		self._activation_pos = self:get_pos()
+		lf("farming", "Stored activation position: " .. minetest.pos_to_string(self._activation_pos))
+	else
+		lf("farming", "Using existing activation position: " .. minetest.pos_to_string(self._activation_pos))
+	end
 end
 
 on_resume = function(self)
@@ -624,7 +711,8 @@ task_base = function(self, action, destination)
 		return 
 	end
 
-	lf("farming:task_base", "task_base: destination=" .. minetest.pos_to_string(destination) .. " action=" .. tostring(action) .. ", state=" .. tostring(self.state))
+	local node = minetest.get_node(destination)
+	lf("farming:task_base", "task_base: destination=" .. node.name .. " action=" .. tostring(action) .. ", state=" .. tostring(self.state))
 	local pos = self:get_pos()
 	-- lf("[maidroid:farming]", "task_base: current pos=" .. minetest.pos_to_string(pos))
 	
@@ -887,6 +975,81 @@ dump_inventory_to_chest_with_exclusion = function(self, chest_pos, inv, exclude_
 	end
 end
 
+-- Check current position for collecting papyrus without searching
+no_search_and_collect_papyrus = function(self, lpos, inv)
+    if is_papyrus(lpos) then
+        if task_base(self, collect_papyrus, lpos) then
+            return true
+        end
+    end
+    return false
+end
+
+-- Check current position for harvesting without searching
+no_search_and_harvest = function(self, lpos, inv)
+    if is_mowable(lpos) then
+        if task_base(self, mow, lpos) then
+            return true
+        end
+        lf("farming:task", "Continued after mow at current position")
+    end
+    return false
+end
+
+-- Search for mowable plants and initiate harvesting
+search_and_harvest = function(self, pos, inv)
+    -- lf("[maidroid:farming]", "Searching for mowable plants near " .. minetest.pos_to_string(pos))
+    local dest = search(pos, is_mowable, self.owner)
+    if dest then
+        -- lf("[maidroid:farming]", "Found mowable plant at " .. minetest.pos_to_string(dest))
+    else
+        lf("farming:task", "No mowable plants found")
+    end
+    if task_base(self, mow, dest) then
+        return true
+    end
+    lf("farming:task", "Continued after mow  plants found")
+    return false
+end
+
+-- Check current position for planting without searching
+no_search_and_plant = function(self, lpos, inv)
+    if is_plantable(lpos) then
+        if not ( self.selected_seed and							-- Is there already a selected seed
+            inv:contains_item("main", self.selected_seed)) then -- in inventory
+            if not select_seed(self) then						-- Try to find a seed in inventory
+                craft_seeds(self)								-- Craft seeds if none
+            end -- TODO delay crafting
+        end
+        -- Planting
+        if self.selected_seed and
+            task_base(self, plant, lpos) then
+            return true
+        end
+    end
+    return false
+end
+
+-- Search for plantable locations and initiate planting
+search_and_plant = function(self, pos, inv)
+    local dest = search(pos, is_plantable, self.owner)
+    if dest then
+        -- local destnode = minetest.get_node(dest)
+        if not ( self.selected_seed and							-- Is there already a selected seed
+            inv:contains_item("main", self.selected_seed)) then -- in inventory
+            if not select_seed(self) then						-- Try to find a seed in inventory
+                craft_seeds(self)								-- Craft seeds if none
+            end -- TODO delay crafting
+        end
+        -- Planting
+        if self.selected_seed and
+            task_base(self, plant, dest) then
+            return true
+        end
+    end
+    return false
+end
+
 -- ,,task
 task = function(self)
 
@@ -923,65 +1086,20 @@ task = function(self)
 
     -- Ensure there is water within 3 nodes horizontally on the same y as lpos; if not, try to place a water source nearby
     -- only if LT on standing soil
-    if lnode.name ~= "air" and cnode.name == "air" then
-        lf("farming:task", "SPOT FOR WATER Checking for water near "..minetest.pos_to_string(lpos))
-        local water_found = false
-        for dx = -3, 3 do
-            if water_found then break end
-            for dz = -3, 3 do
-                local p = vector.add(lpos, { x = dx, y = 0, z = dz }) -- keep same y as lpos
-                local nodename = minetest.get_node(p).name
-                if nodename == "default:water_source" or minetest.get_item_group(nodename, "water") > 0 then
-                    water_found = true
-                    break
-                end
-            end
-        end
+    check_and_place_water(self, lpos, lnode, cnode)
 
-        if not water_found then
-            local under_name = minetest.get_node(lpos).name
-            -- If the node under is dirt/soil, place a water source (unless protected)
-            if is_valid_soil(under_name) or minetest.get_item_group(under_name, "soil") > 0 then
-                if not minetest.is_protected(lpos, self.owner) then
-                    minetest.set_node(lpos, { name = "default:water_source" })
-                    water_found = true
-                    lf("farming:task", "Placed water at "..minetest.pos_to_string(lpos).." (converted soil to water)")
-                else
-                    lf("farming:task", "Cannot place water at "..minetest.pos_to_string(lpos).." - protected")
-                end
-            end
-        end
+    if no_search_and_collect_papyrus(self, pos, inv) then
+        return
     end
-
-    local dest = search(pos, is_plantable, self.owner)
-    if dest then
-        -- local destnode = minetest.get_node(dest)
-        if not ( self.selected_seed and							-- Is there already a selected seed
-            inv:contains_item("main", self.selected_seed)) then -- in inventory
-            if not select_seed(self) then						-- Try to find a seed in inventory
-                craft_seeds(self)								-- Craft seeds if none
-            end -- TODO delay crafting
-        end
-        -- Planting
-        if self.selected_seed and
-            task_base(self, plant, dest) then
-            return
-        end
+    -- Planting logic
+    if no_search_and_plant(self, pos, inv) then
+        return
     end
 
     -- Harvesting
-    -- lf("[maidroid:farming]", "Searching for mowable plants near " .. minetest.pos_to_string(pos))
-    dest = search(pos, is_mowable, self.owner)
-    if dest then
-        -- lf("[maidroid:farming]", "Found mowable plant at " .. minetest.pos_to_string(dest))
-    else
-        lf("farming:task", "No mowable plants found")
+    if no_search_and_harvest(self, pos, inv) then
+        return
     end
-    task_base(self, mow, dest) 
-    -- if task_base(self, mow, dest) then
-    -- 	return
-    -- end
-        lf("farming:task", "Continued after mow  plants found")
 
     -- Plant papyrus
     -- if not is_scythe(self.selected_tool) then
@@ -995,8 +1113,8 @@ task = function(self)
     -- lf("farming:task", "Continued after plant papyrus")
 
     -- Harvest papyrus
-    dest = search(pos, is_papyrus, self.owner)
-    task_base(self, collect_papyrus, dest)
+    -- dest = search(pos, is_papyrus, self.owner)
+    -- task_base(self, collect_papyrus, dest)
 end
 
 is_seed = function(name)
@@ -1318,6 +1436,11 @@ mow = function(self, dtime)
 
 		self:add_items_to_main(stacks)
 		lf("farming:mow", "added items to inventory (scythe mode), stacks count = " .. tostring(#stacks))
+		
+		-- Update harvest metrics
+		harvest_metrics[mature] = (harvest_metrics[mature] or 0) + count
+		lf("farming:mow", "harvest_metrics updated: " .. mature .. " = " .. harvest_metrics[mature])
+		
 		to_wander(self, "farming:mow_scythe_done", 0, timers.change_dir_max, "mow")
 	else -- Normal mode
 		lf("farming:mow", "normal mode (not scythe)")
@@ -1333,6 +1456,11 @@ mow = function(self, dtime)
 		end
 		self:add_items_to_main(stacks)
 		lf("farming:mow", "added items to inventory (normal mode), stacks count = " .. tostring(#stacks))
+		
+		-- Update harvest metrics
+		harvest_metrics[mature] = (harvest_metrics[mature] or 0) + 1
+		lf("farming:mow", "harvest_metrics updated: " .. mature .. " = " .. harvest_metrics[mature])
+		
 		replant_after_harvest(self, mature, self.destination)
 		to_wander(self, "farming:mow_done", 0, timers.change_dir_max, "mow")
 	end
@@ -1362,6 +1490,11 @@ collect_papyrus = function(self, dtime)
 	end
 	self:add_items_to_main({"default:papyrus " .. count})
     lf("farming:collect_papyrus", "added " .. count .. " papyrus to inventory")
+    
+    -- Update harvest metrics
+    harvest_metrics["default:papyrus"] = (harvest_metrics["default:papyrus"] or 0) + count
+    lf("farming:collect_papyrus", "harvest_metrics updated: default:papyrus = " .. harvest_metrics["default:papyrus"])
+    
 	to_wander(self, "farming:collect_papyrus_done", 0, timers.change_dir_max, "collect_papyrus")
 end
 
@@ -1415,37 +1548,26 @@ local check_fence_detection = function(self)
 			" n_below2=" .. n_below2 ..
 			" n_here=" .. n_here ..
 			" n_here_below=" .. n_here_below)
-		if not self.pause and self.core and self.core.on_pause then
-			self.core.on_pause(self)
-			self.pause = true
-		end
+            
+        -- pause the maidroid only due to debugging
+        
+		-- if not self.pause and self.core and self.core.on_pause then
+		-- 	self.core.on_pause(self)
+		-- 	self.pause = true
+		-- end
 	end
 end
 
 -- ,,step
 on_step = function(self, dtime, moveresult)
-	-- Pause if too far from home (more than 20 blocks)
-	if self.home then
-		local distance = vector.distance(self:get_pos(), self.home)
-		if distance > 10 then
-			if not self.pause then
-				self.pause = true
-				self._distance_paused = true
-				if self.core and self.core.on_pause then
-					self.core.on_pause(self)
-				end
-				minetest.log("warning", "farming maidroid paused: too far from home (" .. string.format("%.1f", distance) .. " blocks)")
-			end
-		else
-			-- Resume if within range and currently paused for distance
-			if self.pause and self._distance_paused then
-				self.pause = false
-				self._distance_paused = nil
-				if self.core and self.core.on_resume then
-					self.core.on_resume(self)
-				end
-				minetest.log("warning", "farming maidroid resumed: within range of home")
-			end
+	-- Check if maidroid is more than max_distance_from_activation blocks away from activation position
+	if self._activation_pos then
+		local current_pos = self:get_pos()
+		local distance = vector.distance(current_pos, self._activation_pos)
+		local max_distance = get_max_distance_from_activation()
+		if distance > max_distance then
+			lf("farming", "Too far from activation (" .. string.format("%.1f", distance) .. " > " .. max_distance .. "), teleporting back")
+			self.object:set_pos(self._activation_pos)
 		end
 	end
 
@@ -1464,6 +1586,13 @@ on_step = function(self, dtime, moveresult)
 
 	-- Pickup surrounding items
 	self:pickup_item()
+
+	-- Update metrics logging timer
+	metrics_log_timer = metrics_log_timer + dtime
+	if metrics_log_timer >= metrics_log_interval then
+		log_harvest_metrics()
+		metrics_log_timer = 0 -- Reset timer
+	end
 
 	-- Let wander core handle movement and task selection only
 	-- when not currently performing an explicit action.
@@ -1581,5 +1710,15 @@ maidroid.register_core("farming", {
 	doc = doc,
 })
 maidroid.new_state("ACT")
+
+-- Add custom functions after core registration to prevent overwriting
+-- Expose the configurable distance threshold and setter function
+maidroid.cores.farming.max_distance_from_activation = max_distance_from_activation
+maidroid.cores.farming.set_max_distance_from_activation = set_max_distance_from_activation
+maidroid.cores.farming.get_max_distance_from_activation = get_max_distance_from_activation
+
+-- Also expose directly to maidroid table as fallback
+maidroid.set_max_distance_from_activation_farming = set_max_distance_from_activation
+maidroid.get_max_distance_from_activation_farming = get_max_distance_from_activation
 
 -- vim: ai:noet:ts=4:sw=4:fdm=indent:syntax=lua

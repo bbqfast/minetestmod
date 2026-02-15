@@ -61,6 +61,77 @@ reuse the same code as much as possible for scrolling, pagination, position memo
 ---------------------------
 create new list  on the right side of craftable call cookable, that attach to cooking inventory
 ---------------------------
+analyze this block
+
+if owns and self.core.name == "generic_cooker" then
+
+there are 4 groups of logic to handle
+craftable
+desirable
+cookable
+cooklist
+
+organic the logic to have statement grouped together by above caegory
+seperate the logic for each category by a comment -----------------------<type>
+
+---------------------------
+
+
+
+in this txt file
+write according to the following
+
+read this C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack
+
+check all the lua scripts (*.lua) 
+
+list all the lua functions  (without showing parameters) insde
+like function <name>(.....)
+or <name> = function ....
+
+---------------------------
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack
+
+
+update this txt file
+
+look at this folder
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\inbox
+
+list all the lua files and it's content 
+
+in this format:
+
+Big folder title of inbox
+like ***** inbox *****
+
+file name
+file path of lua
+
+description of file
+
+Lua Function list:
+<function name without arguments> - function description
+
+--
+now do the same for all lua files under:
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\itemframes
+
+Big folder title of inbox
+like ***** itemframes *****
+
+-- 
+do the same for all folder under (same level of details)
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack
+
+--
+look at the folder list highlighted
+
+separate the one that has summary from the ones that didn't 
+
+
+---------------------------
+---------------------------
 ---------------------------
 
 
