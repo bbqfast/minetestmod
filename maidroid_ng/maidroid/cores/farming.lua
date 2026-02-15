@@ -11,6 +11,9 @@ local S = maidroid.translator
 
 local timers = maidroid.timers
 
+-- Import farming items list
+dofile(maidroid.modpath .. "/cores/farming_items.lua")
+
 -- Core interface functions
 local on_start, on_pause, on_resume, on_stop, on_step, is_tool
 
@@ -227,7 +230,9 @@ dump_at_chest = function(self, dtime)
 
         -- dump,,list
 		local dump_list = {"default:papyrus", "farming:wheat", "farming:rhubarb"}
-		dump_inventory_to_chest_direct(self, self._dump_chest_pos, inv, dump_list)
+		-- dump_inventory_to_chest_direct(self, self._dump_chest_pos, inv, dump_list)
+        -- ,,x2
+        dump_inventory_to_chest_with_exclusion(self, self._dump_chest_pos, inv, farmer_reserve_list)
 		self._dump_chest_pos = nil
 	else
 		-- Fallback to positional detection if for some reason chest pos is missing.	minetest.log("error", "[maidroid:farming] dump_at_chest: No chest position stored, cannot dump inventory")
@@ -405,6 +410,41 @@ is_seed = function(name)
 	if seeds[name] ~= nil then
 		return true
 	end
+	return false
+end
+
+-- Enhanced is_seed function with fallback patterns for broader compatibility
+-- This function can be used globally to check if an item is a seed
+maidroid.is_seed = function(item_name)
+	if not item_name or type(item_name) ~= "string" then
+		return false
+	end
+	
+	-- Primary check: use the local seeds table
+	if seeds[item_name] ~= nil then
+		return true
+	end
+	
+	-- Fallback: Check common seed naming patterns
+	local seed_patterns = {
+		"farming:seed_",
+		"ethereal:",
+		"lottfarming:",
+		"better_farming:",
+		"cucina_vegana:"
+	}
+	
+	for _, pattern in ipairs(seed_patterns) do
+		if string.find(item_name, pattern, 1, true) == 1 then
+			return true
+		end
+	end
+	
+	-- Additional check for items containing "seed" in their name
+	if string.find(item_name, "seed", 1, true) then
+		return true
+	end
+	
 	return false
 end
 
@@ -673,6 +713,7 @@ dump_inventory_to_chest = function(self, pos, inv)
 end
 
 -- ,,chest,,ch2
+-- ,,x1
 dump_inventory_to_chest_direct = function(self, chest_pos, inv, dump_item_list)
 	if not chest_pos then
 		return
@@ -750,168 +791,213 @@ dump_inventory_to_chest_direct = function(self, chest_pos, inv, dump_item_list)
 	end
 end
 
--- ,,task
-	task = function(self)
-		local pos = self:get_pos()
-		local inv = self:get_inventory()
-		-- ,,x1
-
-		lpos = vector.add(pos, {x=0, y=-1, z=0})
-		local lnode = minetest.get_node(lpos)
-		local cnode = minetest.get_node(pos)
-
-		-- Log node names under and at current position for debugging
-		local lname = lnode and lnode.name or "nil"
-		local cname = cnode and cnode.name or "nil"
-		lf("farming:task", "task() [maidroid:farming] lnode=" .. lname .. " cnode=" .. cname)
-
-		-- error("dummy error")
-		if cnode.name == "air" and is_valid_soil(lnode.name) then
-			lf("farming:task", "Convert dirt to soil at "..minetest.pos_to_string(lpos))
-			lf("farming:task", "Before: "..cnode.name)
-			minetest.set_node(lpos, { name = "farming:soil" })
-        else
-            -- lf("task", "cannot CONVERT: "..lnode.name)
-		end
-
-		-- First, occasionally try to dump an oversized stack into a nearby chest.
-		-- This may initiate a path-following action toward a chest.
-		if maybe_dump_to_nearby_chest(self, inv, pos) then
-			return
-		end
-
-		-- Then, if already at a chest, perform the immediate dump behavior.
-		-- dump_inventory_to_chest(self, pos, inv)
-
-		-- Ensure there is water within 3 nodes horizontally on the same y as lpos; if not, try to place a water source nearby
-		-- only if LT on standing soil
-		if lnode.name ~= "air" and cnode.name == "air" then
-			lf("farming:task", "SPOT FOR WATER Checking for water near "..minetest.pos_to_string(lpos))
-			local water_found = false
-			for dx = -3, 3 do
-				if water_found then break end
-				for dz = -3, 3 do
-					local p = vector.add(lpos, { x = dx, y = 0, z = dz }) -- keep same y as lpos
-					local nodename = minetest.get_node(p).name
-					if nodename == "default:water_source" or minetest.get_item_group(nodename, "water") > 0 then
-						water_found = true
-						break
-					end
-				end
-			end
-
-			if not water_found then
-				local under_name = minetest.get_node(lpos).name
-				-- If the node under is dirt/soil, place a water source (unless protected)
-				if is_valid_soil(under_name) or minetest.get_item_group(under_name, "soil") > 0 then
-					if not minetest.is_protected(lpos, self.owner) then
-						minetest.set_node(lpos, { name = "default:water_source" })
-						water_found = true
-						lf("farming:task", "Placed water at "..minetest.pos_to_string(lpos).." (converted soil to water)")
-					else
-						lf("farming:task", "Cannot place water at "..minetest.pos_to_string(lpos).." - protected")
-					end
-				end
-			end
-		end
-		-- if not water_found then
-		-- 	ll("No water found near " .. minetest.pos_to_string(lpos) .. " on same y, attempting to place water at lpos or nearby")
-		-- 	local placed = false
-		-- 	local owner = self.owner
-
-		-- 	-- Try current lpos first, then nearby positions within a small radius
-		-- 	local candidates = {}
-		-- 	table.insert(candidates, vector.new(lpos))
-		-- 	for dx = -1, 1 do
-		-- 		for dz = -1, 1 do
-		-- 			local p = vector.add(lpos, { x = dx, y = 0, z = dz })
-		-- 			-- avoid duplicating lpos
-		-- 			if not (p.x == lpos.x and p.y == lpos.y and p.z == lpos.z) then
-		-- 				table.insert(candidates, p)
-		-- 			end
-		-- 		end
-		-- 	end
-
-		-- 	for _, p in ipairs(candidates) do
-		-- 		if placed then break end
-		-- 		local pstr = minetest.pos_to_string(p)
-		-- 		if minetest.is_protected(p, owner) then
-		-- 			ll("Position " .. pstr .. " is protected for owner " .. tostring(owner) .. ", skipping")
-		-- 		else
-		-- 			local nodename = minetest.get_node(p).name
-		-- 			-- If it's already water, consider success and stop
-		-- 			if nodename == "default:water_source" or minetest.get_item_group(nodename, "water") > 0 then
-		-- 				ll("Found existing water at " .. pstr .. " (" .. nodename .. ")")
-		-- 				placed = true
-		-- 				break
-		-- 			end
-		-- 			local rnode = minetest.registered_nodes[nodename]
-		-- 			-- Allow placement on air, buildable_to nodes, or replaceable soil (so we don't overwrite important nodes)
-		-- 			if nodename == "air" or (rnode and rnode.buildable_to) or minetest.get_item_group(nodename, "soil") > 0 then
-		-- 				minetest.set_node(p, { name = "default:water_source" })
-		-- 				placed = true
-		-- 				ll("Placed water at " .. pstr .. " (replaced " .. tostring(nodename) .. ")")
-		-- 				break
-		-- 			else
-		-- 				ll("Node at " .. pstr .. " (" .. tostring(nodename) .. ") is not suitable for placement")
-		-- 			end
-		-- 		end
-		-- 	end
-
-		-- 	if not placed then
-		-- 		ll("Attempted all candidate positions but failed to place water near " .. minetest.pos_to_string(lpos))
-		-- 	else
-		-- 		ll("Successfully ensured water near " .. minetest.pos_to_string(lpos))
-		-- 	end
-		-- else
-		-- 	ll("Water already present near " .. minetest.pos_to_string(lpos) .. ", no placement needed")
-		-- end
-
- 		local dest = search(pos, is_plantable, self.owner)
- 		if dest then
-			-- local destnode = minetest.get_node(dest)
-			if not ( self.selected_seed and							-- Is there already a selected seed
-				inv:contains_item("main", self.selected_seed)) then -- in inventory
-				if not select_seed(self) then						-- Try to find a seed in inventory
-					craft_seeds(self)								-- Craft seeds if none
-				end -- TODO delay crafting
-			end
-			-- Planting
-			if self.selected_seed and
-				task_base(self, plant, dest) then
-				return
-			end
-		end
-
-		-- Harvesting
-		-- lf("[maidroid:farming]", "Searching for mowable plants near " .. minetest.pos_to_string(pos))
- 		dest = search(pos, is_mowable, self.owner)
- 		if dest then
- 			-- lf("[maidroid:farming]", "Found mowable plant at " .. minetest.pos_to_string(dest))
- 		else
-			lf("farming:task", "No mowable plants found")
- 		end
- 		task_base(self, mow, dest) 
- 		-- if task_base(self, mow, dest) then
- 		-- 	return
- 		-- end
-         lf("farming:task", "Continued after mow  plants found")
-
-		-- Plant papyrus
-		-- if not is_scythe(self.selected_tool) then
-		-- 	dest = search(pos, is_papyrus_soil, self.owner)
-		-- 	if inv:contains_item("main", "default:papyrus")
-		-- 		and task_base(self, plant_papyrus, dest) then
-        --         lf("farming:task", "Continued after plant papyrus")
-		-- 		return
-		-- 	end
-		-- end
-        -- lf("farming:task", "Continued after plant papyrus")
-
-		-- Harvest papyrus
-		dest = search(pos, is_papyrus, self.owner)
-		task_base(self, collect_papyrus, dest)
+-- Dump inventory to chest with exclusion list
+-- Similar to dump_inventory_to_chest_direct but takes exclude_dump_item_list
+-- Items in exclude_dump_item_list will NOT be dumped to the chest
+-- ,,ch3
+dump_inventory_to_chest_with_exclusion = function(self, chest_pos, inv, exclude_dump_item_list)
+	if not chest_pos then
+		return
 	end
+	lf("farming:dump_inventory_to_chest_with_exclusion", "at chest for dumping at " .. minetest.pos_to_string(chest_pos))
+	local meta = minetest.get_meta(chest_pos)
+	local owner = meta:get_string("owner")
+	if not owner or owner == "" or owner == self.owner then
+		local chest_inv = meta:get_inventory()
+		local main = inv:get_list("main") or {}
+		local changed = false
+		local reserve_count = 10
+		local function dump_stack_reserving(idx, stack)
+            lf("farming:dump_inventory_to_chest_with_exclusion", "dumping stack " .. stack:get_name() .. " count=" .. stack:get_count())
+			local count = stack:get_count()
+			if count <= reserve_count then
+				return false
+			end
+			local dump_stack = ItemStack(stack)
+			dump_stack:set_count(count - reserve_count)
+			local keep_stack = ItemStack(stack)
+			keep_stack:set_count(reserve_count)
+			local leftover = chest_inv:add_item("main", dump_stack)
+			local leftover_count = leftover:get_count()
+			if leftover_count > 0 then
+				keep_stack:set_count(reserve_count + leftover_count)
+			end
+            lf("farming:dump_inventory_to_chest_with_exclusion", "dumped stack " .. stack:get_name() .. " count=" .. count )
+			main[idx] = keep_stack
+			return true
+		end
+		local function dump_stack_all(idx, stack)
+            lf("farming:dump_inventory_to_chest_with_exclusion", "dumping stack ALL " .. stack:get_name() .. " count=" .. stack:get_count())
+			local count = stack:get_count()
+			if count == 0 then
+				return false
+			end
+			local dump_stack = ItemStack(stack)
+			local leftover = chest_inv:add_item("main", dump_stack)
+			local leftover_count = leftover:get_count()
+			if leftover_count > 0 then
+				-- Keep leftover items in inventory
+				local keep_stack = ItemStack(stack)
+				keep_stack:set_count(leftover_count)
+				main[idx] = keep_stack
+			else
+				-- Remove empty stack from inventory
+				main[idx] = ItemStack("")
+			end
+            lf("farming:dump_inventory_to_chest_with_exclusion", "dumped stack ALL " .. stack:get_name() .. " count=" .. count )
+			return true
+		end
+		local function should_exclude_dump_stack(stack)
+            lf("farming:dump_inventory_to_chest_with_exclusion", "should_exclude_dump_stack: " .. stack:get_name())
+			if not exclude_dump_item_list then
+				return false -- No exclusion list, don't exclude anything
+			end
+			local name = stack:get_name()
+			if name == "" then
+				return false
+			end
+			-- exclude_dump_item_list is expected to be an array-style list like:
+			-- {"farming:seed_wheat", "farming:carrot"}
+			for _, v in ipairs(exclude_dump_item_list) do
+                -- lf("farming:dump_inventory_to_chest_with_exclusion", "exclude_dump_item_list: " .. v .. " " .. name)
+				if v == name then
+					return true -- This item should be excluded from dumping
+				end
+			end
+			return false
+		end
+		
+		-- Process all inventory items
+		for idx, stack in ipairs(main) do
+            lf("farming:dump_inventory_to_chest_with_exclusion", "checking stack " .. stack:get_name() .. " count=" .. stack:get_count())
+			if not stack:is_empty() then
+				if should_exclude_dump_stack(stack) then
+					-- Item is in exclusion list: reserve 10, dump the rest
+					changed = dump_stack_reserving(idx, stack) or changed
+				else
+					-- Item is not in exclusion list: dump all
+					changed = dump_stack_all(idx, stack) or changed
+				end
+			end
+		end
+		
+		if changed then
+			inv:set_list("main", main)
+		end
+	end
+end
+
+-- ,,task
+task = function(self)
+
+    local pos = self:get_pos()
+    local inv = self:get_inventory()
+    -- ,,x1
+
+    lpos = vector.add(pos, {x=0, y=-1, z=0})
+    local lnode = minetest.get_node(lpos)
+    local cnode = minetest.get_node(pos)
+
+    -- Log node names under and at current position for debugging
+    local lname = lnode and lnode.name or "nil"
+    local cname = cnode and cnode.name or "nil"
+    lf("farming:task", "task() [maidroid:farming] lnode=" .. lname .. " cnode=" .. cname)
+
+    -- error("dummy error")
+    if cnode.name == "air" and is_valid_soil(lnode.name) then
+        lf("farming:task", "Convert dirt to soil at "..minetest.pos_to_string(lpos))
+        lf("farming:task", "Before: "..cnode.name)
+        minetest.set_node(lpos, { name = "farming:soil" })
+    else
+        -- lf("task", "cannot CONVERT: "..lnode.name)
+    end
+
+    -- First, occasionally try to dump an oversized stack into a nearby chest.
+    -- This may initiate a path-following action toward a chest.
+    if maybe_dump_to_nearby_chest(self, inv, pos) then
+        return
+    end
+
+    -- Then, if already at a chest, perform the immediate dump behavior.
+    -- dump_inventory_to_chest(self, pos, inv)
+
+    -- Ensure there is water within 3 nodes horizontally on the same y as lpos; if not, try to place a water source nearby
+    -- only if LT on standing soil
+    if lnode.name ~= "air" and cnode.name == "air" then
+        lf("farming:task", "SPOT FOR WATER Checking for water near "..minetest.pos_to_string(lpos))
+        local water_found = false
+        for dx = -3, 3 do
+            if water_found then break end
+            for dz = -3, 3 do
+                local p = vector.add(lpos, { x = dx, y = 0, z = dz }) -- keep same y as lpos
+                local nodename = minetest.get_node(p).name
+                if nodename == "default:water_source" or minetest.get_item_group(nodename, "water") > 0 then
+                    water_found = true
+                    break
+                end
+            end
+        end
+
+        if not water_found then
+            local under_name = minetest.get_node(lpos).name
+            -- If the node under is dirt/soil, place a water source (unless protected)
+            if is_valid_soil(under_name) or minetest.get_item_group(under_name, "soil") > 0 then
+                if not minetest.is_protected(lpos, self.owner) then
+                    minetest.set_node(lpos, { name = "default:water_source" })
+                    water_found = true
+                    lf("farming:task", "Placed water at "..minetest.pos_to_string(lpos).." (converted soil to water)")
+                else
+                    lf("farming:task", "Cannot place water at "..minetest.pos_to_string(lpos).." - protected")
+                end
+            end
+        end
+    end
+
+    local dest = search(pos, is_plantable, self.owner)
+    if dest then
+        -- local destnode = minetest.get_node(dest)
+        if not ( self.selected_seed and							-- Is there already a selected seed
+            inv:contains_item("main", self.selected_seed)) then -- in inventory
+            if not select_seed(self) then						-- Try to find a seed in inventory
+                craft_seeds(self)								-- Craft seeds if none
+            end -- TODO delay crafting
+        end
+        -- Planting
+        if self.selected_seed and
+            task_base(self, plant, dest) then
+            return
+        end
+    end
+
+    -- Harvesting
+    -- lf("[maidroid:farming]", "Searching for mowable plants near " .. minetest.pos_to_string(pos))
+    dest = search(pos, is_mowable, self.owner)
+    if dest then
+        -- lf("[maidroid:farming]", "Found mowable plant at " .. minetest.pos_to_string(dest))
+    else
+        lf("farming:task", "No mowable plants found")
+    end
+    task_base(self, mow, dest) 
+    -- if task_base(self, mow, dest) then
+    -- 	return
+    -- end
+        lf("farming:task", "Continued after mow  plants found")
+
+    -- Plant papyrus
+    -- if not is_scythe(self.selected_tool) then
+    -- 	dest = search(pos, is_papyrus_soil, self.owner)
+    -- 	if inv:contains_item("main", "default:papyrus")
+    -- 		and task_base(self, plant_papyrus, dest) then
+    --         lf("farming:task", "Continued after plant papyrus")
+    -- 		return
+    -- 	end
+    -- end
+    -- lf("farming:task", "Continued after plant papyrus")
+
+    -- Harvest papyrus
+    dest = search(pos, is_papyrus, self.owner)
+    task_base(self, collect_papyrus, dest)
+end
 
 is_seed = function(name)
 	if name == nil then
@@ -1483,7 +1569,7 @@ maidroid.register_core("farming", {
 	on_stop		= on_stop,
 	on_resume	= on_resume,
 	on_pause	= on_pause,
-	on_step	= on_step,
+	on_step		= on_step,
 	is_tool		= is_tool,
 	alt_tool	= select_seed,
 	no_jump		= true,

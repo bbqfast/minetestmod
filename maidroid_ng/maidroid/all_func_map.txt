@@ -4,10 +4,12 @@
 ## MAIN CONFIGURATION FILES
 
 ### init.lua (413 lines)
-- maidroid.lf(func, msg) - Main logging function with duplicate detection and rate limiting
-- append_maidroid_positions_from_storage(res) - Load maidroid positions from mod storage
-- append_maidroid_positions_from_file(out) - Fallback position loading from text file
-- save_maidroid_pos_fallback(nametag, pos_str) - Save maidroid positions to fallback file
+- Main Functions:
+  - maidroid.lf(func, msg) - Main logging function with duplicate detection and rate limiting
+- Local Functions:
+  - append_maidroid_positions_from_storage(res) - Load maidroid positions from mod storage
+  - append_maidroid_positions_from_file(out) - Fallback position loading from text file
+  - save_maidroid_pos_fallback(nametag, pos_str) - Save maidroid positions to fallback file
 - Global step function - Position tracking and inactive maidroid monitoring
 - Chat Commands:
   - /maidroid_list or /mr_list - Lists all maidroid positions
@@ -26,26 +28,51 @@
 
 ### api.lua (3,483 lines)
 - maidroid.animation - Animation frame definitions
-  - STAND = {x = 1, y = 78}
-  - SIT = {x = 81, y = 81}
-  - LAY = {x = 162, y = 165}
-  - WALK = {x = 168, y = 187}
-  - MINE = {x = 189, y = 198}
-  - WALK_MINE = {x = 200, y = 219}
-- maidroid.format_recipe_display(item_name) - Recipe formatting for UI display
-- get_formspec() - Main UI generation for maidroid interface
-- Inventory management functions:
-  - Cooking inventory system
-  - Recipe display integration
-  - Pagination for craftable items (12 per page)
-  - Pagination for cookable items (12 per page)
-- Maidroid spawning and registration functions
-- Metrics tracking system:
-  - all_maidroid_metrics.total_activated
-  - all_maidroid_metrics.total_deactivated
+  - STAND = {x = 1, y = 78} - Standing animation frames
+  - SIT = {x = 81, y = 81} - Sitting animation frames
+  - LAY = {x = 162, y = 165} - Lying down animation frames
+  - WALK = {x = 168, y = 187} - Walking animation frames
+  - MINE = {x = 189, y = 198} - Mining animation frames
+  - WALK_MINE = {x = 200, y = 219} - Walking while mining animation frames
+- maidroid.crafting_allow_put(inv, listname, index, stack, player) - Allow putting items in crafting inventory
+- maidroid.crafting_allow_take(inv, listname, index, stack, player) - Allow taking items from crafting inventory
+- maidroid.populate_items_page(inv, droid, page_items, list_name, slot_count) - Populate inventory page with items
+- maidroid.convert_craftable_outputs_to_sparse_array(craftable_outputs) - Convert craftable outputs to sparse array
+- maidroid.populate_detached_inventory(inv, droid, craftable_outputs, list_name, max_slots) - Populate detached inventory
+- maidroid.update_selection_inventory(inv, droid) - Update selection inventory
+- maidroid.handle_change_desirable(droid) - Handle changes to desirable items list
+- maidroid.handle_change_cooklist(droid) - Handle changes to cooking list
+- maidroid.init_desirable_pageitems(droid, item_list) - Initialize desirable page items
+- maidroid.init_craftable_pageitems(droid, item_list) - Initialize craftable page items
+- maidroid.init_cookable_pageitems(droid, item_list) - Initialize cookable page items
+- maidroid.init_cooklist_pageitems(droid, item_list) - Initialize cooklist page items
+- maidroid.handle_craftable(droid) - Handle craftable item operations
+- maidroid.handle_cookable(droid) - Handle cookable item operations
+- maidroid.build_complete_desirable_list(droid) - Build complete desirable items list
+- maidroid.build_complete_cooklist_list(droid) - Build complete cooklist
+- maidroid.format_recipe_display(item_name) - Format recipe for UI display
+- maidroid.get_maidroid_by_player(player_name) - Get maidroid by player name
+- maidroid.is_maidroid(name) - Check if entity is maidroid
+- maidroid.strong_change_direction(self) - Force direction change
+- maidroid.update_infotext(self) - Update maidroid infotext
+- maidroid.register_core(name, def) - Register new maidroid core
+- calculate_pagination(self, items_list, items_per_page, min_pages, page_field_name) - Calculate pagination
+- calculate_desirable_pagination(self, desirable_outputs, desirable_items_per_page) - Calculate desirable pagination
+- populate_current_page(self, current_page, items_per_page, outputs, page_storage_key, log_prefix) - Populate current page
+- resolve_item_for_display(item) - Resolve item name for display
+- generate_unique_manufacturing_id() - Generate unique ID for maidroid
+- create_inventory(self, inventory_name) - Create maidroid inventory
+- create_crafter_events(self, inventory_name) - Create crafter inventory events
+- create_cooker_events(self, inventory_name) - Create cooker inventory events
+- on_activate(self, staticdata) - Activate maidroid entity
+- safe_read_file(path) - Safely read file contents
+- distance_from_player(self) - Calculate distance from player
+- on_step(self, dtime, moveresult) - Main step function
+- on_rightclick(self, clicker) - Handle right click interaction
+- on_punch(self, puncher, _, tool_capabilities, _, damage) - Handle punch interaction
 - Constants:
-  - DESIRABLE_ITEMS_PER_PAGE = 6
-  - CRAFTABLE_ITEMS_PER_PAGE = 12
+  - DESIRABLE_ITEMS_PER_PAGE = 6 - Items per page for desirable list
+  - CRAFTABLE_ITEMS_PER_PAGE = 12 - Items per page for craftable list
 - Item arrays:
   - init_craftable_outputs - Default cooking outputs
   - all_furnace_inputs - Furnace-compatible materials
@@ -71,27 +98,32 @@
   5. Job-specific cores (conditional loading)
 
 ### helpers.lua (123 lines)
-- maidroid.helpers.search_surrounding(pos, pred, name, range) - Area search with voxel optimization
-- maidroid.helpers.random_pos_near(pos) - Random position generation
-- maidroid.helpers.emit_sound(name, sound, event, pos, gain) - Sound emission
-- maidroid.helpers.is_fence(name) - Fence detection including mod-specific fences
-- maidroid.helpers.is_walkable(name) - Walkable node detection
-- Internal functions:
-  - insert_voxel() - Voxel insertion with duplicate checking
-  - init_voxels(range) - Initialize voxel search patterns
+- maidroid.helpers.search_surrounding(pos, pred, name, range) - Search surrounding area with voxel optimization
+- maidroid.helpers.random_pos_near(pos) - Generate random position near given position
+- maidroid.helpers.emit_sound(name, sound, event, pos, gain) - Emit sound at position
+- maidroid.helpers.is_fence(name) - Check if node is fence (including mod-specific fences)
+- maidroid.helpers.is_walkable(name) - Check if node is walkable
+- insert_voxel(childrens, inserted, range, x, y, z) - Insert voxel with duplicate checking
+- init_voxels(range) - Initialize voxel search patterns
 
 ## CORE BEHAVIOR MODULES (cores/ directory)
 
 ### basic.lua (156 lines)
-- Core interface functions:
-  - on_start(self) - Initialize basic behavior
-  - on_stop(self) - Stop and reset to idle state
-  - on_pause(self) - Pause and sit animation
+- on_start(self) - Initialize basic behavior
+- on_stop(self) - Stop and reset to idle state
+- on_pause(self) - Pause and sit animation
+- on_step(self, dtime, moveresult) - Main step function for behavior processing
 - seek_tamer(self, range, item_name) - Find player with taming item
 - Taming system integration
 - State management for idle/active modes
 
 ### wander.lua (3,157 lines)
+- on_start(self) - Initialize wandering behavior
+- on_resume(self) - Resume wandering from pause
+- on_stop(self) - Stop wandering and reset state
+- on_pause(self) - Pause wandering behavior
+- on_step(self, dtime, moveresult, task, criterion, check_inside) - Main wandering step function
+- to_wander(self, caller, walk, change_dir) - Transition to wandering state
 - Movement and exploration behavior
 - Pathfinding algorithms
 - Obstacle avoidance
@@ -100,6 +132,7 @@
 - Walk timeout management
 
 ### follow.lua (2,856 lines)
+- on_step(self, _, moveresult, player) - Main following step function
 - Player following behavior
 - Target tracking system
 - Pursuit logic
@@ -107,6 +140,11 @@
 - Follow range management
 
 ### path.lua (3,945 lines)
+- on_step(self, dtime, moveresult) - Main pathfinding step function
+- to_follow_path(self, path, destination, finalize, action) - Follow calculated path
+- pos_xyz(p) - Convert position to string format
+- path_to_str(path) - Convert path array to string
+- path_nodes_to_str(path) - Convert path nodes to string with node names
 - Pathfinding system
 - Navigation algorithms
 - Route planning
@@ -114,26 +152,34 @@
 - to_wander() - Transition to wandering behavior
 
 ### farming.lua (51,270 lines)
-- Agricultural operations:
-  - plant(self, pos) - Plant seeds/crops
-  - mow(self, pos) - Harvest mature crops
-  - collect_papyrus(self, pos) - Harvest papyrus
-  - plant_papyrus(self, pos) - Plant papyrus
-  - dump_inventory_to_chest(self) - Move items to chest
-  - dump_inventory_to_chest_direct(self, chest_pos) - Direct chest dumping
-  - dump_at_chest(self, pos) - Dump items at specific chest
-  - maybe_dump_to_nearby_chest(self) - Find and dump to nearby chest
-  - craft_seeds(self) - Craft seeds from materials
-  - select_seed(self) - Choose appropriate seed for planting
-  - task(self) - Main farming task execution
-  - task_base(self) - Base task framework
-- Helper functions:
-  - is_seed(name) - Seed detection
-  - is_plantable(name) - Plantable item detection
-  - is_papyrus(name) - Papyrus detection
-  - is_papyrus_soil(name) - Papyrus soil detection
-  - is_mowable(name) - Mowable crop detection
-  - is_scythe(name) - Scythe tool detection
+- on_start(self) - Initialize farming behavior
+- on_resume(self) - Resume farming from pause
+- on_stop(self) - Stop farming and reset state
+- on_pause(self) - Pause farming behavior
+- on_step(self, dtime, moveresult) - Main farming step function
+- is_tool(stack) - Check if item is farming tool
+- plant(self, dtime) - Plant seeds/crops at position
+- mow(self, dtime) - Harvest mature crops
+- collect_papyrus(self, dtime) - Harvest papyrus plants
+- plant_papyrus(self, dtime) - Plant papyrus at suitable location
+- dump_inventory_to_chest(self, pos, inv) - Move items to chest
+- dump_inventory_to_chest_direct(self, chest_pos, inv, dump_item_list) - Direct chest dumping
+- dump_at_chest(self, dtime) - Dump items at chest location
+- maybe_dump_to_nearby_chest(self, inv, pos) - Find and dump to nearby chest
+- craft_seeds(self) - Craft seeds from materials
+- select_seed(self) - Choose appropriate seed for planting
+- task_base(self, action, destination) - Base task framework
+- to_action(self) - Transition to action state
+- is_fence_or_chest(name) - Check if node is fence or chest
+- extract_before_underscore(str) - Extract part of string before underscore
+- is_plantable(pos, name) - Check if item can be planted at position
+- is_weed(name) - Check if plant is weed
+- is_mowable(pos, name) - Check if plant can be mowed
+- is_seed(name) - Check if item is seed
+- is_papyrus(pos, name) - Check if plant is papyrus
+- is_papyrus_soil(pos, name) - Check if soil is suitable for papyrus
+- is_valid_soil(name) - Check if soil is valid for planting
+- is_scythe(name) - Check if item is scythe tool
 - Multi-mod support: farming, better_farming, cucina_vegana, lottfarming
 
 ### digger.lua (25,391 lines)
@@ -144,6 +190,12 @@
 - Inventory management for mined items
 
 ### torcher.lua (5,657 lines)
+- on_start(self) - Initialize torcher behavior
+- on_stop(self) - Stop torcher and reset state
+- on_pause(self) - Pause torcher behavior
+- on_step(self, dtime, moveresult) - Main torcher step function
+- is_tool(stack) - Check if item is torcher tool
+- is_dark(pos) - Check if area is dark enough for torch
 - Lighting automation
 - Torch placement logic
 - Darkness detection
@@ -151,6 +203,19 @@
 - Torch inventory management
 
 ### stockbreeder.lua (15,700 lines)
+- on_start(self) - Initialize stockbreeder behavior
+- on_resume(self) - Resume stockbreeder from pause
+- on_stop(self) - Stop stockbreeder and reset state
+- on_pause(self) - Pause stockbreeder behavior
+- on_step(self, dtime, moveresult) - Main stockbreeder step function
+- is_tool(stack) - Check if item is stockbreeder tool
+- set_animation_for_job(self, itemname, animal) - Set animation for breeding job
+- get_nearest_entity(self, names, radius) - Find nearest entity of given types
+- select_follow_item(inv, animal) - Select appropriate food for animal
+- milk_cows(self) - Milk nearby cows
+- shear_sheeps(self) - Shear nearby sheep
+- has_group_item(self, group) - Check if inventory has item group
+- random_stack(stacks, name, chance) - Select random item stack with chance
 - Animal breeding management
 - Feeding and care systems
 - Breeding pair selection
@@ -158,12 +223,48 @@
 - Multi-mod support: animalia, petz, mobs_animal
 
 ### generic_cooker.lua (63,409 lines)
-- Automated cooking/furnace operations
-- Furnace feeding system
-- Fuel management
-- Cooking queue management
-- Item selection for cooking
-- Recipe automation
+- on_start(self) - Initialize generic cooker behavior
+- on_resume(self) - Resume generic cooker from pause
+- on_stop(self) - Stop generic cooker and reset state
+- on_pause(self) - Pause generic cooker behavior
+- on_step(self, dtime, moveresult) - Main generic cooker step function
+- is_tool(stack) - Check if item is cooker tool
+- to_action(droid) - Transition to action state
+- to_wander(droid, from_caller) - Transition to wandering state
+- act(droid, dtime) - Main action function
+- task(droid) - Main task function
+- get_combined_take_items(droid) - Get combined take items list
+- get_combined_take_items2(droid) - Get combined take items with recipe
+- is_fence_or_chest(name) - Check if node is fence or chest
+- get_max_distance_from_activation() - Get max distance from activation point
+- set_max_distance_from_activation(distance) - Set max distance from activation point
+- log_chest_taken_metrics() - Log chest item metrics
+- lfv(verbose, ...) - Verbose logging function
+- log_inventory(droid, label) - Log inventory contents
+- get_items_in_group(group_spec) - Get all items in item group
+- get_all_cookable_furnace_inputs() - Get all furnace-compatible items
+- take_item_from_chest(droid, chest_pos, take_items) - Take items from chest
+- try_get_item_from_nearby_chest(droid, pos, take_items) - Try to get items from nearby chest
+- feed_furnace_from_inventory_generic(droid, pos, items) - Feed furnace with items
+- feed_furnace_from_inventory_generic2(droid, pos, items) - Alternative furnace feeding
+- add_coal_fuel_if_needed(droid, pos, finv) - Add coal fuel if needed
+- collect_finished_items_from_furnace(droid, pos, finv) - Collect finished items from furnace
+- feed_get_from_furnace__generic(droid, pos) - Generic furnace feeding
+- try_feed_get_from_furnace__generic(droid, pos) - Try to feed furnace
+- feed_furnace_from_inventory(droid, pos) - Feed furnace from inventory
+- get_replacements_for_output(output_name, verbose) - Get replacement items for output
+- get_replacements_for_recipe(items, method, width, verbose) - Get replacements for recipe
+- get_craft_requirements_from_registered(output_name, verbose) - Get craft requirements
+- get_all_required_craft_items(outputs, verbose) - Get all required craft items
+- craft_rice_flour(droid) - Craft rice flour
+- test_get_items_in_groups() - Test item group functions
+- test_get_craft_requirements() - Test craft requirements
+- tests() - Run test functions
+- try_remove_item_for_craft(inv, consumables) - Remove items for crafting
+- check_required_items(inv, consumables, output_name) - Check required items
+- check_required_items_with_group(inv, consumables, output_name) - Check items with groups
+- craft_generic(droid, craft_outputs) - Generic crafting function
+- GenericCookerTarget.new(pos, item_name, max_take, take_items) - Create new cooker target
 
 ### cooker_items.lua (13,789 bytes)
 - Cooking recipes database
@@ -171,12 +272,33 @@
 - Recipe compatibility tables
 
 ### waffler.lua (12,099 lines)
+- on_start(droid) - Initialize waffler behavior
+- on_resume(droid) - Resume waffler from pause
+- on_stop(droid) - Stop waffler and reset state
+- on_pause(droid) - Pause waffler behavior
+- on_step(droid, dtime, moveresult) - Main waffler step function
+- is_tool(stack) - Check if item is waffler tool
+- to_action(droid) - Transition to action state
+- to_wander(droid, itemset) - Transition to wandering state
+- act(droid, dtime) - Main action function
+- task(droid) - Main task function
+- take_wheat_from_chest(droid, chest_pos, max_count) - Take wheat from chest
+- try_get_wheat_from_nearby_chest(droid, pos) - Try to get wheat from nearby chest
+- is_water_source(pos, name) - Check if position is water source
 - Waffle making automation
 - Batter preparation
 - Waffle cooking process
 - Requires waffles mod integration
 
 ### ocr.lua (5,392 lines)
+- on_start(self) - Initialize OCR behavior
+- on_step(self) - Main OCR step function
+- on_pause(self) - Pause OCR behavior
+- on_stop(self) - Stop OCR and reset state
+- on_resume(self) - Resume OCR from pause
+- is_tool(stack) - Check if item is OCR tool
+- mylog(log) - Log OCR messages
+- get_code(self) - Get OCR code from inventory
 - Optical character recognition functionality
 - Text reading from signs/items
 - Requires pdisc mod
@@ -184,12 +306,17 @@
 ## TOOLS (tools/ directory)
 
 ### nametag.lua (3,452 bytes)
+- on_use = function(itemstack, user, pointed_thing) - Handle nametag usage on maidroid
+- on_place = function(_, placer, pointed_thing) - Handle nametag placement
+- on_receive_fields = function(player, formname, fields) - Handle nametag form input
 - Maidroid naming system
 - Name assignment interface
 - Name validation and management
 - Nametag crafting recipe
 
 ### capture_rod.lua (8,882 bytes)
+- mydump = function(func, msg, obj) - Debug logging function
+- on_use = function(itemstack, user, pointed_thing) - Handle capture rod usage
 - Maidroid capture tool
 - Capture mechanics
 - Maidroid storage and release
@@ -197,14 +324,17 @@
 - Capture rod crafting recipe
 
 ### robbery_stick.lua (1,819 bytes)
+- on_use = function(itemstack, user, pointed_thing) - Handle robbery stick usage
 - Item transfer tool
 - Inventory manipulation
 - Item moving between containers
 - Transfer interface
+- Ownership transfer mechanics
 
 ## SUPPORT SYSTEMS
 
 ### settings.lua (111 lines)
+- arrange_number(number, min, max, integer) - Arrange number within bounds and optionally make integer
 - Configuration management:
   - Mod compatibility detection
   - Timer settings for various behaviors
@@ -220,6 +350,10 @@
   - stockbreeder_pause settings
 
 ### register.lua (86 lines)
+- on_grant = function(name, _) - Handle privilege grant
+- on_revoke = function(name, _) - Handle privilege revoke
+- on_activate = function (self) - Handle dummy item activation
+- on_detach = function(self) - Handle wield item detachment
 - Item and entity registration:
   - maidroid:maidroid_egg - Spawn egg
   - maidroid_tool:nametag - Naming tool
@@ -232,6 +366,8 @@
 - Entity cleanup for old formats
 
 ### pie.lua (88 lines)
+- maidroid_gold_pie_on_punch = function(pos, node, puncher) - Handle maidroid pie punch interaction
+- send_next_quote = function() - Send next quote in sequence
 - Maidroid pie integration
 - pie:maidroid_pie_0 - Golden pie for taming
 - Crafting recipe for maidroid pie
@@ -240,11 +376,20 @@
 - Custom eating effects and sounds
 
 ### trader.lua (316 lines)
+- lottmobs.allow_move(inv, from_list, from_index, to_list, to_index, count, player) - Allow moving items between lists
+- lottmobs.allow_put(inv, listname, index, stack, player) - Allow putting items in inventory
+- lottmobs.allow_take(inv, listname, index, stack, player) - Allow taking items from inventory
+- lottmobs.on_put(inv, listname, index, stack) - Handle putting items in inventory
+- lottmobs.on_take(inv, listname, count, index, stack, player) - Handle taking items from inventory
+- lottmobs.update_takeaway(inv) - Update takeaway items
+- lottmobs.check_pay(inv, paynow) - Check payment for items
+- lottmobs.add_goods(entity, race, same_race) - Add goods to trader inventory
+- lottmobs.face_pos(self, pos) - Face towards position
+- lottmobs_trader(self, clicker, entity, race, image, priv) - Main trader interface function
+- send_next_quote = function() - Send next quote in sequence
 - Trading interface system
 - Based on mobf trader framework
-- Inventory management for trading:
-  - allow_move() - Item movement permissions
-  - Trading logic and validation
+- Inventory management for trading
 - Price management system
 - Goods and selection lists
 
@@ -266,6 +411,7 @@
 - Implementation details
 
 ### test_shift_click.lua (2,208 bytes)
+- test_shift_click_patterns() - Test shift-click functionality patterns
 - Testing utilities
 - Shift-click functionality testing
 - Development debugging tools
