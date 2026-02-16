@@ -2072,6 +2072,251 @@ local enligthen_tool = function(droid)
 	return ""
 end
 
+-- Handle craftable logic for generic_cooker
+-- ,,co1
+local function handle_craftable_logic(self)
+	-- Create and update crafting inventory
+	if not self.crafting_inventory_id then
+		-- Use the new create_crafter_events function
+		local crafting_inventory = create_crafter_events(self, generate_unique_manufacturing_id())
+		maidroid.crafting_inventories[self.crafting_inventory_id] = crafting_inventory
+		maidroid.populate_detached_inventory(crafting_inventory, self, init_craftable_outputs, "craftable", 12)
+		lf("cooker_tab", "Created crafting inventory with ID: " .. self.crafting_inventory_id)
+	end
+	
+	local crafting_inv_id = self.crafting_inventory_id
+	local crafting_inv = maidroid.crafting_inventories[crafting_inv_id]
+	if crafting_inv then
+		lf("cooker_tab", "Found crafting inventory, updating selection")
+		if not self.desirable_page_items then
+			maidroid.init_desirable_pageitems(self, self.desired_craft_outputs)
+		end
+	else
+		lf("cooker_tab", "ERROR: Could not find crafting inventory!")
+	end
+	
+	-- Shop-style layout for cooker with pagination
+	-- Calculate current page and total pages for craftable items
+	local craftable_outputs = {}
+	craftable_outputs = init_craftable_outputs
+
+	-- Craftable pagination variables
+	local craftable_total_pages, craftable_current_page = calculate_pagination(self, craftable_outputs, CRAFTABLE_ITEMS_PER_PAGE, 1, "craftable_page")
+	if not self.craftable_page_items then
+		maidroid.init_craftable_pageitems(self, init_craftable_outputs)
+	end
+	
+	-- Get current craftable page items
+	local craftable_page_items = populate_current_page(self, craftable_current_page, CRAFTABLE_ITEMS_PER_PAGE, craftable_outputs, "craftable_page_items", "craftable")
+	
+	-- Update craftable inventory with current page items
+	maidroid.populate_items_page(crafting_inv, self, craftable_page_items, "craftable", 12)
+	
+	return crafting_inv, crafting_inv_id
+end
+
+-- ,,co2
+-- Handle desirable logic for generic_cooker
+local function handle_desirable_logic(self, crafting_inv)
+	-- Calculate desirable pagination (based on page items tracking)
+	local desirable_outputs = {}
+	
+	-- Build complete list from all pages using helper function
+	if type(self.desirable_page_items) == "table" then
+		desirable_outputs = maidroid.build_complete_desirable_list(self)
+	elseif type(self.desired_craft_outputs) == "table" then
+		-- Fallback to regular desired outputs if page tracking not set
+		desirable_outputs = self.desired_craft_outputs
+	end
+	
+	-- If no desirable items, show empty
+	if type(desirable_outputs) ~= "table" or #desirable_outputs == 0 then
+		desirable_outputs = {}
+	end
+	
+	local desirable_total_pages, desirable_current_page = calculate_desirable_pagination(self, desirable_outputs, DESIRABLE_ITEMS_PER_PAGE)
+	
+	-- Get current desirable page items (from actual desirable outputs)
+	local desirable_page_items = populate_current_page(self, desirable_current_page, DESIRABLE_ITEMS_PER_PAGE, desirable_outputs, "desirable_page_items", "desirable")
+	
+	-- Update desirable inventory with current page items
+	maidroid.populate_items_page(crafting_inv, self, desirable_page_items, "desirable", 6)
+	
+	return desirable_outputs, desirable_total_pages, desirable_current_page
+end
+
+-- ,,co3
+-- Handle cookable logic for generic_cooker
+local function handle_cookable_logic(self)
+	-- cooking_inventories - Copy of crafting inventory section
+	if not self.cooking_inventory_id then
+		-- Use the new create_crafter_events function
+		local cooking_inventory = create_cooker_events(self, generate_unique_manufacturing_id())
+		maidroid.cooking_inventories[self.cooking_inventory_id] = cooking_inventory
+		maidroid.populate_detached_inventory(cooking_inventory, self, all_furnace_inputs, "cookable", 12)
+		lf("cooker_tab", "Created cooking inventory with ID: " .. self.cooking_inventory_id)
+	end
+	
+	local cooking_inv_id = self.cooking_inventory_id
+	local cooking_inv = maidroid.cooking_inventories[cooking_inv_id]
+	if cooking_inv then
+		lf("cooker_tab", "Found cooking inventory, updating selection")
+		if not self.desirable_page_items then
+			maidroid.init_desirable_pageitems(self, self.desired_craft_outputs)
+		end
+	else
+		lf("cooker_tab", "ERROR: Could not find cooking inventory!")
+	end
+	
+	all_furnace_inputs = maidroid.cores.generic_cooker.get_cookable_items()
+	if not self.cookable_page_items then
+		maidroid.init_cookable_pageitems(self, all_furnace_inputs)
+	end
+
+	local cookable_total_pages, cookable_current_page = calculate_pagination(self, all_furnace_inputs, CRAFTABLE_ITEMS_PER_PAGE, 1, "cookable_page")
+	
+	-- Get current cookable page items
+	local cookable_page_items = populate_current_page(self, cookable_current_page, CRAFTABLE_ITEMS_PER_PAGE, all_furnace_inputs, "cookable_page_items", "cookable")
+	lf("XXXXXXXXXXXXXXXXXXX api", "cookable_page_items=" .. dump(cookable_page_items))
+	
+	-- Update cookable inventory with current page items
+	maidroid.populate_items_page(cooking_inv, self, cookable_page_items, "cookable", 12)
+	
+	return cooking_inv, cooking_inv_id
+end
+
+-- ,,co4
+-- Handle cooklist logic for generic_cooker
+local function handle_cooklist_logic(self, cooking_inv)
+	-- Cooklist section (below cookables)
+	-- Initialize cooklist page items if needed
+	if not self.cooklist_page_items then
+		local all_farming_outputs = {}
+		if maidroid.cores and maidroid.cores.generic_cooker then
+			local cooker_items = dofile(maidroid.modpath .. "/cores/cooker_items.lua")
+			all_farming_outputs = cooker_items.all_farming_outputs or {}
+		end
+		maidroid.init_cooklist_pageitems(self, cookable_inputs)
+	end
+	
+	-- Calculate cooklist pagination variables
+	local cooklist_data = {}
+	if maidroid.cores and maidroid.cores.generic_cooker then
+		local cooker_items = dofile(maidroid.modpath .. "/cores/cooker_items.lua")
+		cooklist_data = cooker_items.all_farming_outputs or {}
+	end
+	
+	local cooklist_total_pages, cooklist_current_page = calculate_pagination(self, cooklist_data, 6, 1, "cooklist_page")
+	
+	-- Get current cooklist page items
+	local cooklist_page_items = populate_current_page(self, cooklist_current_page, 6, cooklist_data, "cooklist_page_items", "cooklist")
+	
+	-- Update cooklist inventory with current page items
+	maidroid.populate_items_page(cooking_inv, self, cooklist_page_items, "cooklist", 6)
+	
+	return cooklist_total_pages, cooklist_current_page
+end
+
+-- Generate the cooker form UI
+-- ,,cooker_tab
+local function generate_cooker_form(self, form, crafting_inv, crafting_inv_id, cooking_inv, cooking_inv_id, 
+									desirable_outputs, desirable_total_pages, desirable_current_page,
+									cooklist_total_pages, cooklist_current_page)
+	-- Calculate pagination for craftables
+	local craftable_outputs = init_craftable_outputs
+	local craftable_total_pages, craftable_current_page = calculate_pagination(self, craftable_outputs, CRAFTABLE_ITEMS_PER_PAGE, 1, "craftable_page")
+	
+	-- Calculate pagination for cookables
+	all_furnace_inputs = maidroid.cores.generic_cooker.get_cookable_items()
+	local cookable_total_pages, cookable_current_page = calculate_pagination(self, all_furnace_inputs, CRAFTABLE_ITEMS_PER_PAGE, 1, "cookable_page")
+	
+	-- UI FORM GENERATION
+	form = form .. enligthen_tool(self)
+		-- Left column - Craftables
+		.. "label[0.5,0;" .. S("Craftables") .. "]"
+		.. "label[2.5,0;" .. craftable_current_page .. "/" .. craftable_total_pages .. "]"
+		.. "list[detached:" .. crafting_inv_id .. ";craftable;0.5,0.5;6,2;]"
+		
+	-- Add craftable pagination buttons on the right side if needed
+	if craftable_total_pages > 1 then
+		form = form
+			.. "button[6.5,0.6;0.6,0.1;craftable_prev;<]"
+			.. "button[6.5,1.4;0.6,0.1;craftable_next;>]"
+	end
+	
+	-- Right column - Cookables (furnace inputs)
+	form = form
+		.. "label[7.5,0;" .. S("Cookables") .. "]"
+		.. "label[9.5,0;" .. cookable_current_page .. "/" .. cookable_total_pages .. "]"
+		.. "list[detached:" .. cooking_inv_id .. ";cookable;7.5,0.5;6,2;]"
+		
+	-- Add cookable pagination buttons on the far right if needed
+	if cookable_total_pages > 1 then
+		form = form
+			.. "button[13.5,0.6;0.6,0.1;cookable_prev;<]"
+			.. "button[13.5,1.4;0.6,0.1;cookable_next;>]"
+	end
+	
+	-- Add cooklist UI below cookables
+	form = form
+		.. "label[7.5,2.8;" .. S("Cooking Results") .. "]"
+		.. "label[9.5,2.8;" .. cooklist_current_page .. "/" .. cooklist_total_pages .. "]"
+		.. "list[detached:" .. cooking_inv_id .. ";cooklist;7.5,3.05;6,1;]"
+		
+	-- Add cooklist pagination buttons on the far right if needed
+	if cooklist_total_pages > 1 then
+		form = form
+			.. "button[13.5,3.15;0.6,0.1;cooklist_prev;<]"
+			.. "button[13.5,3.65;0.6,0.1;cooklist_next;>]"
+	end
+	
+	-- Desirable section
+	form = form
+		.. "label[0.5,2.8;" .. S("Desirable Craft") .. "]"
+		.. "label[2.5,2.8;" .. desirable_current_page .. "/" .. desirable_total_pages .. "]"
+		.. "list[detached:" .. crafting_inv_id .. ";desirable;0.5,3.55;6,1;]"
+		.. "listring[detached:".. crafting_inv_id .. ";craftable]"
+		.. "listring[detached:".. crafting_inv_id .. ";desirable]"
+		.. "listring[detached:".. cooking_inv_id .. ";cookable]"
+		.. "listring[detached:".. cooking_inv_id .. ";cooklist]"
+		
+	-- Add desirable pagination buttons on the right side if there are desirable items
+	if #desirable_outputs > 0 then
+		form = form
+			.. "button[6.5,3.65;0.6,0.1;desirable_prev;<]"
+			.. "button[6.5,4.15;0.6,0.1;desirable_next;>]"
+	end
+	
+	-- Add recipe display area below desirable section
+	local recipe_display = ""
+	lf("cooker_ui", "Checking for recipe display, selected_recipe_item: " .. tostring(self.selected_recipe_item))
+	if self.selected_recipe_item then
+		lf("cooker_ui", "Calling format_recipe_display for: " .. self.selected_recipe_item)
+		recipe_display = maidroid.format_recipe_display(self.selected_recipe_item)
+	else
+		lf("cooker_ui", "No selected recipe item found")
+	end
+	
+	form = form
+		.. "label[0.5,4.4;" .. S("Recipe") .. "]"
+		.. "box[0.5,4.6;8,1.8;#000000]"
+		.. recipe_display
+		.. "model[9,4.6;3,3;3d;character.b3d;"
+		.. minetest.formspec_escape(self.textures[1])
+		.. ";0,180;false;true;200,219;7.5]"
+	
+	-- Add cooker controls below the lists
+	form = form
+		.. "button[0.5,7.5;2.5,1;toggle_cooker;" .. S("Toggle Cooker") .. "]"
+		.. "button[3.5,7.5;2.5,1;view_metrics;" .. S("View Metrics") .. "]"
+		.. "label[0.5,8.5;" .. S("Current Task:") .. " "
+		.. minetest.colorize("#ACEEAC", (self.action and self.action or S("Idle"))) .. "]"
+		.. "label[3.5,8.5;" .. S("State:") .. " "
+		.. minetest.colorize("#ACEEAC", (self.state and tostring(self.state) or S("Unknown"))) .. "]"
+	
+	return form
+end
+
 -- get_formspec returns a string that represents a formspec definition.
 -- ,,form
 get_formspec = function(self, player, tab)
@@ -2183,237 +2428,16 @@ get_formspec = function(self, player, tab)
 	if owns and self.core.name == "generic_cooker" then
 		tab_max = tab_max + 1
 		if tab == tab_max then
-			----------------------- CRAFTABLE LOGIC -----------------------
-			-- Create and update crafting inventory
-			if not self.crafting_inventory_id then
-				-- Use the new create_crafter_events function
-				local crafting_inventory = create_crafter_events(self, generate_unique_manufacturing_id())
-				maidroid.crafting_inventories[self.crafting_inventory_id] = crafting_inventory
-				maidroid.populate_detached_inventory(crafting_inventory, self, init_craftable_outputs, "craftable", 12)
-				lf("cooker_tab", "Created crafting inventory with ID: " .. self.crafting_inventory_id)
-			end
+			-- Initialize all cooker systems
+			local crafting_inv, crafting_inv_id = handle_craftable_logic(self)
+			local cooking_inv, cooking_inv_id = handle_cookable_logic(self)
+			local desirable_outputs, desirable_total_pages, desirable_current_page = handle_desirable_logic(self, crafting_inv)
+			local cooklist_total_pages, cooklist_current_page = handle_cooklist_logic(self, cooking_inv)
 			
-			local crafting_inv_id = self.crafting_inventory_id
-			local crafting_inv = maidroid.crafting_inventories[crafting_inv_id]
-			if crafting_inv then
-				lf("cooker_tab", "Found crafting inventory, updating selection")
-                if not self.desirable_page_items then
-                    maidroid.init_desirable_pageitems(self, self.desired_craft_outputs)
-                end
-				-- maidroid.update_selection_inventory(crafting_inv, self)
-			else
-				lf("cooker_tab", "ERROR: Could not find crafting inventory!")
-			end
-			
-			-- Shop-style layout for cooker with pagination
-			-- Calculate current page and total pages for craftable items
-			local craftable_outputs = {}
-            craftable_outputs = init_craftable_outputs
-
-			-- if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.get_craftable_outputs then
-			-- 	craftable_outputs = maidroid.cores.generic_cooker.get_craftable_outputs() or {}
-			-- end
-            
-			-- if type(craftable_outputs) ~= "table" or #craftable_outputs == 0 then
-			-- 	craftable_outputs = init_craftable_outputs
-			-- end
-			
-			-- Craftable pagination variables
-			local craftable_total_pages, craftable_current_page = calculate_pagination(self, craftable_outputs, CRAFTABLE_ITEMS_PER_PAGE, 1, "craftable_page")
-            -- local craftable_start_idx = (craftable_current_page - 1) * craftable_items_per_page + 1
-            -- local craftable_end_idx = math.min(craftable_start_idx + craftable_items_per_page - 1, #craftable_outputs)
-            if not self.craftable_page_items then
-                maidroid.init_craftable_pageitems(self, init_craftable_outputs)
-            end			
-			-- Get current craftable page items
-			local craftable_page_items = populate_current_page(self, craftable_current_page, CRAFTABLE_ITEMS_PER_PAGE, craftable_outputs, "craftable_page_items", "craftable")
-			-- local craftable_page_items = populate_current_craftable_page(self, craftable_current_page, craftable_items_per_page, craftable_page_items)
-			
-			-- Update craftable inventory with current page items
-			maidroid.populate_items_page(crafting_inv, self, craftable_page_items, "craftable", 12)
-
-            local droid = self  
-			----------------------- DESIRABLE LOGIC -----------------------
-			-- Calculate desirable pagination (based on page items tracking)
-			local desirable_outputs = {}
-            local droid = self
-			
-			-- Build complete list from all pages using helper function
-			if type(droid.desirable_page_items) == "table" then
-				desirable_outputs = maidroid.build_complete_desirable_list(droid)
-			elseif type(droid.desired_craft_outputs) == "table" then
-				-- Fallback to regular desired outputs if page tracking not set
-				desirable_outputs = droid.desired_craft_outputs
-			end
-			
-			-- If no desirable items, show empty
-			if type(desirable_outputs) ~= "table" or #desirable_outputs == 0 then
-				desirable_outputs = {}
-			end
-			
-			local desirable_total_pages, desirable_current_page = calculate_desirable_pagination(self, desirable_outputs, DESIRABLE_ITEMS_PER_PAGE)
-			
-			-- Get current desirable page items (from actual desirable outputs)
-			local desirable_page_items = populate_current_page(self, desirable_current_page, DESIRABLE_ITEMS_PER_PAGE, desirable_outputs, "desirable_page_items", "desirable")
-			
-			-- Update desirable inventory with current page items
-			maidroid.populate_items_page(crafting_inv, self, desirable_page_items, "desirable", 6)
-
-			----------------------- COOKABLE LOGIC -----------------------
-			-- cooking_inventories - Copy of crafting inventory section
-			if not self.cooking_inventory_id then
-				-- Use the new create_crafter_events function
-				local cooking_inventory = create_cooker_events(self, generate_unique_manufacturing_id())
-				maidroid.cooking_inventories[self.cooking_inventory_id] = cooking_inventory
-				maidroid.populate_detached_inventory(cooking_inventory, self, all_furnace_inputs, "cookable", 12)
-				lf("cooker_tab", "Created cooking inventory with ID: " .. self.cooking_inventory_id)
-			end
-			
-			local cooking_inv_id = self.cooking_inventory_id
-			local cooking_inv = maidroid.cooking_inventories[cooking_inv_id]
-			if cooking_inv then
-				lf("cooker_tab", "Found cooking inventory, updating selection")
-                if not self.desirable_page_items then
-                    maidroid.init_desirable_pageitems(self, self.desired_craft_outputs)
-                end
-				-- maidroid.update_selection_inventory(cooking_inv, self)
-			else
-				lf("cooker_tab", "ERROR: Could not find cooking inventory!")
-			end
-			
-			------------------ Calculate cookable pagination variables
-            -- ,,x2
-            all_furnace_inputs = maidroid.cores.generic_cooker.get_cookable_items()
-            if not self.cookable_page_items then
-                maidroid.init_cookable_pageitems(self, all_furnace_inputs)
-            end
-
-			local cookable_total_pages, cookable_current_page = calculate_pagination(self, all_furnace_inputs, CRAFTABLE_ITEMS_PER_PAGE, 1, "cookable_page")
-			
-			-- Get current cookable page items
-			local cookable_page_items = populate_current_page(self, cookable_current_page, CRAFTABLE_ITEMS_PER_PAGE, all_furnace_inputs, "cookable_page_items", "cookable")
-            lf("XXXXXXXXXXXXXXXXXXX api", "cookable_page_items=" .. dump(cookable_page_items))
-			
-			-- Update cookable inventory with current page items
-			maidroid.populate_items_page(cooking_inv, self, cookable_page_items, "cookable", 12)
-
-			----------------------- COOKLIST LOGIC -----------------------
-            -- local cookable_page_items = populate_current_page(self, desirable_current_page, DESIRABLE_ITEMS_PER_PAGE, desirable_outputs, "desirable_page_items", "desirable")
-
-            -- maidroid.populate_items_page(crafting_inv, self, desirable_page_items, "cookable", 12)
-
-			-- Cooklist section (below cookables)
-			-- Initialize cooklist page items if needed
-			if not self.cooklist_page_items then
-				local all_farming_outputs = {}
-				if maidroid.cores and maidroid.cores.generic_cooker then
-					local cooker_items = dofile(maidroid.modpath .. "/cores/cooker_items.lua")
-					all_farming_outputs = cooker_items.all_farming_outputs or {}
-				end
-				maidroid.init_cooklist_pageitems(self, cookable_inputs)
-			end
-			
-			-- Calculate cooklist pagination variables
-			local cooklist_data = {}
-			if maidroid.cores and maidroid.cores.generic_cooker then
-				local cooker_items = dofile(maidroid.modpath .. "/cores/cooker_items.lua")
-				cooklist_data = cooker_items.all_farming_outputs or {}
-			end
-			
-			local cooklist_total_pages, cooklist_current_page = calculate_pagination(self, cooklist_data, 6, 1, "cooklist_page")
-			
-			-- Get current cooklist page items
-			local cooklist_page_items = populate_current_page(self, cooklist_current_page, 6, cooklist_data, "cooklist_page_items", "cooklist")
-			
-			-- Update cooklist inventory with current page items
-			maidroid.populate_items_page(cooking_inv, self, cooklist_page_items, "cooklist", 6)
-			
-			----------------------- UI FORM GENERATION -----------------------
-			form = form .. enligthen_tool(self)
-				-- Left column - Craftables
-				.. "label[0.5,0;" .. S("Craftables") .. "]"
-				.. "label[2.5,0;" .. craftable_current_page .. "/" .. craftable_total_pages .. "]"
-				.. "list[detached:" .. crafting_inv_id .. ";craftable;0.5,0.5;6,2;]"
-				
-			-- Add craftable pagination buttons on the right side if needed
-            -- ,,button,,page
-			if craftable_total_pages > 1 then
-				form = form
-					.. "button[6.5,0.6;0.6,0.1;craftable_prev;<]"
-					.. "button[6.5,1.4;0.6,0.1;craftable_next;>]"
-			end
-			
-			-- Right column - Cookables (furnace inputs)
-			form = form
-				.. "label[7.5,0;" .. S("Cookables") .. "]"
-				.. "label[9.5,0;" .. cookable_current_page .. "/" .. cookable_total_pages .. "]"
-				.. "list[detached:" .. cooking_inv_id .. ";cookable;7.5,0.5;6,2;]"
-				
-			-- Add cookable pagination buttons on the far right if needed
-			if cookable_total_pages > 1 then
-				form = form
-					.. "button[13.5,0.6;0.6,0.1;cookable_prev;<]"
-					.. "button[13.5,1.4;0.6,0.1;cookable_next;>]"
-			end
-			
-			-- Add cooklist UI below cookables
-			form = form
-				.. "label[7.5,2.8;" .. S("Cooking Results") .. "]"
-				.. "label[9.5,2.8;" .. cooklist_current_page .. "/" .. cooklist_total_pages .. "]"
-				.. "list[detached:" .. cooking_inv_id .. ";cooklist;7.5,3.05;6,1;]"
-				
-			-- Add cooklist pagination buttons on the far right if needed
-			if cooklist_total_pages > 1 then
-				form = form
-					.. "button[13.5,3.15;0.6,0.1;cooklist_prev;<]"
-					.. "button[13.5,3.65;0.6,0.1;cooklist_next;>]"
-			end
-			
-			-- Desirable section
-			form = form
-				.. "label[0.5,2.8;" .. S("Desirable Craft") .. "]"
-				.. "label[2.5,2.8;" .. desirable_current_page .. "/" .. desirable_total_pages .. "]"
-				.. "list[detached:" .. crafting_inv_id .. ";desirable;0.5,3.55;6,1;]"
-                .. "listring[detached:".. crafting_inv_id .. ";craftable]"
-                .. "listring[detached:".. crafting_inv_id .. ";desirable]"
-                .. "listring[detached:".. cooking_inv_id .. ";cookable]"
-                .. "listring[detached:".. cooking_inv_id .. ";cooklist]"
-                -- .. "listring[current_player;main]"
-				
-			-- Add desirable pagination buttons on the right side if there are desirable items
-			if #desirable_outputs > 0 then
-				form = form
-					.. "button[6.5,3.65;0.6,0.1;desirable_prev;<]"
-					.. "button[6.5,4.15;0.6,0.1;desirable_next;>]"
-			end
-			
-			-- Add recipe display area below desirable section
-			local recipe_display = ""
-			lf("cooker_ui", "Checking for recipe display, selected_recipe_item: " .. tostring(self.selected_recipe_item))
-			if self.selected_recipe_item then
-				lf("cooker_ui", "Calling format_recipe_display for: " .. self.selected_recipe_item)
-				recipe_display = maidroid.format_recipe_display(self.selected_recipe_item)
-			else
-				lf("cooker_ui", "No selected recipe item found")
-			end
-			
-			form = form
-				.. "label[0.5,4.4;" .. S("Recipe") .. "]"
-				.. "box[0.5,4.6;8,1.8;#000000]"
-				.. recipe_display
-				.. "model[9,4.6;3,3;3d;character.b3d;"
-				.. minetest.formspec_escape(self.textures[1])
-				.. ";0,180;false;true;200,219;7.5]"
-			
-			-- Add cooker controls below the lists
-			form = form
-				.. "button[0.5,7.5;2.5,1;toggle_cooker;" .. S("Toggle Cooker") .. "]"
-				.. "button[3.5,7.5;2.5,1;view_metrics;" .. S("View Metrics") .. "]"
-				.. "label[0.5,8.5;" .. S("Current Task:") .. " "
-				.. minetest.colorize("#ACEEAC", (self.action and self.action or S("Idle"))) .. "]"
-				.. "label[3.5,8.5;" .. S("State:") .. " "
-				.. minetest.colorize("#ACEEAC", (self.state and tostring(self.state) or S("Unknown"))) .. "]"
-			
+			-- Generate UI form
+			form = generate_cooker_form(self, form, crafting_inv, crafting_inv_id, cooking_inv, cooking_inv_id, 
+								   desirable_outputs, desirable_total_pages, desirable_current_page,
+								   cooklist_total_pages, cooklist_current_page)
 			return form
 		end
 	end
