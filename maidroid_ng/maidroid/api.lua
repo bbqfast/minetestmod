@@ -2277,8 +2277,10 @@ local function generate_cooker_form(self, form, crafting_inv, crafting_inv_id, c
 		.. "list[detached:" .. crafting_inv_id .. ";desirable;0.5,3.55;6,1;]"
 		.. "listring[detached:".. crafting_inv_id .. ";craftable]"
 		.. "listring[detached:".. crafting_inv_id .. ";desirable]"
+		.. "listring[detached:".. crafting_inv_id .. ";craftable]"
 		.. "listring[detached:".. cooking_inv_id .. ";cookable]"
 		.. "listring[detached:".. cooking_inv_id .. ";cooklist]"
+		.. "listring[detached:".. cooking_inv_id .. ";cookable]"
 		
 	-- Add desirable pagination buttons on the right side if there are desirable items
 	if #desirable_outputs > 0 then

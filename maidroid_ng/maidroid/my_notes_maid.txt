@@ -146,7 +146,11 @@ Updates:
 - furnace lower than 20 coal check
 - attach sword to ltangel 
 - farmer replant on the same spot if seed avaiable
+- farmer: more efficient pathing when fenced 
+- AI organized function body in main UI
+- farmer when far away, teleport back 
+- fix sitting maidroid  moving
 
 
 todo:
-- fix sitting maidroid  moving
+- 
