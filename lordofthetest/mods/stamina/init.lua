@@ -80,6 +80,15 @@ stamina.change = function(player, change)
 	return true
 end
 
+-- global function for mods to get stamina level
+stamina.get_stamina = function(player)
+	local name = player:get_player_name()
+	if not name or not stamina_players[name] then
+		return 0
+	end
+	return stamina_players[name].level
+end
+
 local function exhaust_player(player, v)
 	if not player or not player:is_player() then
 		return
@@ -364,4 +373,46 @@ if minetest.settings:get_bool("enable_damage") and minetest.is_yes(minetest.sett
 	minetest.register_on_respawnplayer(function(player)
 		stamina_update(player, STAMINA_VISUAL_MAX)
 	end)
+
+	-- Shared function for stamina commands
+	local function set_stamina_command(name, param, command_name)
+		local player = minetest.get_player_by_name(name)
+		if not player then
+			return false, "Player not found"
+		end
+		
+		local value = tonumber(param)
+		if not value then
+			return false, "Invalid value. Use: /" .. command_name .. " <number>"
+		end
+		
+		if value < 0 then
+			value = 0
+		elseif value > STAMINA_VISUAL_MAX then
+			value = STAMINA_VISUAL_MAX
+		end
+		
+		stamina_update(player, value)
+		return true, "Stamina set to " .. value
+	end
+
+	-- Chat command for testing stamina
+	minetest.register_chatcommand("stamina", {
+		params = "<value>",
+		description = "Set player stamina to specified value (0-" .. STAMINA_VISUAL_MAX .. ")",
+		privs = {server = true},
+		func = function(name, param)
+			return set_stamina_command(name, param, "stamina")
+		end
+	})
+
+	-- Alias for stamina command
+	minetest.register_chatcommand("stam", {
+		params = "<value>",
+		description = "Set player stamina to specified value (0-" .. STAMINA_VISUAL_MAX .. ")",
+		privs = {server = true},
+		func = function(name, param)
+			return set_stamina_command(name, param, "stam")
+		end
+	})
 end

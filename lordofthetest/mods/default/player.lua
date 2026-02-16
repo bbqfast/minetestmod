@@ -207,6 +207,13 @@ end)
 local hp_huds = {}
 
 
+local function get_player_stamina(player)
+	if stamina and stamina.get_stamina then
+		return stamina.get_stamina(player)
+	end
+	return 0
+end
+
 local function get_player_damage(player)
 	local item = player:get_wielded_item()
 	local def = item:get_definition() or {}
@@ -233,6 +240,7 @@ minetest.register_on_joinplayer(function(player)
 	local hp_max = props.hp_max or 20
 	local dmg = get_player_damage(player)
 	local arm = get_player_armor_level(player)
+	local stm = get_player_stamina(player)
 	local buff_text = ""
 	if snacks then
 		if snacks.get_damage_multiplier then
@@ -257,7 +265,7 @@ minetest.register_on_joinplayer(function(player)
 		alignment     = {x = -1, y = 0},
 		scale         = {x = 100, y = 20},
 		number        = 0xFFFF00,
-		text          = "HP: " .. hp .. " / " .. hp_max .. "  DMG: " .. dmg .. "  ARM: " .. arm .. buff_text,
+		text          = "HP: " .. hp .. " / " .. hp_max .. "  DMG: " .. dmg .. "  ARM: " .. arm .. "  STM: " .. stm .. buff_text,
 	})
 end)
 
@@ -283,6 +291,7 @@ minetest.register_globalstep(function(dtime)
 			local hp_max = props.hp_max or 20
 			local dmg = get_player_damage(player)
 			local arm = get_player_armor_level(player)
+			local stm = get_player_stamina(player)
 			local buff_text = ""
 			if snacks then
 				if snacks.get_damage_multiplier then
@@ -300,7 +309,7 @@ minetest.register_globalstep(function(dtime)
 					end
 				end
 			end
-			player:hud_change(hud_id, "text", "HP: " .. hp .. " / " .. hp_max .. "  DMG: " .. dmg .. "  ARM: " .. arm .. buff_text)
+			player:hud_change(hud_id, "text", "HP: " .. hp .. " / " .. hp_max .. "  DMG: " .. dmg .. "  ARM: " .. arm .. "  STM: " .. stm .. buff_text)
 		end
 	end
 end)

@@ -1,0 +1,380 @@
+========================================
+          BEDS MOD - FUNCTION ANALYSIS
+========================================
+
+FILE STRUCTURE:
+===============
+- api.lua (185 lines)     - Bed registration API
+- beds.lua (110 lines)    - Bed definitions and crafting
+- functions.lua (301 lines) - Main logic and player handling
+- init.lua (27 lines)     - Module initialization
+- spawns.lua (73 lines)   - Spawn point management
+
+========================================
+           API.LUA - BED REGISTRATION
+========================================
+
+MAIN FUNCTIONS:
+----------------
+destruct_bed(pos, n)
+    - Handles bed destruction for two-part bed system
+    - Removes both bottom and top nodes
+    - Cleans up spawn points at bed locations
+    - Dependencies: minetest.get_node(), minetest.facedir_to_dir(),
+                   vector.subtract/add(), minetest.remove_node(),
+                   minetest.check_for_falling(), beds.remove_spawns_at()
+
+beds.register_bed(name, def)
+    - Registers new bed type with bottom and top nodes
+    - Sets up node definitions with callbacks
+    - Handles placement, rotation, destruction logic
+    - Dependencies: minetest.register_node(), minetest.register_alias(),
+                   minetest.register_craft(), beds.on_rightclick(),
+                   beds.can_dig()
+
+NODE REGISTRATION CALLBACKS:
+----------------------------
+on_place(itemstack, placer, pointed_thing)
+    - Complex placement logic with protection checks
+    - Validates two-part bed positioning
+    - Dependencies: Multiple minetest functions for validation
+
+on_destruct(pos)
+    - Calls destruct_bed for proper cleanup
+    - Dependencies: destruct_bed()
+
+on_rightclick(pos, node, clicker, itemstack, pointed_thing)
+    - Triggers bed interaction
+    - Dependencies: beds.on_rightclick()
+
+on_rotate(pos, node, user, _, new_param2)
+    - Handles bed rotation with validation
+    - Dependencies: Multiple minetest functions for rotation
+
+can_dig(pos, player)
+    - Checks if bed can be dug
+    - Dependencies: beds.can_dig()
+
+========================================
+           BEDS.LUA - BED DEFINITIONS
+========================================
+
+BED DEFINITIONS:
+----------------
+beds.register_bed("beds:fancy_bed", {...})
+    - Registers fancy bed with detailed textures and nodebox
+    - Includes footboard and headboard design
+    - Dependencies: beds.register_bed()
+
+beds.register_bed("beds:bed", {...})
+    - Registers simple bed with basic textures
+    - Flat design without decorative elements
+    - Dependencies: beds.register_bed()
+
+CRAFTING RECIPES:
+----------------
+Fancy Bed Recipe:
+    - Top: "", "", "group:stick"
+    - Mid: "wool:white", "wool:white", "wool:white"
+    - Bot: "group:wood", "group:wood", "group:wood"
+
+Simple Bed Recipe:
+    - Top: "wool:white", "wool:white", "wool:white"
+    - Bot: "group:wood", "group:wood", "group:wood"
+
+FUEL RECIPES:
+-------------
+- Fancy Bed: burntime = 13
+- Simple Bed: burntime = 12
+
+LEGACY SUPPORT:
+---------------
+- Aliases for PilzAdam's beds mod compatibility
+- Dependencies: minetest.register_alias()
+
+========================================
+        FUNCTIONS.LUA - MAIN LOGIC
+========================================
+
+HELPER FUNCTIONS (LOCAL):
+-------------------------
+get_look_yaw(pos)
+    - Converts node rotation to player yaw angle
+    - Handles facedir values and colorfacedir masking
+    - Dependencies: minetest.get_node()
+
+is_night_skip_enabled()
+    - Checks if night skipping is enabled in settings
+    - Dependencies: minetest.settings.get_bool()
+
+check_in_beds(players)
+    - Verifies if all specified players are in bed
+    - Returns true if all players are sleeping
+    - Dependencies: minetest.get_connected_players()
+
+lay_down(player, pos, bed_pos, state, skip)
+    - Main function for laying down/standing up
+    - Handles physics, animations, and positioning
+    - Manages bed occupation checks
+    - Dependencies: Multiple player methods, get_look_yaw(),
+                   vector.distance/length(), minetest.chat_send_player(),
+                   player_api.set_animation()
+
+get_player_in_bed_count()
+    - Counts players currently in bed
+    - No external dependencies
+
+update_formspecs(finished)
+    - Updates bed UI forms for all players in bed
+    - Shows player count and force skip button
+    - Dependencies: minetest.get_connected_players(),
+                   get_player_in_bed_count(), is_night_skip_enabled(),
+                   minetest.formspec_escape(), minetest.show_formspec()
+
+PUBLIC API FUNCTIONS:
+---------------------
+beds.kick_players()
+    - Forces all players out of bed
+    - Restores physics and animations
+    - Dependencies: minetest.get_player_by_name(), lay_down()
+
+beds.skip_night()
+    - Sets time to morning (0.23)
+    - Dependencies: minetest.set_timeofday()
+
+beds.on_rightclick(pos, player)
+    - Main bed interaction handler
+    - Time checks and night skip logic
+    - Manages entering/leaving bed
+    - Dependencies: lay_down(), beds.set_spawns(), update_formspecs(),
+                   check_in_beds(), beds.skip_night(), beds.kick_players()
+
+beds.can_dig(bed_pos)
+    - Checks if bed can be dug (not occupied)
+    - Dependencies: vector.equals()
+
+EVENT CALLBACKS:
+----------------
+minetest.register_on_respawnplayer
+    - Respawns player at bed if enabled
+    - Dependencies: beds.spawn, player.set_pos()
+
+minetest.register_on_leaveplayer
+    - Handles player disconnect cleanup
+    - Dependencies: lay_down(), check_in_beds(), update_formspecs(),
+                   beds.skip_night(), beds.kick_players()
+
+minetest.register_on_dieplayer
+    - Handles death while in bed
+    - Dependencies: lay_down(), get_look_yaw()
+
+minetest.register_on_player_receive_fields
+    - Handles bed UI interactions
+    - Dependencies: lay_down(), update_formspecs(),
+                   get_player_in_bed_count(), is_night_skip_enabled(),
+                   beds.skip_night(), beds.kick_players()
+
+========================================
+           INIT.LUA - INITIALIZATION
+========================================
+
+GLOBAL SETUP:
+------------
+- Creates beds table and sub-tables
+- beds.player = {}          - Players currently in bed
+- beds.bed_position = {}    - Bed positions for each player
+- beds.pos = {}             - Original player positions
+- beds.spawn = {}           - Respawn points
+- beds.get_translator = S   - Translation function
+
+FORMSPEC DEFINITION:
+-------------------
+- Creates bed UI layout with leave button
+- Dark background with proper sizing
+- Dependencies: minetest.get_translator(), minetest.formspec_escape()
+
+MODULE LOADING:
+--------------
+- Loads files in dependency order:
+  1. functions.lua (main logic)
+  2. api.lua (bed registration)
+  3. beds.lua (bed definitions)
+  4. spawns.lua (spawn management)
+- Dependencies: dofile(), minetest.get_modpath()
+
+========================================
+         SPAWNS.LUA - SPAWN MANAGEMENT
+========================================
+
+SPAWN MANAGEMENT FUNCTIONS:
+---------------------------
+beds.read_spawns()
+    - Loads spawn points from file
+    - Supports both new and legacy formats
+    - Automatic migration from old format
+    - Dependencies: io.open/close(), minetest.deserialize(),
+                   beds.save_spawns(), os.rename()
+
+beds.save_spawns()
+    - Saves spawn points to file
+    - Formats data as text with coordinates
+    - Dependencies: io.open/close(), table.insert/concat(),
+                   string.format()
+
+beds.set_spawns()
+    - Updates spawn positions for players in bed
+    - Respects protection (no spawn on protected areas)
+    - Dependencies: minetest.get_player_by_name(),
+                   minetest.is_protected(), beds.save_spawns()
+
+beds.remove_spawns_at(pos)
+    - Removes spawn points at specific position
+    - Called when bed is destroyed
+    - Dependencies: vector.equals(), vector.round(),
+                   beds.save_spawns()
+
+FILE HANDLING:
+--------------
+- Supports backward compatibility with PA's beds mod
+- Checks for legacy spawn file format
+- Automatic migration to new format
+- File locations: world_path/beds_spawns
+
+========================================
+         CROSS-FILE DEPENDENCIES
+========================================
+
+FUNCTION CALLS ACROSS FILES:
+----------------------------
+functions.lua → spawns.lua:
+    - beds.set_spawns() called in beds.on_rightclick()
+
+api.lua → spawns.lua:
+    - beds.remove_spawns_at() called in destruct_bed()
+
+api.lua → functions.lua:
+    - beds.on_rightclick() called in node registration
+    - beds.can_dig() called in node registration
+
+beds.lua → api.lua:
+    - beds.register_bed() called for both bed types
+
+========================================
+         EXTERNAL API DEPENDENCIES
+========================================
+
+MINETEST API:
+------------
+Player Management:
+    - get_player_by_name(), get_connected_players()
+    - get_player_name(), set_pos(), get_pos()
+
+Node Manipulation:
+    - get_node(), set_node(), remove_node()
+    - facedir_to_dir(), register_node(), register_alias()
+
+Time Management:
+    - get_timeofday(), set_timeofday()
+
+Protection System:
+    - is_protected(), check_player_privs(), record_protection_violation()
+
+Physics & Movement:
+    - get_physics_override(), set_physics_override()
+    - get_velocity(), get_attach()
+
+UI System:
+    - show_formspec(), formspec_escape()
+    - chat_send_player(), hud_get_flags(), hud_set_flags()
+
+Settings System:
+    - settings.get_bool(), is_singleplayer()
+
+Crafting System:
+    - register_craft()
+
+World Interaction:
+    - check_for_falling(), after()
+    - is_creative_enabled()
+
+PLAYER API:
+-----------
+- player_api.player_attached
+- player_api.set_animation()
+
+VECTOR API:
+-----------
+- vector.add(), vector.subtract()
+- vector.distance(), vector.length()
+- vector.equals(), vector.round()
+
+FILE I/O:
+---------
+- io.open(), io.close()
+- file read/write operations
+- os.rename()
+
+========================================
+              DEPENDENCY GRAPH
+========================================
+
+init.lua (Entry Point)
+├── functions.lua (Main Logic)
+│   ├── get_look_yaw()
+│   ├── is_night_skip_enabled()
+│   ├── check_in_beds()
+│   ├── lay_down()
+│   ├── get_player_in_bed_count()
+│   ├── update_formspecs()
+│   ├── beds.kick_players()
+│   ├── beds.skip_night()
+│   ├── beds.on_rightclick()
+│   └── beds.can_dig()
+├── api.lua (Bed Registration)
+│   ├── destruct_bed()
+│   └── beds.register_bed()
+├── beds.lua (Bed Definitions)
+│   └── beds.register_bed() [calls]
+└── spawns.lua (Spawn Management)
+    ├── beds.read_spawns()
+    ├── beds.save_spawns()
+    ├── beds.set_spawns()
+    └── beds.remove_spawns_at()
+
+========================================
+              KEY FEATURES
+========================================
+
+TWO-PART BED SYSTEM:
+- Bottom and top nodes with coordinated placement
+- Proper destruction handling
+- Rotation support with validation
+
+NIGHT SKIPPING:
+- Majority vote system for skipping night
+- Configurable via settings
+- Force skip option available
+
+SPAWN POINT MANAGEMENT:
+- Automatic spawn point setting on bed use
+- Persistent storage in world files
+- Backward compatibility support
+
+PROTECTION & VALIDATION:
+- Respects protection system
+- Bed occupation checking
+- Movement validation before sleep
+
+PHYSICS & ANIMATIONS:
+- Custom physics override for sleeping
+- Lay/stand animations
+- Proper player positioning
+
+MULTIPLAYER SUPPORT:
+- Forms UI for all sleeping players
+- Player count display
+- Coordinated night skipping
+
+========================================
+              END OF ANALYSIS
+========================================
