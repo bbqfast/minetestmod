@@ -1361,6 +1361,158 @@ local function craft_generic(droid, craft_outputs)
     return false
 end
 
+-- ,,bed,,sleep_action
+-- Function to handle the sleep action for maidroid
+local function handle_sleep_action(droid, bed_pos)
+    lf("DEBUG generic_cooker:handle_sleep_action", "handling sleep action at bed_pos=" .. minetest.pos_to_string(bed_pos))
+    
+    -- Check if already sleeping to prevent multiple sleep calls
+    if droid._is_sleeping == true then
+        lf("DEBUG generic_cooker:handle_sleep_action", "maidroid already sleeping, ignoring sleep action")
+        return false
+    end
+    
+    -- Update action_taken_metrics for sleep
+    action_taken_metrics["sleep"] = (action_taken_metrics["sleep"] or 0) + 1
+    lf("DEBUG action_metrics", "sleep called: " .. action_taken_metrics["sleep"])
+    
+    
+    -- Make maidroid sleep directly using bed logic
+    -- Position maidroid for sleeping (similar to lay_down function)
+    local node = minetest.get_node(bed_pos)
+    local param2 = node.param2
+    local dir = minetest.facedir_to_dir(param2)
+    
+    -- Calculate sleep position - maidroid should sleep with head toward the pillow
+    -- The pillow is usually at the head of the bed (param2 direction)
+    -- So the maidroid should sleep perpendicular to the bed direction
+    local sleep_pos
+    local sleep_yaw
+    
+    if param2 == 0 then -- Bed facing +Z (north)
+        sleep_pos = {x = bed_pos.x, y = bed_pos.y + 0.07, z = bed_pos.z + 0.2}
+        sleep_yaw = math.pi -- Face north (corrected from south)
+    elseif param2 == 1 then -- Bed facing +X (east)
+        sleep_pos = {x = bed_pos.x - 0.2, y = bed_pos.y + 0.07, z = bed_pos.z}
+        sleep_yaw = -math.pi / 2 -- Face west (corrected from east)
+    elseif param2 == 2 then -- Bed facing -Z (south)
+        sleep_pos = {x = bed_pos.x, y = bed_pos.y + 0.07, z = bed_pos.z - 0.2}
+        sleep_yaw = 0 -- Face south (corrected from north)
+    elseif param2 == 3 then -- Bed facing -X (west)
+        sleep_pos = {x = bed_pos.x + 0.2, y = bed_pos.y + 0.07, z = bed_pos.z}
+        sleep_yaw = math.pi / 2 -- Face east (corrected from west)
+    else
+        -- Fallback to original logic if param2 is unexpected
+        sleep_pos = {
+            x = bed_pos.x + dir.x / 2,
+            y = bed_pos.y + 0.07,
+            z = bed_pos.z + dir.z / 2
+        }
+        sleep_yaw = minetest.facedir_to_dir(param2).x
+    end
+    
+    -- Move maidroid to sleep position
+    droid.object:set_pos(sleep_pos)
+    droid.object:set_yaw(sleep_yaw)
+    
+    -- Set sleep animation
+    droid:set_animation(maidroid.animation.LAY or "lay", 0)
+    
+    -- Halt the maidroid while sleeping
+    droid:halt()
+    
+    -- Explicitly set velocity to zero to prevent any movement
+    droid.object:set_velocity({x = 0, y = 0, z = 0})
+    
+    -- Set a flag to prevent on_step from reactivating movement
+    droid._is_sleeping = true
+    
+    lf("DEBUG generic_cooker:handle_sleep_action", "maidroid sleeping in bed at " .. minetest.pos_to_string(bed_pos) .. " (DEBUG: keeping in sleep state, velocity=0, sleep_flag=true)")
+    
+    -- DEBUG: Add manual wake-up timer with better error handling
+    local wake_time = 8
+    lf("DEBUG generic_cooker:handle_sleep_action", "setting wake-up timer for " .. wake_time .. " seconds")
+    
+    minetest.after(wake_time, function()
+        lf("DEBUG generic_cooker:wake_timer", "wake-up timer triggered!")
+        
+        if droid and droid.object then
+            lf("DEBUG generic_cooker:wake_timer", "droid and object valid, clearing sleep flag")
+            
+            -- Clear the sleep flag FIRST to allow normal movement
+            droid._is_sleeping = false
+            
+            -- IMPORTANT: Clear the action state to prevent immediate re-sleep
+            droid.action = nil
+            
+            -- Wake up the maidroid - move it away from bed
+            local wake_pos = vector.add(bed_pos, {x=0, y=1, z=0})
+            droid.object:set_pos(wake_pos)
+            
+            -- Restore normal animation
+            droid:set_animation(maidroid.animation.STAND or "stand", 30)
+            
+            -- Resume normal behavior - force return to wander
+            to_wander(droid, "generic_cooker:wake_timer", 0, 1)
+            
+            lf("DEBUG generic_cooker:wake_timer", "maidroid woke up from sleep, sleep flag cleared, action cleared, moved to " .. minetest.pos_to_string(wake_pos))
+        else
+            lf("DEBUG generic_cooker:wake_timer", "wake-up timer: droid or object is nil")
+            lf("DEBUG generic_cooker:wake_timer", "droid=" .. tostring(droid) .. " object=" .. tostring(droid and droid.object))
+        end
+    end)
+    
+    -- Also add a backup wake-up timer at 15 seconds
+    -- minetest.after(15, function()
+    --     lf("DEBUG generic_cooker:wake_timer", "backup wake-up timer triggered!")
+        
+    --     if droid and droid.object and droid._is_sleeping == true then
+    --         lf("DEBUG generic_cooker:wake_timer", "backup: forcing wake-up")
+    --         droid._is_sleeping = false
+    --         droid.action = nil  -- Clear action state
+    --         local wake_pos = vector.add(bed_pos, {x=0, y=2, z=0})
+    --         droid.object:set_pos(wake_pos)
+    --         droid:set_animation(maidroid.animation.STAND or "stand", 30)
+    --         to_wander(droid, "generic_cooker:backup_wake_timer", 0, 1)
+    --         lf("DEBUG generic_cooker:wake_timer", "backup: maidroid force woke up, action cleared")
+    --     end
+    -- end)
+    lf("DEBUG generic_cooker:handle_sleep_action", "sleep state maintained for debugging (no auto wake-up)")
+    
+    return true
+end
+
+-- ,,bed,,sleep
+-- Function to find and sleep in a nearby bed
+local function try_sleep_in_bed(droid, pos)
+    lf("DEBUG generic_cooker:try_sleep_in_bed", "looking for bed near pos=" .. minetest.pos_to_string(pos))
+    
+    -- Check if beds mod is available
+    if not beds or not beds.on_rightclick then
+        lf("DEBUG generic_cooker:try_sleep_in_bed", "beds mod not available")
+        return false
+    end
+    
+    local find_dist = 12
+    local bed_pos = minetest.find_node_near(pos, find_dist, {"group:bed"})
+    if not bed_pos then
+        lf("DEBUG generic_cooker:try_sleep_in_bed", "no bed found near pos=" .. minetest.pos_to_string(pos))
+        return false
+    end
+
+    local target = vector.add(bed_pos, {x=0, y=1, z=0})
+    local rounded_pos = vector.round(pos)
+    local path = minetest.find_path(rounded_pos, target, find_dist+1, 2, 2, "A*_noprefetch")
+    if not path then
+        lf("DEBUG generic_cooker:try_sleep_in_bed", "path not found to bed at " .. minetest.pos_to_string(bed_pos))
+        return false
+    end
+
+    droid._bed_target = GenericCookerTarget.new(bed_pos, nil, nil)
+    droid:set_tool("maidroid:spatula")
+    maidroid.cores.path.to_follow_path(droid, path, target, to_action, "generic_cooker_sleep")
+    return true
+end
 
 -- ,,act
 
@@ -1397,10 +1549,27 @@ act = function(droid, dtime)
     elseif droid.action == "generic_cooker_craft_rice_flour" then
         lf("generic_cooker:act", "generic_cooker_craft_rice_flour: " .. minetest.pos_to_string(droid:get_pos()))
         craft_rice_flour(droid)
+    elseif droid.action == "generic_cooker_sleep" then
+        lf("DEBUG generic_cooker:act", "generic_cooker_sleep: " .. minetest.pos_to_string(droid:get_pos()))
+        local target = droid._bed_target
+        if target and target.pos then
+            -- Check if beds mod is available
+            if beds then
+                handle_sleep_action(droid, target.pos)
+                -- DEBUG: Don't return to wander after sleep - keep maidroid in sleep state
+                lf("DEBUG generic_cooker:act", "sleep action completed, staying in sleep state (no wander return)")
+                return nil -- Prevent return to wander
+            else
+                lf("DEBUG generic_cooker:act", "beds mod not available for sleeping")
+            end
+        else
+            lf("DEBUG generic_cooker:act", "generic_cooker_sleep: no bed target")
+        end
+        droid._bed_target = nil
 	end
 
-	-- Teleport back to starting position if available
-	if droid.path_start_pos then
+	-- Teleport back to starting position if available (skip for sleep actions)
+	if droid.path_start_pos and droid.action ~= "generic_cooker_sleep" then
 		droid.object:set_pos(droid.path_start_pos)
 		lf("generic_cooker:act", ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Teleported back to start pos: " .. minetest.pos_to_string(vector.round(droid.path_start_pos)))
 	end
@@ -1415,21 +1584,24 @@ task = function(droid)
     local pos = droid:get_pos()
     local inv = droid:get_inventory()
 
-	-- : randomly pick one of two furnace actions, with choice 1 being twice as likely as choice 2
-	-- Use math.random(3): values 1 and 2 map to choice 1, value 3 maps to choice 2
-	local choice = math.random(3)
-    -- choice = 3
+	-- : randomly pick one of four actions, with choice 1 being twice as likely as others
+	-- Use math.random(4): values 1 and 2 map to choice 1, values 3 and 4 map to choices 2, 3, and 4
+	local choice = math.random(4)
+    -- choice = 4
 
 	if choice == 1 then
-		lf("generic_cooker:task", "CHOICE=1: try_feed_get_from_furnace__generic for ")
+		lf("DEBUG generic_cooker:task", "CHOICE=1: try_feed_get_from_furnace__generic for ")
 	    	try_feed_get_from_furnace__generic(droid, pos)
     elseif choice == 2 then
-        lf("generic_cooker:task", "CHOICE=2: craft_generic")
+        lf("DEBUG generic_cooker:task", "CHOICE=2: craft_generic")
         -- craft_rice_flour(droid)
         craft_generic(droid, craft_outputs)
-	else
-		lf("generic_cooker:task", "CHOICE=3: try_get_item_from_nearby_chest for all_take_items count=" .. #all_take_items)
+    elseif choice == 3 then
+		lf("DEBUG generic_cooker:task", "CHOICE=3: try_get_item_from_nearby_chest for all_take_items count=" .. #all_take_items)
 	    	try_get_item_from_nearby_chest(droid, pos, all_take_items)
+	else
+		lf("DEBUG generic_cooker:task", "CHOICE=4: try_sleep_in_bed")
+	    	try_sleep_in_bed(droid, pos)
 	end
 end
 
@@ -1470,6 +1642,16 @@ local check_fence_detection = function(droid)
 end
 -- ,,step
 on_step = function(droid, dtime, moveresult)
+	-- Check if maidroid is sleeping - if so, prevent all movement and processing
+	-- if droid._is_sleeping == true then
+	-- 	-- Ensure velocity stays zero while sleeping
+	-- 	droid.object:set_velocity({x = 0, y = 0, z = 0})
+	-- 	-- Keep sleep animation active
+	-- 	droid:set_animation(maidroid.animation.LAY or "lay", 0)
+	-- 	-- Skip all other processing while sleeping
+	-- 	return
+	-- end
+	
 	droid:pickup_item()
 
 	-- Check if maidroid is more than max_distance_from_activation blocks away from activation position

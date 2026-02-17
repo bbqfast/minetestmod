@@ -31,30 +31,31 @@ local init_craftable_outputs = {
     "farming:cookie", "farming:carrot_gold", "farming:beetroot_soup", "farming:sunflower_oil", "farming:sunflower_bread", "farming:bowl"
 }
 
-
-local all_furnace_inputs = {
-    "default:papyrus",
-    "basic_materials:oil_extract",
-    "basic_materials:paraffin",
-    "basic_materials:terracotta_base",
-    "basic_materials:wet_cement",
-    "bones:bone",
-    "bucket:bucket_water",
-    "building_blocks:tar_base",
-    "christmas_decor:gingerbread_man_raw",
-    "darkage:basalt_cobble",
-    "darkage:gneiss_cobble",
-    "darkage:mud",
-    "darkage:old_tuff_bricks",
-    "darkage:ors_cobble",
-    "darkage:rhyolitic_tuff_rubble",
-    "darkage:schist",
-}
+local all_furnace_inputs = {}
+-- local all_furnace_inputs = {
+--     "default:papyrus",
+--     "basic_materials:oil_extract",
+--     "basic_materials:paraffin",
+--     "basic_materials:terracotta_base",
+--     "basic_materials:wet_cement",
+--     "bones:bone",
+--     "bucket:bucket_water",
+--     "building_blocks:tar_base",
+--     "christmas_decor:gingerbread_man_raw",
+--     "darkage:basalt_cobble",
+--     "darkage:gneiss_cobble",
+--     "darkage:mud",
+--     "darkage:old_tuff_bricks",
+--     "darkage:ors_cobble",
+--     "darkage:rhyolitic_tuff_rubble",
+--     "darkage:schist",
+-- }
 
 
 local cookable_inputs = {
     "farming:flour",
     "farming:rice_flour",
+    "default:papyrus"
 }
 
 -- Expose cookable_inputs globally for access by other modules
@@ -256,10 +257,10 @@ end
 
 --- calculate_pagination calculates total pages and current page
 --- Returns: total_pages, current_page
---- Parameters: self, items_list, items_per_page, min_pages (optional), page_field_name
-local function calculate_pagination(self, items_list, items_per_page, min_pages, page_field_name)
+--- Parameters: self, item_list_count, items_per_page, min_pages (optional), page_field_name
+local function calculate_pagination(self, item_list_count, items_per_page, min_pages, page_field_name)
 	min_pages = min_pages or 1
-	local total_pages = math.max(min_pages, math.ceil(#items_list / items_per_page))
+	local total_pages = math.max(min_pages, math.ceil(item_list_count / items_per_page))
 	local current_page = (self[page_field_name] or 1)
 	if current_page > total_pages then current_page = total_pages end
 	if current_page < 1 then current_page = 1 end
@@ -270,7 +271,7 @@ end
 --- Returns: total_pages, current_page
 local function calculate_desirable_pagination(self, desirable_outputs, desirable_items_per_page)
 	-- Always show at least 2 pages when there are desirable items (for drag-and-drop)
-	return calculate_pagination(self, desirable_outputs, desirable_items_per_page, 2, "desirable_page")
+	return calculate_pagination(self, #desirable_outputs, desirable_items_per_page, 2, "desirable_page")
 end
 
 function maidroid.populate_items_page(inv, droid, page_items, list_name, slot_count)
@@ -293,28 +294,28 @@ end
 -- Function to convert craftable outputs array to a sparse array
 -- Takes the output from maidroid.cores.generic_cooker.get_craftable_outputs()
 -- and returns a sparse array where indices represent item positions
-function maidroid.convert_craftable_outputs_to_sparse_array(craftable_outputs)
-    lf("api:convert_craftable_outputs_to_sparse_array", "convert_craftable_outputs_to_sparse_array: " .. dump(craftable_outputs))
-	if type(craftable_outputs) ~= "table" then
-        lf("api:convert_craftable_outputs_to_sparse_array", "convert_craftable_outputs_to_sparse_array: " .. tostring(craftable_outputs))
-		return {}
-	end
+-- function maidroid.convert_craftable_outputs_to_sparse_array(craftable_outputs)
+--     lf("api:convert_craftable_outputs_to_sparse_array", "convert_craftable_outputs_to_sparse_array: " .. dump(craftable_outputs))
+-- 	if type(craftable_outputs) ~= "table" then
+--         lf("api:convert_craftable_outputs_to_sparse_array", "convert_craftable_outputs_to_sparse_array: " .. tostring(craftable_outputs))
+-- 		return {}
+-- 	end
 	
-	local sparse_array = {}
+-- 	local sparse_array = {}
 	
-	-- Convert each item string to a sparse array entry
-	for i, item_spec in ipairs(craftable_outputs) do
-        lf("api:convert_craftable_outputs_to_sparse_array", "convert_craftable_outputs_to_sparse_array: " .. tostring(item_spec))
-		if type(item_spec) == "string" and item_spec ~= "" then
-            lf("api:convert_craftable_outputs_to_sparse_array", "convert_craftable_outputs_to_sparse_array: " .. tostring(item_spec))
-			-- Use the original index as the key in the sparse array
-			-- This preserves the original ordering while creating a sparse structure
-			sparse_array[i] = item_spec
-		end
-	end
+-- 	-- Convert each item string to a sparse array entry
+-- 	for i, item_spec in ipairs(craftable_outputs) do
+--         lf("api:convert_craftable_outputs_to_sparse_array", "convert_craftable_outputs_to_sparse_array: " .. tostring(item_spec))
+-- 		if type(item_spec) == "string" and item_spec ~= "" then
+--             lf("api:convert_craftable_outputs_to_sparse_array", "convert_craftable_outputs_to_sparse_array: " .. tostring(item_spec))
+-- 			-- Use the original index as the key in the sparse array
+-- 			-- This preserves the original ordering while creating a sparse structure
+-- 			sparse_array[i] = item_spec
+-- 		end
+-- 	end
 	
-	return sparse_array
-end
+-- 	return sparse_array
+-- end
 
 function maidroid.populate_detached_inventory(inv, droid, craftable_outputs, list_name, max_slots)
     lf("api:populate_detached_inventory", "################################# populate_detached_inventory: " .. dump(craftable_outputs))
@@ -339,9 +340,9 @@ function maidroid.populate_detached_inventory(inv, droid, craftable_outputs, lis
 	end
 end
 
-function populate_current_page(self, current_page, items_per_page, outputs, page_storage_key, log_prefix)
+function populate_current_page(self, current_page, items_per_page, output_count, page_storage_key, log_prefix)
 	local start_idx = (current_page - 1) * items_per_page + 1
-	local end_idx = math.min(start_idx + items_per_page - 1, #outputs)
+	local end_idx = math.min(start_idx + items_per_page - 1, output_count)
 	local page_items = {}
 	
 	-- Check if we have stored page data for this page with preserved positions
@@ -372,103 +373,56 @@ end
 
 
 
--- ,,
-function maidroid.update_selection_inventory(inv, droid)
-	-- Clear desirable inventory
-	inv:set_list("desirable", {})
-	-- Calculate desirable pagination (based on page items tracking)
-	local desirable_outputs = {}
+-- -- ,,
+-- function maidroid.update_selection_inventory(inv, droid)
+-- 	-- Clear desirable inventory
+-- 	inv:set_list("desirable", {})
+-- 	-- Calculate desirable pagination (based on page items tracking)
+-- 	local desirable_outputs = {}
 	
-	-- Build complete list from all pages
+-- 	-- Build complete list from all pages
 
-    lf("api:update_selection_inventory", "update_selection_inventory: type" .. type(droid.desirable_page_items))
-	if type(droid.desirable_page_items) == "table" then
-        lf("api:update_selection_inventory1", "update_selection_inventory: desirable_page_items: " .. dump(droid.desirable_page_items))
-        -- ,,hack
-		-- for page_num, page_items in pairs(droid.desirable_page_items) do
-		-- 	for _, item in ipairs(page_items) do
-		-- 		local already_exists = false
-		-- 		for _, existing_item in ipairs(desirable_outputs) do
-		-- 			if existing_item == item then
-		-- 				already_exists = true
-		-- 				break
-		-- 			end
-		-- 		end
-		-- 		if not already_exists then
-		-- 			table.insert(desirable_outputs, item)
-		-- 		end
-		-- 	end
-		-- end
-	elseif type(droid.desired_craft_outputs) == "table" then
-        lf("api:update_selection_inventory2", "update_selection_inventory: desired_craft_outputs: " .. dump(droid.desired_craft_outputs))
-		-- Fallback to regular desired outputs if page tracking not set
-		desirable_outputs = droid.desired_craft_outputs
+--     lf("api:update_selection_inventory", "update_selection_inventory: type" .. type(droid.desirable_page_items))
+-- 	if type(droid.desirable_page_items) == "table" then
+--         lf("api:update_selection_inventory1", "update_selection_inventory: desirable_page_items: " .. dump(droid.desirable_page_items))
+--         -- ,,hack
+-- 		-- for page_num, page_items in pairs(droid.desirable_page_items) do
+-- 		-- 	for _, item in ipairs(page_items) do
+-- 		-- 		local already_exists = false
+-- 		-- 		for _, existing_item in ipairs(desirable_outputs) do
+-- 		-- 			if existing_item == item then
+-- 		-- 				already_exists = true
+-- 		-- 				break
+-- 		-- 			end
+-- 		-- 		end
+-- 		-- 		if not already_exists then
+-- 		-- 			table.insert(desirable_outputs, item)
+-- 		-- 		end
+-- 		-- 	end
+-- 		-- end
+-- 	elseif type(droid.desired_craft_outputs) == "table" then
+--         lf("api:update_selection_inventory2", "update_selection_inventory: desired_craft_outputs: " .. dump(droid.desired_craft_outputs))
+-- 		-- Fallback to regular desired outputs if page tracking not set
+-- 		desirable_outputs = droid.desired_craft_outputs
 
-        -- ,,x5
-        maidroid.init_desirable_pageitems(droid, droid.desired_craft_outputs)
+--         -- ,,x5
+--         maidroid.init_desirable_pageitems(droid, droid.desired_craft_outputs)
 
-	end
+-- 	end
 	
     
 
-	-- Populate desirable list (max 6 for 6x1 grid)
-	-- for i, itemname in ipairs(desirable_outputs) do
-	-- 	if i <= 6 and type(itemname) == "string" and itemname ~= "" then
-	-- 		inv:set_stack("desirable", i, itemname)
-	-- 	end
-	-- end
+-- 	-- Populate desirable list (max 6 for 6x1 grid)
+-- 	-- for i, itemname in ipairs(desirable_outputs) do
+-- 	-- 	if i <= 6 and type(itemname) == "string" and itemname ~= "" then
+-- 	-- 		inv:set_stack("desirable", i, itemname)
+-- 	-- 	end
+-- 	-- end
 	
-	lf("update_selection_inventory", "Populated desirable with: " .. dump(desired_items))
-    lf("api:update_selection_inventory", "update_selection_inventory: " .. dump(inv))
-    -- error("test")
+-- 	lf("update_selection_inventory", "Populated desirable with: " .. dump(desired_items))
+--     lf("api:update_selection_inventory", "update_selection_inventory: " .. dump(inv))
+--     -- error("test")
 
-end
-
--- ,,c2d
--- Helper function to handle moving items between craftable and desirable lists
--- function maidroid.handle_craftable_to_desirable_move(droid)
--- 	lf("cooker_inventory", "Item moved from craftable to desirable, updating desired craft outputs")
-	
--- 	if not droid then
--- 		lf("cooker_inventory", "ERROR: Could not find maidroid for inventory " .. tostring(droid.crafting_inventory_id))
--- 		return
--- 	end
-	
--- 	-- Get all items from desirable list (current inventory state)
--- 	local crafting_inv = maidroid.crafting_inventories[droid.crafting_inventory_id]
--- 	local page_data = {} -- Store both items and empty positions
-	
--- 	for i = 1, 6 do -- desirable has 6 slots
--- 		local stack = crafting_inv:get_stack("desirable", i)
--- 		if not stack:is_empty() then
--- 			page_data[i] = stack:get_name() -- Store item at its position
--- 		else
--- 			page_data[i] = nil -- Explicitly mark empty slot
--- 		end
--- 	end
-	
--- 	-- Get current page
--- 	local current_page = (droid.desirable_page or 1)
-	
--- 	-- Initialize page items tracking if not exists
--- 	if not droid.desirable_page_items then
--- 		droid.desirable_page_items = {}
--- 	end
-	
--- 	-- Store current page data with positions preserved
--- 	droid.desirable_page_items[current_page] = page_data
-	
--- 	-- Build complete list from all pages using helper function
--- 	local all_desired_items = maidroid.build_complete_desirable_list(droid)
-	
--- 	-- Update generic_cooker's desired craft outputs
--- 	if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.set_desired_craft_outputs then
--- 		maidroid.cores.generic_cooker.set_desired_craft_outputs(droid, all_desired_items)
--- 	else
--- 		droid.desired_craft_outputs = all_desired_items
--- 	end
-	
--- 	lf("cooker_inventory", "Updated desired craft outputs: " .. dump(all_desired_items))
 -- end
 
 -- Helper function to handle moving items from desirable to craftable list
@@ -620,11 +574,17 @@ function maidroid.init_desirable_pageitems(droid, item_list)
 end
 
 -- Initialize craftable page items with given item list
-function maidroid.init_craftable_pageitems(droid, item_list)
+function maidroid.init_craftable_pageitems(droid, item_list, desirable_items)
 	if not droid then
 		lf("cooker_inventory", "ERROR: Could not find maidroid for init_craftable_pageitems")
 		return
 	end
+	
+	-- Get list of items already in desirable to avoid duplicates
+	-- local desirable_items = {}
+	-- if type(droid.desirable_page_items) == "table" then
+	-- 	desirable_items = maidroid.build_complete_desirable_list(droid)
+	-- end
 	
 	-- Initialize page items tracking if not exists
 	if not droid.craftable_page_items then
@@ -637,8 +597,17 @@ function maidroid.init_craftable_pageitems(droid, item_list)
 	-- Store items in pages of 12 items each
 	local page_num = 1
 	local page_data = {}
-	
+	-- ,,y2
 	for i, item in ipairs(item_list) do
+		-- Check if item is already in desirable list
+		local item_in_desirable = false
+		for _, desirable_item in ipairs(desirable_items) do
+			if desirable_item == item then
+				item_in_desirable = true
+				break
+			end
+		end
+		
 		-- Calculate position in current page (1-12)
 		local pos_in_page = ((i - 1) % 12) + 1
 		
@@ -649,8 +618,13 @@ function maidroid.init_craftable_pageitems(droid, item_list)
 			page_data = {}
 		end
 		
-		-- Store item at its position in the page
-		page_data[pos_in_page] = item
+		-- Store item at its position in the page, or leave blank if already in desirable
+		if item_in_desirable then
+			page_data[pos_in_page] = ""  -- Leave slot blank
+			lf("cooker_inventory", "Item " .. item .. " already in desirable, leaving craftable slot blank at position " .. pos_in_page)
+		else
+			page_data[pos_in_page] = item
+		end
 	end
 	
 	-- Store the last page if it has items
@@ -658,11 +632,11 @@ function maidroid.init_craftable_pageitems(droid, item_list)
 		droid.craftable_page_items[page_num] = page_data
 	end
 	
-	lf("cooker_inventory", "Initialized craftable_page_items with " .. #item_list .. " items across " .. page_num .. " pages")
+	lf("cooker_inventory", "Initialized craftable_page_items with " .. #item_list .. " items across " .. page_num .. " pages (duplicates filtered)")
 end
 
 -- Initialize cookable page items with given item list
-function maidroid.init_cookable_pageitems(droid, item_list)
+function maidroid.init_cookable_pageitems(droid, item_list, cooklist_items)
 	if not droid then
 		lf("cooker_inventory", "ERROR: Could not find maidroid for init_cookable_pageitems")
 		return
@@ -681,6 +655,15 @@ function maidroid.init_cookable_pageitems(droid, item_list)
 	local page_data = {}
 	
 	for i, item in ipairs(item_list) do
+		-- Check if item is already in cooklist list
+		local item_in_cooklist = false
+		for _, cooklist_item in ipairs(cooklist_items) do
+			if cooklist_item == item then
+				item_in_cooklist = true
+				break
+			end
+		end
+		
 		-- Calculate position in current page (1-12)
 		local pos_in_page = ((i - 1) % 12) + 1
 		
@@ -691,8 +674,13 @@ function maidroid.init_cookable_pageitems(droid, item_list)
 			page_data = {}
 		end
 		
-		-- Store item at its position in the page
-		page_data[pos_in_page] = item
+		-- Store item at its position in the page, or leave blank if already in cooklist
+		if item_in_cooklist then
+			page_data[pos_in_page] = ""  -- Leave slot blank
+			lf("cooker_inventory", "Item " .. item .. " already in cooklist, leaving cookable slot blank at position " .. pos_in_page)
+		else
+			page_data[pos_in_page] = item
+		end
 	end
 	
 	-- Store the last page if it has items
@@ -700,7 +688,7 @@ function maidroid.init_cookable_pageitems(droid, item_list)
 		droid.cookable_page_items[page_num] = page_data
 	end
 	
-	lf("cooker_inventory", "Initialized cookable_page_items with " .. #item_list .. " items across " .. page_num .. " pages")
+	lf("cooker_inventory", "Initialized cookable_page_items with " .. #item_list .. " items across " .. page_num .. " pages (duplicates filtered)")
 end
 
 -- Initialize cooklist page items with given item list
@@ -2080,7 +2068,7 @@ local function handle_craftable_logic(self)
 		-- Use the new create_crafter_events function
 		local crafting_inventory = create_crafter_events(self, generate_unique_manufacturing_id())
 		maidroid.crafting_inventories[self.crafting_inventory_id] = crafting_inventory
-		maidroid.populate_detached_inventory(crafting_inventory, self, init_craftable_outputs, "craftable", 12)
+		-- maidroid.populate_detached_inventory(crafting_inventory, self, init_craftable_outputs, "craftable", 12)
 		lf("cooker_tab", "Created crafting inventory with ID: " .. self.crafting_inventory_id)
 	end
 	
@@ -2099,15 +2087,15 @@ local function handle_craftable_logic(self)
 	-- Calculate current page and total pages for craftable items
 	local craftable_outputs = {}
 	craftable_outputs = init_craftable_outputs
-
 	-- Craftable pagination variables
-	local craftable_total_pages, craftable_current_page = calculate_pagination(self, craftable_outputs, CRAFTABLE_ITEMS_PER_PAGE, 1, "craftable_page")
+	local craftable_total_pages, craftable_current_page = calculate_pagination(self, #craftable_outputs, CRAFTABLE_ITEMS_PER_PAGE, 1, "craftable_page")
 	if not self.craftable_page_items then
-		maidroid.init_craftable_pageitems(self, init_craftable_outputs)
+		maidroid.init_craftable_pageitems(self, init_craftable_outputs, self.desired_craft_outputs)
 	end
 	
+    -- ,,y1
 	-- Get current craftable page items
-	local craftable_page_items = populate_current_page(self, craftable_current_page, CRAFTABLE_ITEMS_PER_PAGE, craftable_outputs, "craftable_page_items", "craftable")
+	local craftable_page_items = populate_current_page(self, craftable_current_page, CRAFTABLE_ITEMS_PER_PAGE, #craftable_outputs, "craftable_page_items", "craftable")
 	
 	-- Update craftable inventory with current page items
 	maidroid.populate_items_page(crafting_inv, self, craftable_page_items, "craftable", 12)
@@ -2137,7 +2125,7 @@ local function handle_desirable_logic(self, crafting_inv)
 	local desirable_total_pages, desirable_current_page = calculate_desirable_pagination(self, desirable_outputs, DESIRABLE_ITEMS_PER_PAGE)
 	
 	-- Get current desirable page items (from actual desirable outputs)
-	local desirable_page_items = populate_current_page(self, desirable_current_page, DESIRABLE_ITEMS_PER_PAGE, desirable_outputs, "desirable_page_items", "desirable")
+	local desirable_page_items = populate_current_page(self, desirable_current_page, DESIRABLE_ITEMS_PER_PAGE, #desirable_outputs, "desirable_page_items", "desirable")
 	
 	-- Update desirable inventory with current page items
 	maidroid.populate_items_page(crafting_inv, self, desirable_page_items, "desirable", 6)
@@ -2161,22 +2149,26 @@ local function handle_cookable_logic(self)
 	local cooking_inv = maidroid.cooking_inventories[cooking_inv_id]
 	if cooking_inv then
 		lf("cooker_tab", "Found cooking inventory, updating selection")
-		if not self.desirable_page_items then
-			maidroid.init_desirable_pageitems(self, self.desired_craft_outputs)
+		if not self.cooklist_page_items then
+            -- ,,y4
+			-- maidroid.init_desirable_pageitems(self, self.desired_craft_outputs)
+			maidroid.init_cooklist_pageitems(self, cookable_inputs)
 		end
 	else
 		lf("cooker_tab", "ERROR: Could not find cooking inventory!")
 	end
-	
+	-- ,,y3
 	all_furnace_inputs = maidroid.cores.generic_cooker.get_cookable_items()
 	if not self.cookable_page_items then
-		maidroid.init_cookable_pageitems(self, all_furnace_inputs)
+		-- Get cooklist items to exclude from cookable list
+		local cooklist_items = maidroid.build_complete_cooklist_list(self)
+		maidroid.init_cookable_pageitems(self, all_furnace_inputs, cooklist_items)
 	end
 
-	local cookable_total_pages, cookable_current_page = calculate_pagination(self, all_furnace_inputs, CRAFTABLE_ITEMS_PER_PAGE, 1, "cookable_page")
+	local cookable_total_pages, cookable_current_page = calculate_pagination(self, #all_furnace_inputs, CRAFTABLE_ITEMS_PER_PAGE, 1, "cookable_page")
 	
 	-- Get current cookable page items
-	local cookable_page_items = populate_current_page(self, cookable_current_page, CRAFTABLE_ITEMS_PER_PAGE, all_furnace_inputs, "cookable_page_items", "cookable")
+	local cookable_page_items = populate_current_page(self, cookable_current_page, CRAFTABLE_ITEMS_PER_PAGE, #all_furnace_inputs, "cookable_page_items", "cookable")
 	lf("XXXXXXXXXXXXXXXXXXX api", "cookable_page_items=" .. dump(cookable_page_items))
 	
 	-- Update cookable inventory with current page items
@@ -2206,10 +2198,10 @@ local function handle_cooklist_logic(self, cooking_inv)
 		cooklist_data = cooker_items.all_farming_outputs or {}
 	end
 	
-	local cooklist_total_pages, cooklist_current_page = calculate_pagination(self, cooklist_data, 6, 1, "cooklist_page")
+	local cooklist_total_pages, cooklist_current_page = calculate_pagination(self, #cooklist_data, 6, 1, "cooklist_page")
 	
 	-- Get current cooklist page items
-	local cooklist_page_items = populate_current_page(self, cooklist_current_page, 6, cooklist_data, "cooklist_page_items", "cooklist")
+	local cooklist_page_items = populate_current_page(self, cooklist_current_page, 6, #cooklist_data, "cooklist_page_items", "cooklist")
 	
 	-- Update cooklist inventory with current page items
 	maidroid.populate_items_page(cooking_inv, self, cooklist_page_items, "cooklist", 6)
@@ -2224,11 +2216,11 @@ local function generate_cooker_form(self, form, crafting_inv, crafting_inv_id, c
 									cooklist_total_pages, cooklist_current_page)
 	-- Calculate pagination for craftables
 	local craftable_outputs = init_craftable_outputs
-	local craftable_total_pages, craftable_current_page = calculate_pagination(self, craftable_outputs, CRAFTABLE_ITEMS_PER_PAGE, 1, "craftable_page")
+	local craftable_total_pages, craftable_current_page = calculate_pagination(self, #craftable_outputs, CRAFTABLE_ITEMS_PER_PAGE, 1, "craftable_page")
 	
 	-- Calculate pagination for cookables
 	all_furnace_inputs = maidroid.cores.generic_cooker.get_cookable_items()
-	local cookable_total_pages, cookable_current_page = calculate_pagination(self, all_furnace_inputs, CRAFTABLE_ITEMS_PER_PAGE, 1, "cookable_page")
+	local cookable_total_pages, cookable_current_page = calculate_pagination(self, #all_furnace_inputs, CRAFTABLE_ITEMS_PER_PAGE, 1, "cookable_page")
 	
 	-- UI FORM GENERATION
 	form = form .. enligthen_tool(self)

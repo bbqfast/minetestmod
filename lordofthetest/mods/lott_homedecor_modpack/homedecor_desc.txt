@@ -1,0 +1,197 @@
+***** inbox *****
+init.lua
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\inbox\init.lua
+
+Description of file:
+This file implements a mailbox system for the homedecor modpack. It registers a mailbox node that allows players to send and receive mail items. The mailbox has different interfaces for owners (who can view and take items) and other players (who can only insert items).
+
+Lua Function list:
+get_inbox_formspec - Generates the formspec for mailbox owners to view and manage their mail
+get_inbox_insert_formspec - Generates the formspec for non-owners to insert mail items
+
+***** itemframes *****
+init.lua
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\itemframes\init.lua
+
+Description of file:
+This file implements item frames and pedestals for displaying items. It registers an entity system to display items visually on walls (frames) or on stands (pedestals). Includes ownership protection and automatic entity restoration.
+
+Lua Function list:
+remove_item - Removes the item entity from a frame or pedestal
+update_item - Updates or creates the item entity for a frame or pedestal
+drop_item - Drops the displayed item as a physical item
+
+***** building_blocks *****
+init.lua
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\building_blocks\init.lua
+
+Description of file:
+Main initialization file for building_blocks mod. Loads all sub-modules including aliases, stairs, other nodes, and recipes.
+
+Lua Function list:
+None - This file only loads other modules using dofile()
+
+alias.lua
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\building_blocks\alias.lua
+
+Description of file:
+Handles mod compatibility by registering aliases for nodes when other mods like moreblocks, stairs, or technic are present. Also registers fallback granite node if technic mod is not available.
+
+Lua Function list:
+None - This file only registers aliases and nodes
+
+node_stairs.lua
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\building_blocks\node_stairs.lua
+
+Description of file:
+Defines various building material nodes with automatic stair and slab generation. Includes glass types, adobe, hardwood, roofing, tar, marble, and decorative items like fireplace and chess tiles.
+
+Lua Function list:
+building_blocks_stairs - Registers a node and automatically creates stairs/slabs for it if stairs mod is available
+
+others.lua
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\building_blocks\others.lua
+
+Description of file:
+Registers craft items and tools including sticks, tar base, and tar knife with tool capabilities.
+
+Lua Function list:
+None - This file only registers craft items and tools
+
+recipes.lua
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\building_blocks\recipes.lua
+
+Description of file:
+Contains all crafting recipes for building_blocks items including regular crafts, cooking recipes, and fuel recipes.
+
+Lua Function list:
+None - This file only registers crafting recipes
+
+***** computer *****
+init.lua
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\computer\init.lua
+
+Description of file:
+Main initialization file for computer mod. Provides framework for registering computer nodes with on/off states and handheld items. Loads computer definitions, misc items, recipes, and tetris game.
+
+Lua Function list:
+computer.register - Registers a computer node with on/off states and click handling
+computer.register_handheld - Registers a handheld computer item
+computer.pixelnodebox - Creates a nodebox from pixel-based dimensions
+
+computers.lua
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\computer\computers.lua
+
+Description of file:
+Defines various computer nodes including SheFriendSOO (Amiga-like), Pony Vanio laptop, and other computer systems with 3D models and on/off states.
+
+Lua Function list:
+None - This file only registers computer nodes
+
+miscitems.lua
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\computer\miscitems.lua
+
+Description of file:
+Provides fallback plastic sheet and plastic base items if homedecor mod is not available. Includes crafting recipes for plastic materials from vegetation.
+
+Lua Function list:
+None - This file only registers craft items and recipes
+
+recipes.lua
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\computer\recipes.lua
+
+Description of file:
+Contains crafting recipes for computer items and components.
+
+Lua Function list:
+None - This file only registers crafting recipes
+
+tetris.lua
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\computer\tetris.lua
+
+Description of file:
+Implements a playable Tetris game that can be played on computer nodes. Includes game logic, controls, and display.
+
+Lua Function list:
+draw_shape - Draws a tetris shape at specified position and rotation
+step - Main game loop function that handles game state and timer updates
+new_game - Initializes a new tetris game with empty board and random pieces
+update_boardstring - Updates the visual representation of the game board
+add - Adds current piece to the board when it lands
+scroll - Scrolls board lines down when a line is cleared
+check_lines - Checks for completed lines and clears them
+check_position - Validates if a piece can be placed at given position
+stuck - Checks if current piece cannot move down further
+tick - Advances game by one time step
+move - Moves piece in specified direction
+rotate - Rotates piece by specified amount
+key - Handles keyboard/button input for game controls
+
+***** fake_fire *****
+init.lua
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\fake_fire\init.lua
+
+Description of file:
+Implements decorative fire effects including ice fire, fancy fire, glowing embers, and chimney tops. Features particle effects, smoke generation, and sound effects for realistic fire decoration.
+
+Lua Function list:
+start_smoke - Starts smoke particle effects and sounds for fire/chimney nodes
+stop_smoke - Stops smoke particle effects and sounds
+checkwall - Checks if wall placement is valid for TV installation
+
+***** lavalamp *****
+init.lua
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\lavalamp\init.lua
+
+Description of file:
+Implements colorable lava lamps with animated liquid effects. Supports unifieddyes for color customization and includes conversion system for old static colored nodes.
+
+Lua Function list:
+None - This file only registers nodes and conversion LBM
+
+***** plasmascreen *****
+init.lua
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\plasmascreen\init.lua
+
+Description of file:
+Implements plasma screen TVs with animated video textures and TV stands. Includes on/off states and wall placement validation.
+
+Lua Function list:
+checkwall - Validates wall placement conditions for TV installation
+
+=== FOLDERS WITH COMPLETED SUMMARIES ===
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\building_blocks
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\computer
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\fake_fire
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\inbox
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\itemframes
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\lavalamp
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\plasmascreen
+
+=== FOLDERS NEEDING SUMMARIES ===
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\homedecor_bathroom
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\homedecor_bedroom
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\homedecor_books
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\homedecor_climate_control
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\homedecor_clocks
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\homedecor_cobweb
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\homedecor_common
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\homedecor_electrical
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\homedecor_electronics
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\homedecor_exterior
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\homedecor_fences
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\homedecor_foyer
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\homedecor_furniture
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\homedecor_furniture_medieval
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\homedecor_gastronomy
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\homedecor_kitchen
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\homedecor_laundry
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\homedecor_lighting
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\homedecor_misc
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\homedecor_office
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\homedecor_pictures_and_paintings
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\homedecor_roofing
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\homedecor_seating
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\homedecor_tables
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\homedecor_trash_cans
+C:\Minetest\v5.6\games\lordofthetest\mods\lott_homedecor_modpack\homedecor_windows_and_treatments
