@@ -151,6 +151,10 @@ Updates:
 - farmer when far away, teleport back 
 - fix sitting maidroid  moving
 
+- sleep action for cooker
+- more cleanup api.lua
+- remove dup items from craftable and cookable
+
 
 todo:
 - 
