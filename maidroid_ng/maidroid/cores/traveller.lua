@@ -297,6 +297,172 @@ local function on_step_shower_check(droid, dtime, moveresult)
 	return false -- Return false to indicate not showering
 end
 
+-- Helper function to convert yaw to readable direction
+local function yaw_to_direction(yaw)
+	local normalized = yaw % (2 * math.pi)
+	if normalized < math.pi/4 or normalized >= 7*math.pi/4 then return "North"
+	elseif normalized < 3*math.pi/4 then return "East"
+	elseif normalized < 5*math.pi/4 then return "South"
+	else return "West"
+	end
+end
+
+-- ,toi
+-- Function to teleport to saved toilet position
+local function teleport_to_toilet_position(droid)
+	if not droid._toilet_pos then
+		lf("traveller", "No saved toilet position available for teleport")
+		return false
+	end
+	
+	local current_pos = droid:get_pos()
+	local toilet_pos = droid._toilet_pos
+	
+	lf("traveller", "Teleporting from " .. minetest.pos_to_string(current_pos) .. " to toilet at " .. minetest.pos_to_string(toilet_pos))
+	
+	-- Calculate teleport position (toilet seat at y=0.5, maidroid bottom at -0.5, so center at y=1.0)
+	local teleport_pos = vector.add(toilet_pos, {x=0, y=0.2, z=0})
+	
+	-- Get toilet node to check its orientation
+	local toilet_node = minetest.get_node(toilet_pos)
+	local toilet_param2 = toilet_node.param2 or 0
+	
+	-- Calculate facing direction based on toilet's param2
+	-- param2 values: 0=north, 1=east, 2=south, 3=west (90-degree rotations)
+	-- Different logic for cardinal vs diagonal directions
+	local toilet_yaw = toilet_param2 * (math.pi / 2)
+	local backward_yaw
+	
+	-- For North (0) and South (2), add π (face opposite)
+	-- For East (1) and West (3), face same direction
+	if toilet_param2 == 0 or toilet_param2 == 2 then
+		backward_yaw = (toilet_yaw + math.pi) % (2 * math.pi)  -- Face opposite
+	else
+		backward_yaw = toilet_yaw  -- Face same direction
+	end
+	
+	lf("traveller", "POS DEBUG: Toilet orientation param2=" .. toilet_param2 .. ", toilet_yaw=" .. toilet_yaw .. " (" .. yaw_to_direction(toilet_yaw) .. "), setting corrected yaw=" .. backward_yaw .. " (" .. yaw_to_direction(backward_yaw) .. ")")
+	
+	-- Perform teleport
+	droid.object:set_pos(teleport_pos)
+	
+	-- Set rotation to face backward relative to toilet's orientation
+	droid.object:set_yaw(backward_yaw)
+	
+	-- Add a small delay to check the actual yaw after setting it
+	minetest.after(0.1, function()
+		if droid and droid.object then
+			local actual_yaw = droid.object:get_yaw() or 0
+			lf("traveller", "POS DEBUG: Maidroid actual yaw after setting: " .. actual_yaw .. " (" .. yaw_to_direction(actual_yaw) .. ")")
+		end
+	end)
+	
+	-- Immediately halt and set velocity to zero after teleport
+	droid:halt()
+	droid.object:set_velocity({x = 0, y = 0, z = 0})
+	
+	lf("traveller", "Successfully teleported to toilet position and halted")
+	
+	return true
+end
+
+-- Function to flush toilet at specific position
+local function flush_toilet(droid, pos)
+	local node = minetest.get_node(pos)
+	
+	-- Check if it's a toilet
+	lf("DEBUG traveller:flush_toilet", "Checking node at " .. minetest.pos_to_string(pos) .. ": " .. node.name)
+	if node.name == "homedecor:toilet" or node.name == "homedecor:toilet_open" then
+		lf("DEBUG traveller:flush_toilet", "Found toilet, flushing it")
+		
+		-- Save the exact toilet position for later teleport
+		droid._toilet_pos = vector.round(pos)
+		lf("traveller", "Saved toilet position: " .. minetest.pos_to_string(droid._toilet_pos))
+		
+		-- Teleport to toilet position before flushing
+		teleport_to_toilet_position(droid)
+		
+		-- Check if already using toilet to prevent multiple toilet calls
+		if droid._is_using_toilet == true then
+			lf("DEBUG traveller:flush_toilet", "maidroid already using toilet, ignoring toilet action")
+			return true
+		end
+		
+		-- Set a flag to prevent on_step from reactivating movement
+		droid._is_using_toilet = true
+		
+		-- Halt the maidroid while using toilet
+		droid:halt()
+		
+		-- Explicitly set velocity to zero to prevent any movement
+		droid.object:set_velocity({x = 0, y = 0, z = 0})
+		
+		-- Set sit animation while using toilet
+		local sit_anim = (maidroid and maidroid.animation and maidroid.animation.SIT) or "sit"
+		droid:set_animation(sit_anim, 0)
+		
+		lf("DEBUG traveller:flush_toilet", "maidroid sitting on toilet at " .. minetest.pos_to_string(pos) .. " (toilet_flag=true, velocity=0)")
+		
+		-- Get the node definition and call its on_rightclick to flush
+		local def = minetest.registered_nodes[node.name]
+		if def and def.on_rightclick then
+			def.on_rightclick(pos, node, nil, nil, nil)
+			lf("traveller", "Flushed toilet at " .. minetest.pos_to_string(pos))
+		end
+		
+		-- Add automatic timer to finish using toilet
+		local toilet_time = 4 -- Use toilet for 4 seconds
+		lf("DEBUG traveller:flush_toilet", "setting toilet finish timer for " .. toilet_time .. " seconds")
+		
+		minetest.after(toilet_time, function()
+			lf("DEBUG traveller:toilet_timer", "toilet finish timer triggered!")
+			
+			if droid and droid.object then
+				lf("DEBUG traveller:toilet_timer", "droid and object valid, clearing toilet flag")
+				
+				-- Clear the toilet flag FIRST to allow normal movement
+				droid._is_using_toilet = false
+				
+				-- IMPORTANT: Clear the action state to prevent immediate re-toilet
+				droid.action = nil
+				
+				-- Restore normal animation
+				local stand_anim = (maidroid and maidroid.animation and maidroid.animation.STAND) or "stand"
+				droid:set_animation(stand_anim, 30)
+				
+				-- Resume normal behavior - force return to wander
+				to_wander(droid, "traveller:toilet_timer")
+				
+				lf("DEBUG traveller:toilet_timer", "maidroid finished using toilet, toilet flag cleared, action cleared")
+			else
+				lf("DEBUG traveller:toilet_timer", "toilet finish timer: droid or object is nil")
+				lf("DEBUG traveller:toilet_timer", "droid=" .. tostring(droid) .. " object=" .. tostring(droid and droid.object))
+			end
+		end)
+		
+		return true
+	else
+		lf("traveller", "Node at " .. minetest.pos_to_string(pos) .. " is not a toilet")
+	end
+	
+	return false
+end
+
+-- Function to check if maidroid is using toilet and handle toilet state
+local function on_step_toilet_check(droid, dtime, moveresult)
+	-- Check if maidroid is using toilet - if so, prevent all movement and processing
+	if droid._is_using_toilet == true then
+		-- Ensure velocity stays zero while using toilet
+		droid.object:set_velocity({x = 0, y = 0, z = 0})
+		-- Keep sit animation active while using toilet
+		local sit_anim = (maidroid and maidroid.animation and maidroid.animation.SIT) or "sit"
+		droid:set_animation(sit_anim, 0)
+		-- Skip all other processing while using toilet
+		return true -- Return true to indicate toilet state is active
+	end
+	return false -- Return false to indicate not using toilet
+end
+
 
 -- Function to find path to shower head and turn on on
 local function find_and_turn_on_shower(self)
@@ -350,6 +516,63 @@ local function find_and_turn_on_shower(self)
 		return true
 	else
 		lf("traveller", "No path found to shower head")
+		return false
+	end
+end
+
+-- ,,toi
+-- Function to find path to toilet and use it
+local function find_and_use_toilet(self)
+	lf("DEBUG traveller:find_and_use_toilet", "Starting toilet search")
+	local pos = self:get_pos()
+	
+	-- Find toilet within range
+	lf("DEBUG traveller:find_and_use_toilet", "Searching for toilets within " .. TRAVEL_RANGE .. " blocks")
+	local toilet_pos = minetest.find_node_near(pos, TRAVEL_RANGE, {"homedecor:toilet", "homedecor:toilet_open"})
+	
+	if not toilet_pos then
+		lf("traveller", "No toilet found within range")
+		return false
+	end
+	
+	lf("traveller", "Found toilet at " .. minetest.pos_to_string(toilet_pos))
+	lf("DEBUG traveller:find_and_use_toilet", "Checking if toilet location is safe")
+	
+	-- Check if destination is safe
+	if not is_destination_safe(self, toilet_pos) then
+		lf("traveller", "Toilet location is not safe")
+		return false
+	end
+	
+	-- Calculate distance to toilet
+	local distance = vector.distance(pos, toilet_pos)
+	lf("DEBUG traveller:find_and_use_toilet", "Distance to toilet: " .. string.format("%.2f", distance))
+	
+	-- If already close to toilet, use it
+	if distance < 3 then
+		lf("traveller", "Already near toilet, using it")
+		lf("DEBUG traveller:find_and_use_toilet", "Calling flush_toilet directly")
+		return flush_toilet(self, toilet_pos)
+	end
+	
+	-- Find path to toilet
+	lf("traveller", "Finding path to toilet from " .. minetest.pos_to_string(pos) .. " to " .. minetest.pos_to_string(toilet_pos))
+	lf("DEBUG traveller:find_and_use_toilet", "Using A* pathfinding with parameters: 8, 1, 1")
+	local path = minetest.find_path(pos, toilet_pos, 8, 1, 1, "A*")
+	
+	if path ~= nil then
+		lf("traveller", "Path found to toilet with " .. #path .. " nodes")
+		lf("DEBUG traveller:find_and_use_toilet", "Path found successfully, setting up movement")
+		self:set_yaw({self:get_pos(), toilet_pos})
+		
+		-- Set up action to use toilet when arriving
+		lf("DEBUG traveller:find_and_use_toilet", "Setting destination and action for toilet")
+		self.destination = toilet_pos
+		self.action = "use_toilet"
+		core_path.to_follow_path(self, path, toilet_pos, to_action, "use_toilet")
+		return true
+	else
+		lf("traveller", "No path found to toilet")
 		return false
 	end
 end
@@ -432,6 +655,8 @@ to_wander = function(self, from_caller)
 	self._bed_target = nil
 	self._is_showering = nil  -- Clear showering state
 	self._shower_pos = nil    -- Clear saved shower position
+	self._is_using_toilet = nil  -- Clear toilet state
+	self._toilet_pos = nil      -- Clear saved toilet position
 	-- Set the correct tool for traveller
 	self:set_tool("default:bronzeblock")
 	lf("traveller:to_wander", "setting state to WANDER")
@@ -481,6 +706,21 @@ local act = function(self)
 			lf("DEBUG traveller:act", "turn_on_shower: no destination")
 		end
 		self.destination = nil
+	elseif self.action == "use_toilet" then
+		lf("DEBUG traveller:act", "use_toilet: " .. minetest.pos_to_string(self:get_pos()))
+		lf("DEBUG traveller:act", "destination=" .. (self.destination and minetest.pos_to_string(self.destination) or "nil"))
+		if self.destination then
+			lf("DEBUG traveller:act", "Calling flush_toilet at destination")
+			local success = flush_toilet(self, self.destination)
+			if success then
+				lf("traveller:act", "Successfully used toilet")
+			else
+				lf("traveller:act", "Failed to use toilet")
+			end
+		else
+			lf("DEBUG traveller:act", "use_toilet: no destination")
+		end
+		self.destination = nil
 	else
 		lf("traveller:act", "unknown action: " .. tostring(self.action))
 	end
@@ -494,10 +734,10 @@ task = function(self)
 	local pos = self:get_pos()
 	local inv = self:get_inventory()
 	
-	-- Randomly pick one of four actions, with choice 1 being twice as likely as others
-	-- Use math.random(5): values 1 and 2 map to choice 1, values 3, 4, and 5 map to choices 2, 3, and 4
-	local choice = math.random(5)
-    choice = 4
+	-- Randomly pick one of five actions, with choice 1 being twice as likely as others
+	-- Use math.random(6): values 1 and 2 map to choice 1, values 3, 4, 5, and 6 map to choices 2, 3, 4, and 5
+	local choice = math.random(6)
+    choice = 5
 
 	lf("traveller:task", "CHOICE=" .. choice .. " selected")
 
@@ -521,8 +761,12 @@ task = function(self)
 		lf("traveller:task", "CHOICE=4: find_and_turn_on_shower")
 		lf("DEBUG traveller:task", "Calling find_and_turn_on_shower function")
 		find_and_turn_on_shower(self)
+	elseif choice == 5 then
+		lf("traveller:task", "CHOICE=5: find_and_use_toilet")
+		lf("DEBUG traveller:task", "Calling find_and_use_toilet function")
+		find_and_use_toilet(self)
 	else
-		lf("traveller:task", "CHOICE=5: explore_nearby_area")
+		lf("traveller:task", "CHOICE=6: explore_nearby_area")
 		-- Simple exploration - pick a random nearby position and try to go there
 		local random_offset = {
 			x = math.random(-TRAVEL_RANGE/2, TRAVEL_RANGE/2),
@@ -582,13 +826,18 @@ on_step = function(self, dtime, moveresult)
 		return -- Skip all other processing while showering
 	end
 	
+	-- Check if maidroid is using toilet - if so, prevent all movement and processing
+	if on_step_toilet_check(self, dtime, moveresult) then
+		return -- Skip all other processing while using toilet
+	end
+	
 	-- Check distance from activation position and teleport back if too far
 	if check_distance_from_activation(self) then
 		return -- Teleported back, skip other processing
 	end
 	
-	-- Ensure we have the correct tool (bronze block) when not sleeping or showering
-	if not self._is_sleeping and not self._is_showering and self.selected_tool ~= "default:bronzeblock" then
+	-- Ensure we have the correct tool (bronze block) when not sleeping, showering, or using toilet
+	if not self._is_sleeping and not self._is_showering and not self._is_using_toilet and self.selected_tool ~= "default:bronzeblock" then
 		self:set_tool("default:bronzeblock")
 		self.selected_tool = "default:bronzeblock"
 		lf("traveller:on_step", "corrected tool to bronze block")
@@ -629,7 +878,7 @@ end
 -- Documentation for the traveller core
 local doc = S("Traveller maidroid core") .. "\n\n"
 	.. S("The traveller maidroid explores the world and visits interesting locations.") .. "\n"
-	.. S("It can find and travel to chests, beds, signs, showers, and other points of interest.") .. "\n\n"
+	.. S("It can find and travel to chests, beds, signs, showers, toilets, and other points of interest.") .. "\n\n"
 	.. S("Activation: Give the maidroid a bronze block to activate traveller mode.") .. "\n\n"
 	.. S("Features:") .. "\n"
 	.. "- " .. S("Automatic destination finding") .. "\n"
@@ -637,12 +886,14 @@ local doc = S("Traveller maidroid core") .. "\n\n"
 	.. "- " .. S("Periodic exploration") .. "\n"
 	.. "- " .. S("Occasional sleeping in beds") .. "\n"
 	.. "- " .. S("Finding and turning on shower heads") .. "\n"
+	.. "- " .. S("Finding and using toilets") .. "\n"
 	.. "- " .. S("Distance limit (10 blocks from activation)") .. "\n"
 	.. "- " .. S("Auto-teleport back if too far") .. "\n"
 	.. "- " .. S("Wanders when no destinations available") .. "\n\n"
 	.. S("The traveller will automatically explore within a configurable range and return to wandering when no destinations are found.") .. "\n"
 	.. S("It will occasionally sleep in nearby beds to rest during its travels.") .. "\n"
 	.. S("It can also find shower heads and turn them on, creating water particle effects.") .. "\n"
+	.. S("Additionally, it can find toilets and flush them, simulating bathroom breaks.") .. "\n"
 	.. S("If the traveller gets more than 10 blocks away from its activation position, it will automatically teleport back.")
 
 -- Register the traveller core
