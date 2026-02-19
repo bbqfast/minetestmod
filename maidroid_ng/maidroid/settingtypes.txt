@@ -13,6 +13,7 @@ maidroid.ocr				(Enable programmable maidroids) bool true
 maidroid.stockbreeder			(Enable stockbreeders) bool true
 maidroid.torcher			(Enable torchers) bool true
 maidroid.waffler			(Enable waffle cookers) bool true
+maidroid.traveller			(Enable travellers) bool true
 
 [Farming]
 maidroid.farming.job_time		(Delay to rest after after a job) float 3 0.5 5

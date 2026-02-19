@@ -59,6 +59,7 @@ m_settings.ocr = mods.pdisc and g_settings:get_bool("maidroid.ocr", true)
 m_settings.stockbreeder = ( mods.petz or mods.animalia or mods.animal )
 	and g_settings:get_bool("maidroid.stockbreeder", true)
 m_settings.waffler = mods.waffles and g_settings:get_bool("maidroid.waffler", true)
+m_settings.traveller = g_settings:get_bool("maidroid.traveller", true)
 
 -- Tools
 m_settings.tools_capture_rod = g_settings:get_bool("maidroid.tools.capture_rod")

@@ -1,0 +1,57 @@
+# Chat Commands in Lord of the Test Project
+
+## Complete Command List
+
+| Mod Name                       | Lua File                              | Command             | Description                                                               |
+|--------------------------------|---------------------------------------|---------------------|---------------------------------------------------------------------------|
+| better_bookmarks               | init.lua                              | bmset               | Set a bookmark to your current position. Bookmark names may not contain "." |
+| better_bookmarks               | init.lua                              | bm                  | Go to bookmark. "-" is where you were when you last successfully ran /bm   |
+| better_bookmarks               | init.lua                              | bmdel               | Delete a bookmark                                                         |
+| better_bookmarks               | init.lua                              | bmls                | List all your bookmarks                                                    |
+| default                        | chatcommands.lua                      | privs               | Print out privileges of player                                            |
+| default                        | chatcommands.lua                      | grant               | Give privilege to player                                                  |
+| default                        | chatcommands.lua                      | grantme             | Give privilege to yourself                                                |
+| default                        | chatcommands.lua                      | revoke              | Remove privilege from player                                              |
+| lottachievements               | chat_commands.lua                     | achievements        | Show, clear, disable or enable your achievements                          |
+| lottachievements               | chat_commands.lua                     | achievement-info    | Show details of an achievement                                            |
+| lottachievements               | chat_commands.lua                     | achievement-stats   | Get the achievements statistics for the given player or yourself         |
+| lottmobs                       | ltees.lua                             | list_npcs           | List all NPCs near you                                                    |
+| lottmobs                       | ltees.lua                             | spawn_npc           | Spawns test NPC                                                           |
+| lottmobs                       | ltees.lua                             | recipe              | Check crafting recipe for an item                                         |
+| stamina                        | init.lua                              | stamina             | Set player stamina to specified value (0-20)                              |
+| stamina                        | init.lua                              | stam                | Set player stamina to specified value (0-20)                              |
+| worldedit_pack/worldedit_commands | safe.lua                           | /y                  | Confirm a pending operation                                               |
+| worldedit_pack/worldedit_commands | safe.lua                           | /n                  | Abort a pending operation                                                 |
+| lottclasses                    | allies.lua                            | allies              | Change Allies                                                             |
+| lottclasses                    | init.lua                              | race                | Find/change a player's race                                               |
+| lottmapgen                     | init.lua                              | list_lttypes        | List all LT building types                                                |
+| lottmapgen                     | schematics.lua                        | load_schem          | Load a schematic from schems folder at your position                      |
+| lottmobs                       | riddler.lua                           | spawn_ltee_riddler  | Spawns an LT riddler NPC                                                  |
+| lottmobs                       | special_mobs.lua                      | spawn_mob           | Spawn a mob by full entity name, e.g. lottmobs:ltee_trader_1            |
+| lottother                      | credits.lua                           | credits             | Credits of LOTT                                                           |
+| lottpotion                     | init.lua                              | effect              | Get effect info                                                           |
+
+## WorldEdit Commands
+Located in worldedit_pack/worldedit_commands/init.lua - multiple editing commands
+
+## WorldEdit Short Commands  
+Located in worldedit_pack/worldedit_shortcommands/init.lua - short aliases for WorldEdit commands
+
+## Summary
+- **29 chat commands** across **17 mods**
+- **4 bookmark commands** (better_bookmarks)
+- **4 privilege commands** (default)
+- **3 achievement commands** (lottachievements)
+- **3 NPC/recipe commands** (lottmobs/ltees.lua)
+- **2 stamina commands** (stamina)
+- **2 confirmation commands** (worldedit_commands/safe.lua)
+- **1 command each** in: lottclasses, lottmapgen, lottother, lottpotion
+- **Multiple WorldEdit commands** for world editing
+
+## Command Categories
+- **Player Management**: privs, grant, grantme, revoke, race, allies
+- **Navigation**: bmset, bm, bmdel, bmls
+- **Game Info**: achievements, achievement-info, achievement-stats, credits, list_lttypes, effect
+- **NPC Management**: list_npcs, spawn_npc, spawn_ltee_riddler, spawn_mob
+- **World Building**: load_schem, WorldEdit commands
+- **Game Mechanics**: stamina, stam, recipe

@@ -1,0 +1,192 @@
+# Function Call Chain Analysis - maidroid/api.lua
+
+# instructions
+# this file list function call chains for maidroid/api.lua
+# check this file if the function name, call chain is current, update if necessary
+# if function no longer exists in maidroid/api.lua, remove it from this file
+# if new function is added to maidroid/api.lua, add it to this file
+
+## Core Registration & Initialization Chain
+
+```
+register_maidroid() [2905]
+├── minetest.register_entity() [2947]
+│   ├── on_activate() [2332]
+│   │   ├── create_inventory() [1549]
+│   │   │   ├── minetest.create_detached_inventory() [1552]
+│   │   ├── generate_unique_manufacturing_id() [1616]
+│   │   └── select_core() [1052]
+│   │       ├── select_tool_for_core() [1031]
+│   │       │   ├── get_inventory() [990]
+│   │       │   └── maidroid.cores[name].is_tool() [1036]
+│   │       ├── maidroid.cores[name].on_start() [1060]
+│   │       └── update_infotext() [1409]
+│   │
+│   ├── on_step() [2888]
+│   │   ├── toggle_entity_jump() [2871]
+│   │   ├── autoheal() [1689]
+│   │   └── self.core.on_step() [2915]
+│   │
+│   ├── on_rightclick() [2793]
+│   │   └── get_formspec() [2207]
+│   │       ├── handle_craftable_logic() [1906]
+│   │       │   ├── create_crafter_events() [1853]
+│   │       │   │   └── minetest.create_detached_inventory() [1855]
+│   │       │   ├── calculate_pagination() [175]
+│   │       │   ├── populate_current_page() [343]
+│   │       │   └── populate_items_page() [277]
+│   │       │
+│   │       ├── handle_cookable_logic() [1979]
+│   │       │   ├── create_cooker_events() [1963]
+│   │       │   └── maidroid.cores.generic_cooker.get_cookable_items() [2192]
+│   │       │
+│   │       ├── handle_desirable_logic() [2141]
+│   │       │   └── build_complete_desirable_list() [652]
+│   │       │
+│   │       ├── handle_cooklist_logic() [2211]
+│   │       │   └── dofile("/cores/cooker_items.lua") [2217]
+│   │       │
+│   │       └── generate_cooker_form() [2243]
+│   │           └── format_recipe_display() [720]
+│   │               ├── minetest.get_craft_recipe() [918]
+│   │               └── resolve_item_for_display() [898]
+│   │
+│   ├── on_punch() [2939]
+│   │   ├── heal() [1675]
+│   │   ├── update_infotext() [1409]
+│   │   └── generate_texture() [1713]
+│   │
+│   └── get_staticdata() [2615]
+│       ├── get_inventory() [990]
+│       ├── distance_from_player() [2598]
+│       └── safe_read_file() [2586]
+```
+
+## Inventory Management Chain
+
+```
+Crafting Inventory Events (create_crafter_events) [1853]
+├── on_move() [1875]
+│   ├── maidroid.handle_change_desirable() [476]
+│   │   ├── build_complete_desirable_list() [652]
+│   │   └── maidroid.cores.generic_cooker.set_desired_craft_outputs() [513]
+│   ├── maidroid.handle_craftable() [770]
+│   └── get_formspec() [1913] (UI refresh)
+
+Cooking Inventory Events (create_cooker_events) [1963]
+├── on_move() [1985]
+│   ├── maidroid.handle_change_cooklist() [522]
+│   │   ├── build_complete_cooklist_list() [679]
+│   │   └── maidroid.cores.generic_cooker.set_cooklist() [572]
+│   ├── maidroid.handle_cookable() [806]
+│   └── get_formspec() [2024] (UI refresh)
+```
+
+## Pagination & UI Chain
+
+```
+Pagination System
+├── calculate_pagination() [175]
+├── calculate_desirable_pagination() [194]
+├── populate_current_page() [343]
+├── populate_items_page() [277]
+└── Field Handlers (minetest.register_on_player_receive_fields) [3212]
+    ├── craftable_prev/next [3274-3309]
+    ├── desirable_prev/next [3312-3354]
+    ├── cookable_prev/next [3357-3384]
+    └── cooklist_prev/next [3387-3419]
+```
+
+## Helper Functions Chain
+
+```
+Page Management
+├── init_desirable_pageitems() [582]
+├── init_craftable_pageitems() [624]
+├── init_cookable_pageitems() [686]
+├── init_cooklist_pageitems() [728]
+└── build_complete_*_list() [652, 679]
+
+Movement & Navigation
+├── change_direction() [1370]
+├── strong_change_direction() [1396]
+├── set_target_node() [1357]
+├── is_blocked() [1461]
+└── get_front() [1160]
+    ├── get_look_direction() [1178]
+    └── get_pos() [1137]
+```
+
+## Tool & Core Management
+
+```
+Tool System
+├── select_tool_for_core() [1031]
+├── set_tool() [1103]
+├── maidroid.register_tool_rotation() [3208]
+└── enligthen_tool() [2080]
+
+Core System
+├── maidroid.register_core() [1630]
+│   ├── minetest.register_entity() (for hats) [1644]
+│   └── maidroid.cores[name] = def [1659]
+└── maidroid.new_state() [138]
+```
+
+## Item Management Chain
+
+```
+Item Operations
+├── add_items_to_main() [1286]
+│   ├── flush() [1222]
+│   │   ├── get_tube() [997]
+│   │   └── check_chest() [1204]
+│   └── pickup_item() [2843]
+├── has_item_in_main() [1344]
+└── heal() [1675]
+```
+
+## Key Function Relationships
+
+### Main Entry Points
+- **register_maidroid()**: Main registration function that sets up entity callbacks
+- **get_formspec()**: Central UI generation hub that calls all tab-specific handlers
+- **on_activate()**: Entity initialization that sets up inventory and core systems
+
+### Inventory Event Flow
+- **create_crafter_events()** → **on_move()** → **handle_change_desirable()** → **build_complete_desirable_list()**
+- **create_cooker_events()** → **on_move()** → **handle_change_cooklist()** → **build_complete_cooklist_list()**
+
+### UI Generation Flow
+- **get_formspec()** → **handle_*_logic()** → **populate_current_page()** → **populate_items_page()**
+
+### Page Management Flow
+- **init_*_pageitems()** → **populate_current_page()** → **build_complete_*_list()**
+
+## Complex Interactions
+
+The most complex chains are in the UI/cooker system where:
+1. **Inventory moves** trigger cascading updates across multiple systems
+2. **Pagination systems** manage large item lists across multiple pages
+3. **Recipe display** integrates with crafting selection
+4. **Core behaviors** are updated based on user inventory changes
+
+## Function Categories
+
+### Entity Lifecycle (Lines 2332-2615)
+- on_activate, on_step, on_rightclick, on_punch, get_staticdata
+
+### Inventory Management (Lines 1549-2024)
+- create_inventory, create_crafter_events, create_cooker_events
+
+### UI Generation (Lines 2207-2243)
+- get_formspec, handle_*_logic, generate_cooker_form
+
+### Pagination (Lines 175-343)
+- calculate_pagination, populate_current_page, populate_items_page
+
+### Helper Functions (Lines 652-679)
+- build_complete_*_list, init_*_pageitems
+
+### Core Management (Lines 1031-1659)
+- select_core, select_tool_for_core, register_core

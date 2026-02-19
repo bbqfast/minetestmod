@@ -44,4 +44,10 @@ end
 if maidroid.settings.farming then
 	dofile(maidroid.modpath .. "/cores/generic_cooker.lua")
 end
+
+-- Traveller core
+if maidroid.settings.traveller then
+	dofile(maidroid.modpath .. "/cores/traveller.lua")
+end
+
 -- vim: ai:noet:ts=4:sw=4:fdm=indent:syntax=lua

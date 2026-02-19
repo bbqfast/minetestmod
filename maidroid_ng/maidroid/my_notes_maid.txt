@@ -154,7 +154,7 @@ Updates:
 - sleep action for cooker
 - more cleanup api.lua
 - remove dup items from craftable and cookable
-
+- added reset to cooker desirable and cooklist
 
 todo:
 - 
