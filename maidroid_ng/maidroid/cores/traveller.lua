@@ -463,6 +463,195 @@ local function on_step_toilet_check(droid, dtime, moveresult)
 	return false -- Return false to indicate not using toilet
 end
 
+-- Function to check if maidroid is using refrigerator and handle refrigerator state
+local function on_step_refrigerator_check(droid, dtime, moveresult)
+	-- Check if maidroid is using refrigerator - if so, prevent all movement and processing
+	if droid._is_using_refrigerator == true then
+		-- Ensure velocity stays zero while using refrigerator
+		droid.object:set_velocity({x = 0, y = 0, z = 0})
+		-- Keep mining animation active while using refrigerator (holding item)
+		local mine_anim = (maidroid and maidroid.animation and maidroid.animation.MINE) or "mine"
+		droid:set_animation(mine_anim, 0)
+		-- Skip all other processing while using refrigerator
+		return true -- Return true to indicate refrigerator state is active
+	end
+	return false -- Return false to indicate not using refrigerator
+end
+
+-- ,,ref4
+-- Function to get the position in front of a refrigerator based on its orientation
+local function get_refrigerator_front(refrigerator_pos)
+	-- Get refrigerator node and its orientation
+	local refrigerator_node = minetest.get_node(refrigerator_pos)
+	local refrigerator_param2 = refrigerator_node.param2 or 0
+	
+	-- Calculate offset based on refrigerator's facing direction
+	-- param2 values: 0=north, 1=east, 2=south, 3=west (90-degree rotations)
+	local offset = {x=0, y=0, z=0}
+	if refrigerator_param2 == 0 then
+		-- Facing north, front is at negative Z (behind refrigerator)
+		offset.z = -1
+	elseif refrigerator_param2 == 1 then
+		-- Facing east, front is at negative X (behind refrigerator)
+		offset.x = -1
+	elseif refrigerator_param2 == 2 then
+		-- Facing south, front is at positive Z (behind refrigerator)
+		offset.z = 1
+	elseif refrigerator_param2 == 3 then
+		-- Facing west, front is at positive X (behind refrigerator)
+		offset.x = 1
+	end
+	
+	-- Calculate and return the position in front of refrigerator
+	return vector.add(refrigerator_pos, offset)
+end
+
+-- Function to teleport to saved refrigerator position
+-- ,,ref2
+local function teleport_to_refrigerator_position(droid)
+	if not droid._refrigerator_pos then
+		lf("traveller", "No saved refrigerator position available for teleport")
+		return false
+	end
+	
+	local current_pos = droid:get_pos()
+	local refrigerator_pos = droid._refrigerator_pos
+	
+	lf("traveller", "Teleporting from " .. minetest.pos_to_string(current_pos) .. " to refrigerator at " .. minetest.pos_to_string(refrigerator_pos))
+	
+	-- Calculate teleport position in front of refrigerator based on its orientation
+	-- local teleport_pos = get_refrigerator_front(refrigerator_pos)
+	local teleport_pos = droid._refrigerator_front
+	lf("traveller", "Teleport position: " .. minetest.pos_to_string(teleport_pos))
+	
+	-- Perform teleport
+	droid.object:set_pos(teleport_pos)
+	
+	-- Immediately halt and set velocity to zero after teleport
+	droid:halt()
+	droid.object:set_velocity({x = 0, y = 0, z = 0})
+	
+	lf("traveller", "Successfully teleported to refrigerator position and halted")
+	
+	return true
+end
+
+-- ref3
+-- Function to get random item from refrigerator and hold it
+local function use_refrigerator(droid, pos)
+	local node = minetest.get_node(pos)
+	
+	-- Check if it's a refrigerator
+	lf("DEBUG traveller:use_refrigerator", "Checking node at " .. minetest.pos_to_string(pos) .. ": " .. node.name)
+	if node.name == "homedecor:refrigerator_white" then
+		lf("DEBUG traveller:use_refrigerator", "Found refrigerator, getting item from it")
+		
+		-- Save the exact refrigerator position for later teleport
+		droid._refrigerator_pos = vector.round(pos)
+		lf("traveller", "Saved refrigerator position: " .. minetest.pos_to_string(droid._refrigerator_pos))
+		
+		-- Teleport to refrigerator position before using it
+		teleport_to_refrigerator_position(droid)
+		
+		-- Check if already using refrigerator to prevent multiple refrigerator calls
+		if droid._is_using_refrigerator == true then
+			lf("DEBUG traveller:use_refrigerator", "maidroid already using refrigerator, ignoring refrigerator action")
+			return true
+		end
+		
+		-- Set a flag to prevent on_step from reactivating movement
+		droid._is_using_refrigerator = true
+		
+		-- Halt the maidroid while using refrigerator
+		droid:halt()
+		
+		-- Explicitly set velocity to zero to prevent any movement
+		droid.object:set_velocity({x = 0, y = 0, z = 0})
+		
+		-- Get refrigerator's inventory to pick a random item
+		local refrigerator_meta = minetest.get_meta(pos)
+		local refrigerator_inv = refrigerator_meta:get_inventory()
+		
+		-- Try to get a random item from refrigerator
+		local item_list = refrigerator_inv:get_list("main")
+		local valid_items = {}
+		
+		-- Collect non-empty items
+		for i, stack in ipairs(item_list) do
+			if not stack:is_empty() then
+				table.insert(valid_items, stack)
+			end
+		end
+		
+		-- Pick a random item if available
+		local selected_item = nil
+		if #valid_items > 0 then
+			local random_index = math.random(#valid_items)
+			selected_item = valid_items[random_index]
+			lf("traveller", "Selected random item from refrigerator: " .. selected_item:get_name())
+			
+			-- Deduct 1 item from refrigerator immediately
+			selected_item:take_item(1)
+			refrigerator_inv:set_stack("main", random_index, selected_item)
+			lf("traveller", "Deducted 1 " .. selected_item:get_name() .. " from refrigerator")
+			
+			-- Set the selected item as the maidroid's tool (simulating holding it)
+			droid:set_tool(selected_item:get_name())
+			droid.selected_tool = selected_item:get_name()
+		else
+			lf("traveller", "Refrigerator is empty, using default tool")
+			droid:set_tool("default:bronzeblock")
+			droid.selected_tool = "default:bronzeblock"
+		end
+		
+		-- Set mining animation while using refrigerator (holding item)
+		local mine_anim = (maidroid and maidroid.animation and maidroid.animation.MINE) or "mine"
+		droid:set_animation(mine_anim, 0)
+		
+		lf("DEBUG traveller:use_refrigerator", "maidroid using refrigerator at " .. minetest.pos_to_string(pos) .. " (refrigerator_flag=true, velocity=0)")
+		
+		-- Add automatic timer to finish using refrigerator (hold item for 10 seconds)
+		local refrigerator_time = 10 -- Use refrigerator for 10 seconds
+		lf("DEBUG traveller:use_refrigerator", "setting refrigerator finish timer for " .. refrigerator_time .. " seconds")
+		
+		minetest.after(refrigerator_time, function()
+			lf("DEBUG traveller:refrigerator_timer", "refrigerator finish timer triggered!")
+			
+			if droid and droid.object then
+				lf("DEBUG traveller:refrigerator_timer", "droid and object valid, clearing refrigerator flag")
+				
+				-- Clear the refrigerator flag FIRST to allow normal movement
+				droid._is_using_refrigerator = false
+				
+				-- IMPORTANT: Clear the action state to prevent immediate re-refrigerator
+				droid.action = nil
+				
+				-- Restore normal tool (bronze block)
+				droid:set_tool("default:bronzeblock")
+				droid.selected_tool = "default:bronzeblock"
+				
+				-- Restore normal animation
+				local stand_anim = (maidroid and maidroid.animation and maidroid.animation.STAND) or "stand"
+				droid:set_animation(stand_anim, 30)
+				
+				-- Resume normal behavior - force return to wander
+				to_wander(droid, "traveller:refrigerator_timer")
+				
+				lf("DEBUG traveller:refrigerator_timer", "maidroid finished using refrigerator, refrigerator flag cleared, action cleared")
+			else
+				lf("DEBUG traveller:refrigerator_timer", "refrigerator finish timer: droid or object is nil")
+				lf("DEBUG traveller:refrigerator_timer", "droid=" .. tostring(droid) .. " object=" .. tostring(droid and droid.object))
+			end
+		end)
+		
+		return true
+	else
+		lf("traveller", "Node at " .. minetest.pos_to_string(pos) .. " is not a refrigerator")
+	end
+	
+	return false
+end
+
 
 -- Function to find path to shower head and turn on on
 local function find_and_turn_on_shower(self)
@@ -577,6 +766,72 @@ local function find_and_use_toilet(self)
 	end
 end
 
+-- Function to find path to refrigerator and use it
+-- ,,ref1
+local function find_and_use_refrigerator(self)
+	lf("DEBUG traveller:find_and_use_refrigerator", "Starting refrigerator search")
+	local pos = self:get_pos()
+	
+	-- Find refrigerator within range
+	lf("DEBUG traveller:find_and_use_refrigerator", "Searching for refrigerators within " .. TRAVEL_RANGE .. " blocks")
+	local refrigerator_pos = minetest.find_node_near(pos, TRAVEL_RANGE, {"homedecor:refrigerator_white"})
+	
+	if not refrigerator_pos then
+		lf("traveller", "No refrigerator found within range")
+		return false
+	end
+	
+	-- Save refrigerator position
+	self._refrigerator_pos = refrigerator_pos
+	lf("traveller", "Found refrigerator at " .. minetest.pos_to_string(refrigerator_pos))
+	lf("DEBUG traveller:find_and_use_refrigerator", "Checking if refrigerator location is safe")
+	
+
+    	-- Calculate target position in front of refrigerator based on its orientation
+	local target_pos = get_refrigerator_front(refrigerator_pos)
+	self._refrigerator_front = target_pos
+	lf("traveller", "Target position in front of refrigerator: " .. minetest.pos_to_string(target_pos))
+
+    
+	-- Check if destination is safe
+	if not is_destination_safe(self, refrigerator_pos) then
+		lf("traveller", "Refrigerator location is not safe")
+		return false
+	end
+	
+	-- Calculate distance to refrigerator
+	local distance = vector.distance(pos, refrigerator_pos)
+	lf("DEBUG traveller:find_and_use_refrigerator", "Distance to refrigerator: " .. string.format("%.2f", distance))
+	
+	-- If already close to refrigerator, use it
+	if distance < 3 then
+		lf("traveller", "Already near refrigerator, using it")
+		lf("DEBUG traveller:find_and_use_refrigerator", "Calling use_refrigerator directly")
+		return use_refrigerator(self, refrigerator_pos)
+	end
+	
+	-- Find path to refrigerator
+	lf("traveller", "Finding path to refrigerator from " .. minetest.pos_to_string(pos) .. " to " .. minetest.pos_to_string(refrigerator_pos))
+	lf("DEBUG traveller:find_and_use_refrigerator", "Using A* pathfinding with parameters: 8, 1, 1")
+	local path = minetest.find_path(pos, target_pos, 8, 1, 1, "A*")
+	
+	if path ~= nil then
+		lf("traveller", "Path found to refrigerator with " .. #path .. " nodes")
+		lf("DEBUG traveller:find_and_use_refrigerator", "Path found successfully, setting up movement")
+		self:set_yaw({self:get_pos(), target_pos})
+		
+		-- Set up action to use refrigerator when arriving
+		lf("DEBUG traveller:find_and_use_refrigerator", "Setting destination and action for refrigerator")
+		self.destination = refrigerator_pos
+		self.action = "use_refrigerator"
+		core_path.to_follow_path(self, path, target_pos, to_action, "use_refrigerator")
+		return true
+	else
+		lf("traveller", "No path found to refrigerator")
+		return false
+	end
+end
+
 -- Function to travel to a destination
 travel_to_destination = function(self, destination)
 	if not destination then
@@ -657,6 +912,8 @@ to_wander = function(self, from_caller)
 	self._shower_pos = nil    -- Clear saved shower position
 	self._is_using_toilet = nil  -- Clear toilet state
 	self._toilet_pos = nil      -- Clear saved toilet position
+	self._is_using_refrigerator = nil  -- Clear refrigerator state
+	self._refrigerator_pos = nil      -- Clear saved refrigerator position
 	-- Set the correct tool for traveller
 	self:set_tool("default:bronzeblock")
 	lf("traveller:to_wander", "setting state to WANDER")
@@ -721,6 +978,21 @@ local act = function(self)
 			lf("DEBUG traveller:act", "use_toilet: no destination")
 		end
 		self.destination = nil
+	elseif self.action == "use_refrigerator" then
+		lf("DEBUG traveller:act", "use_refrigerator: " .. minetest.pos_to_string(self:get_pos()))
+		lf("DEBUG traveller:act", "destination=" .. (self.destination and minetest.pos_to_string(self.destination) or "nil"))
+		if self.destination then
+			lf("DEBUG traveller:act", "Calling use_refrigerator at destination")
+			local success = use_refrigerator(self, self.destination)
+			if success then
+				lf("traveller:act", "Successfully used refrigerator")
+			else
+				lf("traveller:act", "Failed to use refrigerator")
+			end
+		else
+			lf("DEBUG traveller:act", "use_refrigerator: no destination")
+		end
+		self.destination = nil
 	else
 		lf("traveller:act", "unknown action: " .. tostring(self.action))
 	end
@@ -734,11 +1006,10 @@ task = function(self)
 	local pos = self:get_pos()
 	local inv = self:get_inventory()
 	
-	-- Randomly pick one of five actions, with choice 1 being twice as likely as others
-	-- Use math.random(6): values 1 and 2 map to choice 1, values 3, 4, 5, and 6 map to choices 2, 3, 4, and 5
-	local choice = math.random(6)
-    choice = 5
-
+	-- Randomly pick one of six actions, with choice 1 being twice as likely as others
+	-- Use math.random(7): values 1 and 2 map to choice 1, values 3, 4, 5, 6, and 7 map to choices 2, 3, 4, 5, and 6
+	local choice = math.random(7)
+    choice = 6
 	lf("traveller:task", "CHOICE=" .. choice .. " selected")
 
 	if choice == 1 or choice == 2 then
@@ -765,8 +1036,12 @@ task = function(self)
 		lf("traveller:task", "CHOICE=5: find_and_use_toilet")
 		lf("DEBUG traveller:task", "Calling find_and_use_toilet function")
 		find_and_use_toilet(self)
+	elseif choice == 6 then
+		lf("traveller:task", "CHOICE=6: find_and_use_refrigerator")
+		lf("DEBUG traveller:task", "Calling find_and_use_refrigerator function")
+		find_and_use_refrigerator(self)
 	else
-		lf("traveller:task", "CHOICE=6: explore_nearby_area")
+		lf("traveller:task", "CHOICE=7: explore_nearby_area")
 		-- Simple exploration - pick a random nearby position and try to go there
 		local random_offset = {
 			x = math.random(-TRAVEL_RANGE/2, TRAVEL_RANGE/2),
@@ -816,6 +1091,18 @@ end
 -- ,,step
 -- Main step function
 on_step = function(self, dtime, moveresult)
+	-- Initialize step timer if not present
+	-- if not self._step_timer then
+	-- 	self._step_timer = 0
+	-- end
+	
+	-- -- Accumulate time and only execute steps every 0.2 seconds
+	-- self._step_timer = self._step_timer + dtime
+	-- if self._step_timer < 0.2 then
+	-- 	return -- Skip processing until 0.2 seconds have passed
+	-- end
+	-- self._step_timer = 0 -- Reset timer after executing step
+	
 	-- Check if maidroid is sleeping - if so, prevent all movement and processing
 	if maidroid.sleep.on_step_sleep_check(self, dtime, moveresult) then
 		return -- Skip all other processing while sleeping
@@ -831,13 +1118,18 @@ on_step = function(self, dtime, moveresult)
 		return -- Skip all other processing while using toilet
 	end
 	
+	-- Check if maidroid is using refrigerator - if so, prevent all movement and processing
+	if on_step_refrigerator_check(self, dtime, moveresult) then
+		return -- Skip all other processing while using refrigerator
+	end
+	
 	-- Check distance from activation position and teleport back if too far
 	if check_distance_from_activation(self) then
 		return -- Teleported back, skip other processing
 	end
 	
-	-- Ensure we have the correct tool (bronze block) when not sleeping, showering, or using toilet
-	if not self._is_sleeping and not self._is_showering and not self._is_using_toilet and self.selected_tool ~= "default:bronzeblock" then
+	-- Ensure we have the correct tool (bronze block) when not sleeping, showering, using toilet, or using refrigerator
+	if not self._is_sleeping and not self._is_showering and not self._is_using_toilet and not self._is_using_refrigerator and self.selected_tool ~= "default:bronzeblock" then
 		self:set_tool("default:bronzeblock")
 		self.selected_tool = "default:bronzeblock"
 		lf("traveller:on_step", "corrected tool to bronze block")
@@ -878,7 +1170,7 @@ end
 -- Documentation for the traveller core
 local doc = S("Traveller maidroid core") .. "\n\n"
 	.. S("The traveller maidroid explores the world and visits interesting locations.") .. "\n"
-	.. S("It can find and travel to chests, beds, signs, showers, toilets, and other points of interest.") .. "\n\n"
+	.. S("It can find and travel to chests, beds, signs, showers, toilets, refrigerators, and other points of interest.") .. "\n\n"
 	.. S("Activation: Give the maidroid a bronze block to activate traveller mode.") .. "\n\n"
 	.. S("Features:") .. "\n"
 	.. "- " .. S("Automatic destination finding") .. "\n"
@@ -887,6 +1179,7 @@ local doc = S("Traveller maidroid core") .. "\n\n"
 	.. "- " .. S("Occasional sleeping in beds") .. "\n"
 	.. "- " .. S("Finding and turning on shower heads") .. "\n"
 	.. "- " .. S("Finding and using toilets") .. "\n"
+	.. "- " .. S("Finding and using refrigerators") .. "\n"
 	.. "- " .. S("Distance limit (10 blocks from activation)") .. "\n"
 	.. "- " .. S("Auto-teleport back if too far") .. "\n"
 	.. "- " .. S("Wanders when no destinations available") .. "\n\n"
@@ -894,6 +1187,7 @@ local doc = S("Traveller maidroid core") .. "\n\n"
 	.. S("It will occasionally sleep in nearby beds to rest during its travels.") .. "\n"
 	.. S("It can also find shower heads and turn them on, creating water particle effects.") .. "\n"
 	.. S("Additionally, it can find toilets and flush them, simulating bathroom breaks.") .. "\n"
+	.. S("It can also find refrigerators and randomly pick items to hold for 10 seconds, simulating snack breaks.") .. "\n"
 	.. S("If the traveller gets more than 10 blocks away from its activation position, it will automatically teleport back.")
 
 -- Register the traveller core
