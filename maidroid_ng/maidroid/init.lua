@@ -95,6 +95,7 @@ end
 
 dofile(maidroid.modpath .. "/settings.lua")
 dofile(maidroid.modpath .. "/helpers.lua")
+dofile(maidroid.modpath .. "/main.lua")
 dofile(maidroid.modpath .. "/api.lua")
 dofile(maidroid.modpath .. "/register.lua")
 dofile(maidroid.modpath .. "/cores.lua")

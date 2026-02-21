@@ -28,3 +28,5 @@ DONE:
 - log path and node under path 
 - dump all items in chest and leave 10 in inventory
 - rearrange 
+- reward system 
+- path debug, path fix where dest is solid node
