@@ -145,9 +145,6 @@ end
 -- registered maidroids list in case of import mode
 maidroid.registered_maidroids = {}
 
--- list of cores registered by maidroid.register_core
-maidroid.cores = {}
-
 local farming_redo = farming and farming.mod and farming.mod == "redo"
 
 -- Crafting inventory system for drag and drop (based on trader.lua)
@@ -1433,39 +1430,6 @@ local function generate_unique_manufacturing_id()
 end
 
 ---------------------------------------------------------------------
-
--- maidroid.register_core registers a definition of a new core.
-function maidroid.register_core(name, def)
-	def.name = name
-	if not def.walk_max then
-		def.walk_max = maidroid.timers.walk_max
-	end
-
-	-- Register a hat entity
-	if def.hat then
-		local hat_name = "maidroid:" .. def.hat.name
-		def.hat.name = hat_name
-
-		if minetest.get_current_modname() ~= "maidroid" then
-			hat_name = ":" .. hat_name
-		end
-		minetest.register_entity(hat_name, {
-			visual = "mesh",
-			mesh = def.hat.mesh,
-			textures = def.hat.textures,
-
-			physical = false,
-			pointable = false,
-			static_save = false,
-
-			on_detach = function(self)
-				lf("api", "wield_item on_detach called - removing wield_item object")
-				self.object:remove()
-			end
-		})
-	end
-	maidroid.cores[name] = def
-end
 
 -- player_can_control return if the interacting player "owns" the maidroid
 local player_can_control = function(self, player)

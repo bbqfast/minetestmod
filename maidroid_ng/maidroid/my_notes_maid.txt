@@ -155,9 +155,10 @@ Updates:
 - more cleanup api.lua
 - remove dup items from craftable and cookable
 - added reset to cooker desirable and cooklist
+- handle fridge empty, stop counting
+- refac: move non ui func out of api
 
 todo:
-- handle fridge empty, stop counting
 - add drinking
 - new tab
 - check point reset 
