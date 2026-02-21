@@ -72,7 +72,7 @@ m_settings.tools_robbery_stick = g_settings:get_bool("maidroid.tools.robbery_sti
 
 -- Timers
 timers.find_path_max = g_settings:get("maidroid.path.timeout")
-	or g_settings:get("maidroid_find_path_interval") or 10
+	or g_settings:get("maidroid_find_path_interval") or 20
 timers.find_path_max = arrange_number(timers.find_path_max, 5, 20)
 
 timers.change_dir_max = g_settings:get("maidroid.wander.direction_timeout")
@@ -82,6 +82,10 @@ timers.change_dir_max = arrange_number(timers.change_dir_max, 2, 5)
 timers.walk_max = g_settings:get("maidroid.wander.walk_timeout")
 	or g_settings:get("maidroid_max_walk_time") or 4 -- n seconds max walk time
 timers.walk_max = arrange_number(timers.walk_max, 2, 12)
+
+timers.path_max = g_settings:get("maidroid.path.timeout")
+	or g_settings:get("maidroid_path_timeout") or 12 -- n seconds max path following time
+timers.path_max = arrange_number(timers.path_max, 4, 40)
 
 if m_settings.torcher then
 	timers.place_torch_max = g_settings:get("maidroid.torcher.delay")

@@ -157,4 +157,9 @@ Updates:
 - added reset to cooker desirable and cooklist
 
 todo:
-- 
+- handle fridge empty, stop counting
+- add drinking
+- new tab
+- check point reset 
+- add total vs rewarded
+

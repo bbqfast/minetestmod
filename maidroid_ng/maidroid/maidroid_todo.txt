@@ -21,3 +21,10 @@ DONE:
 - command shorthand
 - list maidroid files
 - farming dump inventory item to nearby chest
+
+- craft_generic prioritize longer recipe first
+- farmer ability to harvest papyrus
+- farmer replant same seed after harvest
+- log path and node under path 
+- dump all items in chest and leave 10 in inventory
+- rearrange 

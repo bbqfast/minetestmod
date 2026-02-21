@@ -1704,7 +1704,8 @@ maidroid.register_core("farming", {
 	no_jump		= true,
 	-- walk_max = 2.5 * timers.walk_max,
     -- fence detection fails when walk timeout
-	walk_max = 4.5 * timers.walk_max,
+	-- walk_max = 4.5 * timers.walk_max,
+	path_max =  15,
 	hat = hat,
 	can_sell = true,
 	doc = doc,
