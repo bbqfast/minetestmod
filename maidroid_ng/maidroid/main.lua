@@ -2,6 +2,16 @@
 local S = maidroid.translator
 local lf = maidroid.lf
 
+-- Initialize states table and function to register new states
+maidroid.states = {}
+maidroid.states_count = 0
+maidroid.new_state = function(string)
+	if not maidroid.states[string] then
+		maidroid.states_count = maidroid.states_count + 1
+		maidroid.states[string] = maidroid.states_count
+	end
+end
+
 maidroid.distance_from_player = function(self)
 	local player = minetest.get_player_by_name(self.owner)
 	if not player then

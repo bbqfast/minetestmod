@@ -124,23 +124,11 @@ local maid_skins = {
 -- 	punch_end = 198,
 -- },
 
--- all known maidroid states
-maidroid.states = {}
-
 -- local functions
 local random_pos_near = maidroid.helpers.random_pos_near
 local get_formspec, get_tube
 
 local maidroid_buf = {} -- formspec buffer
-
--- states counter and function to register a new states
-maidroid.states_count = 0
-maidroid.new_state = function(string)
-	if not maidroid.states[string] then
-		maidroid.states_count = maidroid.states_count + 1
-		maidroid.states[string] = maidroid.states_count
-	end
-end
 
 -- registered maidroids list in case of import mode
 maidroid.registered_maidroids = {}

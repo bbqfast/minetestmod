@@ -157,6 +157,7 @@ Updates:
 - added reset to cooker desirable and cooklist
 - handle fridge empty, stop counting
 - refac: move non ui func out of api
+- refac: move register core
 
 todo:
 - add drinking
