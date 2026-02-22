@@ -47,10 +47,19 @@ local ACTION_POINTS = {
 
 -- Reward system configuration
 local REWARD_CONFIG = {
-	points_per_reward = 10,
-	reward_item = "default:coal_lump",
-	check_interval = 60 -- seconds
+	rewards = {
+		["default:coal_lump"] = 10,
+		["default:iron_lump"] = 30,
+		["default:silver_lump"] = 60,
+		["default:gold_lump"] = 100
+	}
 }
+
+-- Reward multiplier (defaults to 1)
+local REWARD_MULTIPLIER = 1
+
+-- Reward check interval (seconds)
+local REWARD_CHECK_INTERVAL = 60
 
 -- Timer for periodic metrics logging
 local metrics_log_timer = 0
@@ -58,8 +67,8 @@ local metrics_log_interval = 35 -- seconds
 
 -- Point system functions
 local function initialize_points(self)
-	if not self._accumulated_points then
-		self._accumulated_points = 0
+	if not self._reward_accumulated_points then
+		self._reward_accumulated_points = 0
 		lf("traveller", "Initialized point system with 0 points")
 	end
 	
@@ -74,17 +83,24 @@ local function initialize_points(self)
 end
 
 local function add_points(self, action, points)
-	lf("traveller:add_points", string.format("add_points called: action=%s, points=%d, _accumulated_points=%s", action, points, tostring(self._accumulated_points)))
-	if self._accumulated_points ~= nil then
-		self._accumulated_points = self._accumulated_points + points
-		lf("DEBUG traveller", string.format("Action '%s' completed: +%d points (Total: %d)", action, points, self._accumulated_points))
+	-- Apply reward multiplier
+	local multiplier = REWARD_MULTIPLIER or 1
+	local adjusted_points = math.floor(points * multiplier)
+	
+	lf("traveller:add_points", string.format("add_points called: action=%s, base_points=%d, multiplier=%s, adjusted_points=%d, _reward_accumulated_points=%s", 
+		action, points, tostring(multiplier), adjusted_points, tostring(self._reward_accumulated_points)))
+	if self._reward_accumulated_points ~= nil then
+		self._reward_accumulated_points = self._reward_accumulated_points + adjusted_points
+		lf("DEBUG traveller", string.format("Action '%s' completed: +%d points (base: %d, multiplier: %s) (Total: %d)", 
+			action, adjusted_points, points, tostring(multiplier), self._reward_accumulated_points))
 	else
 		lf("DEBUG traveller", "Warning: Point system not initialized for action '" .. action .. "'")
 	end
 end
 
+-- ,,reward
 local function get_total_points(self)
-	return self._accumulated_points or 0
+	return self._reward_accumulated_points or 0
 end
 
 -- Function to display points in chat (for debugging)
@@ -103,9 +119,9 @@ local function log_traveller_metrics(self)
 	local droid_pos = self:get_pos()
 	
 	-- Log accumulated points
-	if self._accumulated_points then
-		lf("points_metrics", string.format("Traveller at %s: %d accumulated points", 
-			minetest.pos_to_string(droid_pos), self._accumulated_points))
+	if self._reward_accumulated_points then
+		lf("points_metrics", string.format("Traveller: %d accumulated points", 
+			self._reward_accumulated_points))
 	end
 	
 	-- Log action taken metrics
@@ -114,11 +130,10 @@ local function log_traveller_metrics(self)
 		for action_name, count in pairs(self._action_taken_metrics) do
 			table.insert(action_parts, string.format("%s:%d", action_name, count))
 		end
-		lf("action_metrics", string.format("Traveller at %s - Action Metrics: %s", 
-			minetest.pos_to_string(droid_pos), table.concat(action_parts, ", ")))
+		lf("action_metrics", string.format("Traveller - Action Metrics: %s", 
+			table.concat(action_parts, ", ")))
 	else
-		lf("action_metrics", string.format("Traveller at %s - No actions taken yet", 
-			minetest.pos_to_string(droid_pos)))
+		lf("action_metrics", string.format("Traveller - No actions taken yet"))
 	end
 	
 	-- Log food eaten metrics
@@ -127,11 +142,10 @@ local function log_traveller_metrics(self)
 		for food_name, count in pairs(self._food_eaten_metrics) do
 			table.insert(food_parts, string.format("%s:%d", food_name, count))
 		end
-		lf("food_metrics", string.format("Traveller at %s - Food Eaten Metrics: %s", 
-			minetest.pos_to_string(droid_pos), table.concat(food_parts, ", ")))
+		lf("food_metrics", string.format("Traveller - Food Eaten Metrics: %s", 
+			table.concat(food_parts, ", ")))
 	else
-		lf("food_metrics", string.format("Traveller at %s - No food items eaten yet", 
-			minetest.pos_to_string(droid_pos)))
+		lf("food_metrics", string.format("Traveller - No food items eaten yet"))
 	end
 	
 	lf("traveller_metrics", "**************** End Traveller Metrics ****************")
@@ -142,36 +156,50 @@ local function initialize_reward_system(self)
 	if not self._reward_points_used then
 		self._reward_points_used = 0
 		self._reward_check_timer = 0
+		-- self._selected_reward = "default:coal_lump" -- Default to coal
+		self._selected_reward = "default:gold_lump" -- Default to coal
 		lf("traveller", "Initialized reward system")
 	end
 end
 
+
+-- Award reward items to traveller inventory
+local function award_reward_items(self, selected_reward, rewards_earned, points_to_use)
+	local inv = self:get_inventory()
+	local reward_stack = ItemStack(selected_reward .. " " .. rewards_earned)
+	
+	if inv:room_for_item("main", reward_stack) then
+		inv:add_item("main", reward_stack)
+		self._reward_points_used = (self._reward_points_used or 0) + points_to_use
+		
+		lf("traveller", string.format("Awarded %dx %s for %d points (Total used: %d)", 
+			rewards_earned, selected_reward, points_to_use, self._reward_points_used))
+		
+		-- Optional: Send chat message about reward
+		local pos = self:get_pos()
+		minetest.chat_send_all(string.format("Traveller at %s earned %dx %s! (%d points spent)", 
+			minetest.pos_to_string(pos), rewards_earned, selected_reward, points_to_use))
+	else
+		lf("traveller", "Inventory full, cannot award rewards")
+	end
+end
+
+-- ,,reward 
 local function check_and_award_rewards(self)
 	local total_points = get_total_points(self)
 	local points_available = total_points - (self._reward_points_used or 0)
 	
-	if points_available >= REWARD_CONFIG.points_per_reward then
-		local rewards_earned = math.floor(points_available / REWARD_CONFIG.points_per_reward)
-		local points_to_use = rewards_earned * REWARD_CONFIG.points_per_reward
+	-- Get the selected reward item and its cost
+	local selected_reward = self._selected_reward or "default:coal_lump"
+	local reward_cost = REWARD_CONFIG.rewards[selected_reward]
+	
+	if reward_cost and points_available >= reward_cost then
+		-- Calculate how many of this reward we can give
+		local rewards_earned = math.floor(points_available / reward_cost)
+		local points_to_use = rewards_earned * reward_cost
 		
-		-- Add coal lumps to inventory
-		local inv = self:get_inventory()
-		local reward_stack = ItemStack(REWARD_CONFIG.reward_item .. " " .. rewards_earned)
-		
-		if inv:room_for_item("main", reward_stack) then
-			inv:add_item("main", reward_stack)
-			self._reward_points_used = (self._reward_points_used or 0) + points_to_use
-			
-			lf("traveller", string.format("Awarded %dx %s for %d points (Total used: %d)", 
-				rewards_earned, REWARD_CONFIG.reward_item, points_to_use, self._reward_points_used))
-			
-			-- Optional: Send chat message about reward
-			local pos = self:get_pos()
-			minetest.chat_send_all(string.format("Traveller at %s earned %dx %s! (%d points spent)", 
-				minetest.pos_to_string(pos), rewards_earned, REWARD_CONFIG.reward_item, points_to_use))
-		else
-			lf("traveller", "Inventory full, cannot award rewards")
-		end
+-- Add reward items to inventory
+		award_reward_items(self, selected_reward, rewards_earned, points_to_use)
 	end
 end
 
@@ -1214,7 +1242,7 @@ task = function(self)
 	
 	-- Randomly pick one of four actions
 	local choice = math.random(4)
-    choice = 4
+    -- choice = 4
 	lf("traveller:task", "CHOICE=" .. choice .. " selected")
 
 	if choice == 1 then
@@ -1303,7 +1331,7 @@ on_step = function(self, dtime, moveresult)
 	end
 	
 	-- Check for rewards every 60 seconds
-	if self._reward_check_timer >= REWARD_CONFIG.check_interval then
+	if self._reward_check_timer >= REWARD_CHECK_INTERVAL then
 		self._reward_check_timer = 0
 		check_and_award_rewards(self)
 	end
@@ -1427,6 +1455,7 @@ maidroid.register_core("traveller", {
 	default_item     = "default:bronzeblock",
 	to_wander        = to_wander,
 	path_max         = 18,
+	can_sell         = true,
 	doc = doc,
 })
 

@@ -41,11 +41,12 @@ maidroid.safe_read_file = function(path)
 end
 
 -- called when the object is destroyed.
+-- ,,stat
 maidroid.get_staticdata = function(self, captured)
 	-- Log who called get_staticdata and why
 	local pos = self:get_pos()
 	local dist = maidroid.distance_from_player and maidroid.distance_from_player(self) or "unknown"
-	lf("get_staticdata", "CALLED - nametag: " .. tostring(self.nametag) .. ", pos: " .. (pos and minetest.pos_to_string(pos) or "nil") .. ", distance from player: " .. tostring(dist) .. ", captured: " .. tostring(captured))
+	lf("get_staticdata", "1 CALLED - nametag: " .. tostring(self.nametag) .. ", pos: " .. (pos and minetest.pos_to_string(pos) or "nil") .. ", distance from player: " .. tostring(dist) .. ", captured: " .. tostring(captured))
 	
 	local data = {
 		nametag = self.nametag,
@@ -58,9 +59,9 @@ maidroid.get_staticdata = function(self, captured)
 	-- data.textures = luaentity.object:get_properties()["textures"][1]
 
 	-- lf("api", "====================== get_staticdata1:"..dump(self))
-    mydump("get_staticdata", "====================== get_staticdata1", self)
+    mydump("get_staticdata", "2===================== get_staticdata1", self)
 	-- lf("api", "====================== get_staticdata2:"..dump(data))
-    mydump("get_staticdata", "====================== get_staticdata2", data)
+    mydump("get_staticdata", "3===================== get_staticdata2", data)
 	-- lf("api", "====================== get_staticdata3:"..dump(self:get_properties()))
 	-- check if object is destroyed, then return nil
 	if not self.object or not self.object:get_pos() then
@@ -70,7 +71,7 @@ maidroid.get_staticdata = function(self, captured)
 
 	local eeee = self.object:get_properties()
 	-- lf("api", "====================== get_staticdata3:"..dump(eeee))
-    mydump("get_staticdata", "====================== get_staticdata3", eeee)
+    mydump("get_staticdata", "4===================== get_staticdata3", eeee)
 	-- to work aroudn texture loss problem save texture from object properties
 	data["textures"] = eeee["textures"][1]
 
@@ -88,6 +89,9 @@ maidroid.get_staticdata = function(self, captured)
 		end
 		data.inventory[list_name] = tmplist
 	end
+
+	-- dump final data with inventory included
+    mydump("get_staticdata", "5====================== get_staticdata_final_with_inventory", data)
 
 	if not captured then
 		data.home = self.home

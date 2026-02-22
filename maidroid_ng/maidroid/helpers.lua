@@ -118,5 +118,55 @@ maidroid.helpers.is_walkable = function(name)
 		and minetest.registered_nodes[name].walkable
 end
 
+maidroid.helpers.compact_dump = function(obj, indent, max_line_length)
+	indent = indent or ""
+	max_line_length = max_line_length or 80
+	local result = {}
+	local current_line = indent
+	
+	for k, v in pairs(obj) do
+		local key = type(k) == "string" and k or "[" .. tostring(k) .. "]"
+		local value
+		
+		if type(v) == "table" then
+			if next(v) == nil then
+				value = "{}"
+			else
+				value = maidroid.helpers.compact_dump(v, indent .. "  ", max_line_length)
+			end
+		elseif type(v) == "string" then
+			if #v > 30 then
+				value = '"' .. v:sub(1, 27) .. "..."
+			else
+				value = '"' .. v .. '"'
+			end
+		else
+			value = tostring(v)
+		end
+		
+		local pair = key .. " = " .. value
+		local test_line = current_line == "" and pair or current_line .. ", " .. pair
+		
+		if #test_line <= max_line_length and not value:find("\n") then
+			current_line = test_line
+		else
+			if current_line ~= "" then
+				table.insert(result, current_line)
+			end
+			current_line = indent .. pair
+		end
+	end
+	
+	if current_line ~= "" then
+		table.insert(result, current_line)
+	end
+	
+	if #result == 1 then
+		return "{ " .. result[1]:sub(#indent + 1) .. " }"
+	else
+		return "{\n" .. table.concat(result, ",\n") .. "\n" .. indent:gsub("  ", "", 1) .. "}"
+	end
+end
+
 voxels_sets["4,3"] = init_voxels(default_range) -- initialize voxels for default range
 -- vim: ai:noet:ts=4:sw=4:fdm=indent:syntax=lua

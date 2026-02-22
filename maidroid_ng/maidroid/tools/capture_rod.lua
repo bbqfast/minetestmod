@@ -21,7 +21,8 @@ local maid_skins = {
 
 mydump = function(func, msg, obj)
 	-- uncommon to incrase verbose
-	-- lf(func, msg..dump(obj))
+    lf(func, msg..dump(obj))
+    -- lf(func, msg..maidroid.helpers.compact_dump(obj))
 end
 
 minetest.register_tool("maidroid:capture_rod", {

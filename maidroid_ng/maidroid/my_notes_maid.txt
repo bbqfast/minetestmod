@@ -158,6 +158,7 @@ Updates:
 - handle fridge empty, stop counting
 - refac: move non ui func out of api
 - refac: move register core
+- refac: move state
 
 todo:
 - add drinking
