@@ -42,7 +42,8 @@ local current_destination = nil
 local ACTION_POINTS = {
 	toilet = 5,
 	fridge = 10,
-	shower = 8
+	shower = 8,
+	bookshelf = 7
 }
 
 -- Reward system configuration
@@ -234,6 +235,76 @@ local function check_distance_from_activation(self)
 	
 	return false
 end
+
+
+-- ,,surrounding
+local function get_standable_pos_around(pos)
+    local offsets = {
+        {x=1,y=0,z=0},
+        {x=-1,y=0,z=0},
+        {x=0,y=0,z=1},
+        {x=0,y=0,z=-1},
+    }
+
+    local candidates = {}
+    
+    for _, off in ipairs(offsets) do
+        local p = vector.add(pos, off)
+
+        local node = minetest.get_node(p)
+        local below = minetest.get_node({x=p.x,y=p.y-1,z=p.z})
+        local above = minetest.get_node({x=p.x,y=p.y+1,z=p.z})
+
+        if not minetest.registered_nodes[node.name].walkable
+        and minetest.registered_nodes[below.name].walkable
+        and not minetest.registered_nodes[above.name].walkable then
+            table.insert(candidates, p)
+        end
+    end
+
+    return candidates
+end
+
+-- Function to get the shortest path by checking multiple standable positions around target
+-- ,,shortest_path
+local function get_shortest_path(target_pos, player_pos)
+    local shortest_path = nil
+    local shortest_length = math.huge
+    local shortest_destination = nil
+    
+    lf("shortest_path", "Starting get_shortest_path: target=" .. minetest.pos_to_string(target_pos) .. " player=" .. minetest.pos_to_string(player_pos))
+    
+    -- Get standable positions around target
+    local standable_candidates = get_standable_pos_around(target_pos)
+    
+    -- Find path to each standable candidate and return the shortest
+    for i, pos in ipairs(standable_candidates) do
+        lf("shortest_path", "Checking path to position " .. i .. ": " .. minetest.pos_to_string(pos))
+        local path = minetest.find_path(player_pos, pos, 8, 1, 1, "A*")
+        if path then
+            lf("shortest_path", "Path found with " .. #path .. " nodes")
+            if #path < shortest_length then
+                shortest_path = path
+                shortest_length = #path
+                shortest_destination = pos
+                lf("shortest_path", "New shortest path found: " .. shortest_length .. " nodes to " .. minetest.pos_to_string(pos))
+            else
+                lf("shortest_path", "Path longer than current shortest (" .. #path .. " vs " .. shortest_length .. ")")
+            end
+        else
+            lf("shortest_path", "No path found to position " .. i)
+        end
+    end
+    
+    if shortest_path then
+        lf("shortest_path", "Returning shortest path with " .. #shortest_path .. " nodes to destination " .. minetest.pos_to_string(shortest_destination))
+    else
+        lf("shortest_path", "No valid path found, returning nil")
+    end
+    
+    return shortest_path, shortest_destination
+end
+
 
 -- Function to find interesting destinations
 local function find_interesting_destinations(self)
@@ -663,7 +734,22 @@ local function on_step_refrigerator_check(droid, dtime, moveresult)
 	return false -- Return false to indicate not using refrigerator
 end
 
--- ,,ref4
+-- Function to check if maidroid is using bookshelf and handle bookshelf state
+local function on_step_bookshelf_check(droid, dtime, moveresult)
+	-- Check if maidroid is using bookshelf - if so, prevent all movement and processing
+	if droid._is_using_bookshelf == true then
+		-- Ensure velocity stays zero while using bookshelf
+		droid.object:set_velocity({x = 0, y = 0, z = 0})
+		-- Keep mining animation active while using bookshelf (holding item)
+		local mine_anim = (maidroid and maidroid.animation and maidroid.animation.MINE) or "mine"
+		droid:set_animation(mine_anim, 0)
+		-- Skip all other processing while using bookshelf
+		return true -- Return true to indicate bookshelf state is active
+	end
+	return false -- Return false to indicate not using bookshelf
+end
+
+-- ,,fri4
 -- Function to get the position in front of a refrigerator based on its orientation
 local function get_refrigerator_front(refrigerator_pos)
 	-- Get refrigerator node and its orientation
@@ -691,8 +777,148 @@ local function get_refrigerator_front(refrigerator_pos)
 	return vector.add(refrigerator_pos, offset)
 end
 
+-- ,,book3
+-- Function to get the position in front of a bookshelf based on its orientation
+local function get_bookshelf_front(bookshelf_pos)
+	-- Get bookshelf node and its orientation
+	local bookshelf_node = minetest.get_node(bookshelf_pos)
+	local bookshelf_param2 = bookshelf_node.param2 or 0
+	
+	-- Debug logging to check what we're actually detecting
+	lf("traveller:get_bookshelf_front", "Bookshelf node name: " .. (bookshelf_node.name or "unknown"))
+	lf("traveller:get_bookshelf_front", "Bookshelf param2 value: " .. bookshelf_param2)
+	lf("traveller:get_bookshelf_front", "Bookshelf position: " .. minetest.pos_to_string(bookshelf_pos))
+	
+	-- Calculate offset based on bookshelf's facing direction (-90 degree rotation)
+	-- param2 values: 0=north, 1=east, 2=south, 3=west (90-degree rotations)
+	-- Rotated -90 degrees: north→west, east→north, south→east, west→south
+	local offset = {x=0, y=0, z=0}
+	local locked_orientation = nil
+	
+	if bookshelf_param2 == 0 then
+		-- Facing north, rotated -90°, front is at negative X (west)
+		offset.x = -1
+		locked_orientation = "north→west"
+	elseif bookshelf_param2 == 1 then
+		-- Facing east, rotated -90°, front is at negative Z (north)
+		offset.z = -1
+		locked_orientation = "east→north"
+	elseif bookshelf_param2 == 2 then
+		-- Facing south, rotated -90°, front is at positive X (east)
+		offset.x = 1
+		locked_orientation = "south→east"
+	elseif bookshelf_param2 == 3 then
+		-- Facing west, rotated -90°, front is at positive Z (south)
+		offset.z = 1
+		locked_orientation = "west→south"
+	else
+		-- Handle unexpected param2 values
+		lf("traveller:get_bookshelf_front", "Unexpected param2 value: " .. bookshelf_param2)
+		locked_orientation = "unknown"
+	end
+	
+	-- Log locked orientation for debugging
+	lf("traveller:get_bookshelf_front", "Bookshelf orientation locked: " .. (locked_orientation or "unknown") .. 
+	   " (param2=" .. bookshelf_param2 .. ")")
+	
+	-- Calculate and return the position in front of bookshelf
+	local target_pos = vector.add(bookshelf_pos, offset)
+	lf("traveller:get_bookshelf_front", "Bookshelf front position: " .. minetest.pos_to_string(target_pos))
+	
+	return target_pos
+end
+
+-- Function to check and highlight positions in all four cardinal directions
+-- ,,check1,,chk
+local function front_check(pos)
+	if not pos then
+		lf("traveller:front_check", "No position provided")
+		return
+	end
+	
+	lf("traveller:front_check", "Checking directions around position: " .. minetest.pos_to_string(pos))
+	
+	-- Define offsets for each cardinal direction (clockwise order)
+	local directions = {
+		{name = "North", offset = {x = 0,  y = 0,  z = -1}},
+		{name = "East",  offset = {x = 1,  y = 0,  z = 0}},
+		{name = "South", offset = {x = 0,  y = 0,  z = 1}},
+		{name = "West",  offset = {x = -1, y = 0,  z = 0}}
+	}
+	
+	-- Function to place destination marker (similar to path.lua)
+	local function place_marker(target_pos, direction_name)
+		if not target_pos then return end
+		
+		-- Check what's at the target position
+		local dest_node = minetest.get_node(target_pos)
+		local place_pos
+		
+		-- If target is on walkable nodes, place marker above
+		if dest_node.name ~= "air" then
+			place_pos = { x = target_pos.x, y = target_pos.y + 1, z = target_pos.z }
+		else
+			-- If target is in air, place at target level
+			place_pos = { x = target_pos.x, y = target_pos.y, z = target_pos.z }
+		end
+		
+		local current_node = minetest.get_node(place_pos)
+		-- Only place if current node is air
+		if current_node.name == "air" then
+			-- Place marker with different colors for each direction
+			local param2_color = 240 -- Default yellow
+			if direction_name == "East" then
+				param2_color = 240 -- Yellow
+			elseif direction_name == "South" then
+				param2_color = 180 -- Red
+			elseif direction_name == "West" then
+				param2_color = 120 -- Blue
+			elseif direction_name == "North" then
+				param2_color = 60  -- Green
+			end
+			
+			minetest.set_node(place_pos, { name = "maidroid:destination_marker", param2 = param2_color })
+			lf("traveller:front_check", "Placed " .. direction_name .. " marker at " .. minetest.pos_to_string(place_pos))
+			
+			-- Set up removal timer for marker (3 seconds)
+			minetest.after(3, function()
+				local node = minetest.get_node(place_pos)
+				if node.name == "maidroid:destination_marker" then
+					minetest.set_node(place_pos, { name = "air" })
+					lf("traveller:front_check", "Removed " .. direction_name .. " marker at " .. minetest.pos_to_string(place_pos))
+				end
+			end)
+		end
+	end
+	
+	-- Check each direction with delay
+	for i, dir in ipairs(directions) do
+		local target_pos = vector.add(pos, dir.offset)
+		local target_node = minetest.get_node(target_pos)
+		
+		lf("traveller:front_check", string.format("%s (+%d,%d,%d): %s at %s", 
+			dir.name, 
+			dir.offset.x, dir.offset.y, dir.offset.z,
+			target_node.name,
+			minetest.pos_to_string(target_pos)
+		))
+		
+		-- Place marker with delay
+		minetest.after(i * 0.5, function()
+			place_marker(target_pos, dir.name)
+		end)
+	end
+	
+	-- Also highlight the center position with delay
+	minetest.after(0, function()
+		place_marker(pos, "Center")
+	end)
+	
+	lf("traveller:front_check", "Scheduled marker placement for center and all 4 directions with 0.5s delays")
+end
+
 -- Function to teleport to saved refrigerator position
--- ,,ref2
+-- ,,fri2
 local function teleport_to_refrigerator_position(droid)
 	if not droid._refrigerator_pos then
 		lf("traveller", "No saved refrigerator position available for teleport")
@@ -717,6 +943,36 @@ local function teleport_to_refrigerator_position(droid)
 	droid.object:set_velocity({x = 0, y = 0, z = 0})
 	
 	lf("traveller", "Successfully teleported to refrigerator position and halted")
+	
+	return true
+end
+
+-- Function to teleport to saved bookshelf position
+-- ,,book2
+local function teleport_to_bookshelf_position(droid)
+	if not droid._bookshelf_pos then
+		lf("traveller", "No saved bookshelf position available for teleport")
+		return false
+	end
+	
+	local current_pos = droid:get_pos()
+	local bookshelf_pos = droid._bookshelf_pos
+	
+	lf("traveller", "Teleporting from " .. minetest.pos_to_string(current_pos) .. " to bookshelf at " .. minetest.pos_to_string(bookshelf_pos))
+	
+	-- Calculate teleport position in front of bookshelf based on its orientation
+	-- local teleport_pos = get_refrigerator_front(bookshelf_pos)
+	local teleport_pos = droid._bookshelf_front
+	lf("traveller", "Teleport position: " .. minetest.pos_to_string(teleport_pos))
+	
+	-- Perform teleport
+	droid.object:set_pos(teleport_pos)
+	
+	-- Immediately halt and set velocity to zero after teleport
+	droid:halt()
+	droid.object:set_velocity({x = 0, y = 0, z = 0})
+	
+	lf("traveller", "Successfully teleported to bookshelf position and halted")
 	
 	return true
 end
@@ -854,6 +1110,311 @@ local function use_refrigerator(droid, pos)
 		return true
 	else
 		lf("traveller", "Node at " .. minetest.pos_to_string(pos) .. " is not a refrigerator")
+	end
+	
+	return false
+end
+
+-- Function to get random book from bookshelf and hold it
+-- ,,book4
+local function use_bookshelf(droid, pos)
+    pos = droid._bookshelf_pos 
+	local node = minetest.get_node(pos)
+	
+	-- Check if it's a bookshelf
+	lf("traveller:use_bookshelf", "Checking node at " .. minetest.pos_to_string(pos) .. ": " .. node.name)
+	if node.name == "default:bookshelf" then
+		lf("traveller:use_bookshelf", "Found bookshelf, getting book from it")
+		
+		-- Save the exact bookshelf position for later teleport
+		-- droid._bookshelf_pos = vector.round(pos)
+		lf("traveller", "Saved bookshelf position: " .. minetest.pos_to_string(droid._bookshelf_pos))
+		
+		-- Teleport to bookshelf position before using it
+		teleport_to_bookshelf_position(droid)
+		
+		-- Check if already using bookshelf to prevent multiple bookshelf calls
+		if droid._is_using_bookshelf == true then
+			lf("traveller:use_bookshelf", "maidroid already using bookshelf, ignoring bookshelf action")
+			return true
+		end
+		
+		-- Set a flag to prevent on_step from reactivating movement
+		droid._is_using_bookshelf = true
+		
+		-- Halt the maidroid while using bookshelf
+		droid:halt()
+		
+		-- Explicitly set velocity to zero to prevent any movement
+		droid.object:set_velocity({x = 0, y = 0, z = 0})
+		
+		-- Get bookshelf's inventory to pick a random book
+		local bookshelf_meta = minetest.get_meta(pos)
+		local bookshelf_inv = bookshelf_meta:get_inventory()
+		
+		-- Collect non-empty books with their original positions
+		local valid_books = {}
+		local current_inventory = "books"
+		lf("traveller", "Starting book collection from bookshelf at " .. minetest.pos_to_string(pos))
+		
+		-- First try books inventory
+		local book_list = bookshelf_inv:get_list("books")
+		lf("traveller", "Checking 'books' inventory, list available: " .. tostring(book_list ~= nil))
+		if book_list then
+			lf("traveller", "Books inventory size: " .. #book_list)
+			for i, stack in ipairs(book_list) do
+				if not stack:is_empty() then
+					-- Check if it's a proper MTG book type
+					local item_name = stack:get_name()
+					lf("traveller", "Slot " .. i .. ": " .. item_name .. " count: " .. stack:get_count())
+					if item_name == "default:book" or item_name == "default:book_written" then
+						table.insert(valid_books, {stack = stack, index = i, inventory_name = "books"})
+						lf("traveller", "Added book from 'books' inventory: " .. item_name)
+					end
+				end
+			end
+		end
+		
+		-- If no books found in books inventory, try main inventory
+		if #valid_books == 0 then
+			lf("traveller", "No books found in 'books' inventory, trying 'main' inventory")
+			current_inventory = "main"
+			book_list = bookshelf_inv:get_list("main")
+			lf("traveller", "Checking 'main' inventory, list available: " .. tostring(book_list ~= nil))
+			if book_list then
+				lf("traveller", "Main inventory size: " .. #book_list)
+				for i, stack in ipairs(book_list) do
+					if not stack:is_empty() then
+						-- Check if it's a proper MTG book type
+						local item_name = stack:get_name()
+						lf("traveller", "Slot " .. i .. ": " .. item_name .. " count: " .. stack:get_count())
+						if item_name == "default:book" or item_name == "default:book_written" then
+							table.insert(valid_books, {stack = stack, index = i, inventory_name = "main"})
+							lf("traveller", "Added book from 'main' inventory: " .. item_name)
+						end
+					end
+				end
+			end
+		end
+		
+		lf("traveller", "Book collection completed, found " .. #valid_books .. " valid books")
+		
+		-- Pick a random book if available
+		local selected_book = nil
+		local original_index = nil
+		local inventory_name = nil
+		
+		if #valid_books > 0 then
+			local random_index = math.random(#valid_books)
+			local selected_data = valid_books[random_index]
+			selected_book = selected_data.stack
+			original_index = selected_data.index
+			inventory_name = selected_data.inventory_name
+			lf("traveller", "Selected random book from bookshelf: " .. selected_book:get_name() .. " from slot " .. original_index .. " in " .. inventory_name)
+			
+			-- Transfer the FULL stack from bookshelf to maidroid
+			local droid_inv = droid:get_inventory()
+			lf("traveller", "Starting book transfer process")
+			lf("traveller", "Maidroid inventory available: " .. tostring(droid_inv ~= nil))
+			
+			if droid_inv then
+				-- Log book details before transfer
+				lf("traveller", "Book to transfer: " .. selected_book:get_name() .. " count: " .. selected_book:get_count())
+				lf("traveller", "Removing from inventory: " .. inventory_name .. " slot: " .. original_index)
+				
+				-- Remove book from bookshelf
+				local removed_successfully = bookshelf_inv:set_stack(inventory_name, original_index, ItemStack(""))
+				lf("traveller", "Book removal completed, success: " .. tostring(removed_successfully))
+				
+				-- Add full stack to maidroid inventory
+				local remaining_stack = droid_inv:add_item("main", selected_book)
+				lf("traveller", "Book addition completed, remaining stack: " .. tostring(remaining_stack:get_count()))
+				
+				if remaining_stack:is_empty() then
+					lf("traveller", "Full book stack transferred successfully to maidroid")
+				else
+					lf("traveller", "Partial transfer - " .. remaining_stack:get_count() .. " items could not be added (inventory full?)")
+				end
+			else
+				lf("traveller", "ERROR: Failed to get maidroid inventory - transfer aborted")
+			end
+			
+			-- Update per-maidroid food_eaten_metrics (for books read)
+			if not droid._food_eaten_metrics then
+				droid._food_eaten_metrics = {}
+			end
+			local book_name = selected_book:get_name()
+			droid._food_eaten_metrics[book_name] = (droid._food_eaten_metrics[book_name] or 0) + 1
+			lf("book_metrics", "book_read updated: " .. book_name .. " = " .. droid._food_eaten_metrics[book_name])
+			
+			-- Set the selected book as the maidroid's tool (simulating holding it)
+			droid:set_tool(book_name)
+			droid.selected_tool = book_name
+			
+			-- Print reading message with book content preview
+			local function read_book_stack(stack)
+				lf("traveller", "read_book_stack: Starting function")
+				
+				if stack:is_empty() then 
+					lf("traveller", "read_book_stack: Stack is empty, returning nil")
+					return nil 
+				end
+
+				local name = stack:get_name()
+				lf("traveller", "read_book_stack: Stack name: " .. name)
+				
+				-- Books in MTG are usually default:book or default:book_written
+				if name ~= "default:book" and name ~= "default:book_written" then
+					lf("traveller", "read_book_stack: Not a valid MTG book type, returning nil")
+					return nil
+				end
+				
+				lf("traveller", "read_book_stack: Valid book type detected: " .. name)
+
+				local meta  = stack:get_meta()
+				local title = meta:get_string("title") -- "" if none
+				local text  = meta:get_string("text")  -- "" if none
+				
+				-- Dump all metadata for debugging
+				lf("traveller", "read_book_stack: Dumping all metadata fields:")
+				local meta_table = meta:to_table()
+				if meta_table and meta_table.fields then
+					for key, value in pairs(meta_table.fields) do
+						lf("traveller", "read_book_stack:   [" .. key .. "] = '" .. value .. "' (len=" .. #value .. ")")
+					end
+				else
+					lf("traveller", "read_book_stack:   No metadata fields found or metadata is nil")
+				end
+				
+				-- Check if metadata is stored as serialized data (common in some book mods)
+				local default_data = meta:get_string("")
+				if default_data and default_data ~= "" and default_data:find("return") then
+					lf("traveller", "read_book_stack: Found serialized book data, attempting to parse")
+					lf("traveller", "read_book_stack: Serialized data: " .. default_data)
+					
+					-- Try to parse the serialized data
+					local success, book_func = pcall(loadstring, default_data)
+					if success and book_func then
+						lf("traveller", "read_book_stack: Successfully loaded serialized function")
+						local book_data = book_func()
+						if book_data then
+							lf("traveller", "read_book_stack: Successfully executed function and got data")
+							title = book_data.title or ""
+							text = book_data.text or ""
+							lf("traveller", "read_book_stack: Parsed title: '" .. title .. "'")
+							lf("traveller", "read_book_stack: Parsed text length: " .. #text)
+						else
+							lf("traveller", "read_book_stack: Function executed but returned nil data")
+						end
+					else
+						lf("traveller", "read_book_stack: Failed to load serialized data: " .. tostring(book_func))
+					end
+				end
+				
+				lf("traveller", "read_book_stack: Final title extracted: '" .. title .. "'")
+				lf("traveller", "read_book_stack: Final text length: " .. #text)
+
+				-- Fallback title if missing
+				if title == "" then
+					title = (name == "default:book_written") and "(Untitled Book)" or "(Blank Book)"
+					lf("traveller", "read_book_stack: Using fallback title: " .. title)
+				else
+					lf("traveller", "read_book_stack: Using original title: " .. title)
+				end
+
+				local result = { name = name, title = title, text = text }
+				lf("traveller", "read_book_stack: Returning book data: name=" .. result.name .. " title=" .. result.title .. " text_len=" .. #result.text)
+				return result
+			end
+
+			-- Read the book from maidroid's inventory after transfer
+			local droid_inv = droid:get_inventory()
+			local book_stack = nil
+			
+			-- Find the book in maidroid's main inventory (should be the last added item)
+			if droid_inv then
+				local main_list = droid_inv:get_list("main")
+				if main_list then
+					for i = #main_list, 1, -1 do  -- Search backwards to find the most recently added book
+						local stack = main_list[i]
+						if not stack:is_empty() and (stack:get_name() == "default:book" or stack:get_name() == "default:book_written") then
+							book_stack = stack
+							lf("traveller", "Found book in maidroid inventory at slot " .. i .. ": " .. stack:get_name())
+							break
+						end
+					end
+				end
+			end
+
+			local book = read_book_stack(book_stack or ItemStack(""))
+			if book then
+				local content_preview = book.text:sub(1, 10)
+				minetest.chat_send_all("Reading " .. book.title .. "..." .. content_preview .. "....")
+				lf("traveller", "Reading book: " .. book.title .. " (len=" .. #book.text .. ")")
+				lf("traveller", "Preview: " .. content_preview)
+			else
+				minetest.chat_send_all("Reading unknown book...")
+				lf("traveller", "Could not read book metadata properly")
+			end
+		else
+			lf("traveller", "Bookshelf is empty or no books found, using default tool")
+			droid:set_tool("default:bronzeblock")
+			droid.selected_tool = "default:bronzeblock"
+		end
+		
+		-- Update per-maidroid action_taken_metrics
+		if not droid._action_taken_metrics then
+			droid._action_taken_metrics = {}
+		end
+		droid._action_taken_metrics["bookshelf_used"] = (droid._action_taken_metrics["bookshelf_used"] or 0) + 1
+		lf("action_metrics", "bookshelf_used called: " .. droid._action_taken_metrics["bookshelf_used"])
+		
+		-- Award points for successful bookshelf action
+		add_points(droid, "bookshelf", ACTION_POINTS.bookshelf)
+		
+		-- Set reading animation while using bookshelf (holding book)
+		local mine_anim = (maidroid and maidroid.animation and maidroid.animation.MINE) or "mine"
+		droid:set_animation(mine_anim, 0)
+		
+		lf("traveller:use_bookshelf", "maidroid using bookshelf at " .. minetest.pos_to_string(pos) .. " (bookshelf_flag=true, velocity=0)")
+		
+		-- Add automatic timer to finish using bookshelf (read book for 8 seconds)
+		local bookshelf_time = 8 -- Use bookshelf for 8 seconds
+		lf("traveller:use_bookshelf", "setting bookshelf finish timer for " .. bookshelf_time .. " seconds")
+		
+		minetest.after(bookshelf_time, function()
+			lf("traveller:bookshelf_timer", "bookshelf finish timer triggered!")
+			
+			if droid and droid.object then
+				lf("traveller:bookshelf_timer", "droid and object valid, clearing bookshelf flag")
+				
+				-- Clear the bookshelf flag FIRST to allow normal movement
+				droid._is_using_bookshelf = false
+				
+				-- IMPORTANT: Clear the action state to prevent immediate re-bookshelf
+				droid.action = nil
+				
+				-- Restore normal tool (bronze block)
+				droid:set_tool("default:bronzeblock")
+				droid.selected_tool = "default:bronzeblock"
+				
+				-- Restore normal animation
+				local stand_anim = (maidroid and maidroid.animation and maidroid.animation.STAND) or "stand"
+				droid:set_animation(stand_anim, 30)
+				
+				-- Resume normal behavior - force return to wander
+				to_wander(droid, "traveller:bookshelf_timer")
+				
+				lf("traveller:bookshelf_timer", "maidroid finished using bookshelf, bookshelf flag cleared, action cleared")
+			else
+				lf("traveller:bookshelf_timer", "bookshelf finish timer: droid or object is nil")
+				lf("traveller:bookshelf_timer", "droid=" .. tostring(droid) .. " object=" .. tostring(droid and droid.object))
+			end
+		end)
+		
+		return true
+	else
+		lf("traveller", "Node at " .. minetest.pos_to_string(pos) .. " is not a bookshelf")
 	end
 	
 	return false
@@ -1058,6 +1619,89 @@ local function find_and_use_refrigerator(self)
 	end
 end
 
+-- Function to find path to bookshelf and use it
+-- ,,book1
+local function find_and_use_bookshelf(self)
+	lf("traveller:find_and_use_bookshelf", "Starting bookshelf search")
+	local pos = self:get_pos()
+	
+	-- Find bookshelf within range
+	lf("traveller:find_and_use_bookshelf", "Searching for bookshelves within " .. TRAVEL_RANGE .. " blocks")
+	local bookshelf_pos = minetest.find_node_near(pos, TRAVEL_RANGE, {"default:bookshelf"})
+	
+	if not bookshelf_pos then
+		lf("traveller", "No bookshelf found within range")
+		return false
+
+
+	else
+		-- Log bookshelf position and node name
+		local bookshelf_node = minetest.get_node(bookshelf_pos)
+		lf("traveller", "Found bookshelf at position: " .. minetest.pos_to_string(bookshelf_pos) .. " with node name: " .. (bookshelf_node.name or "unknown"))
+	end
+
+    -- front_check(bookshelf_pos)
+	
+	-- Save bookshelf position
+	self._bookshelf_pos = bookshelf_pos
+	lf("traveller", "Found bookshelf at " .. minetest.pos_to_string(bookshelf_pos))
+	lf("traveller:find_and_use_bookshelf", "Checking if bookshelf location is safe")
+	
+
+    	-- Calculate target position in front of bookshelf based on its orientation
+	-- local target_pos = get_bookshelf_front(bookshelf_pos)
+	-- self._bookshelf_front = target_pos
+	-- lf("traveller", "Target position in front of bookshelf: " .. minetest.pos_to_string(target_pos))
+	lf("traveller", "Target position in front of bookshelf: " .. minetest.pos_to_string(bookshelf_pos))
+
+    
+	-- Check if destination is safe
+	if not is_destination_safe(self, bookshelf_pos) then
+		lf("traveller", "Bookshelf location is not safe")
+		return false
+	end
+	
+	-- Calculate distance to bookshelf
+	local distance = vector.distance(pos, bookshelf_pos)
+	lf("traveller:find_and_use_bookshelf", "Distance to bookshelf: " .. string.format("%.2f", distance))
+	
+	-- If already close to bookshelf, use it
+	if distance < 1 then
+		lf("traveller", "Already near bookshelf, using it")
+		lf("traveller:find_and_use_bookshelf", "Calling use_bookshelf directly")
+		return use_bookshelf(self, bookshelf_pos)
+	end
+	
+	-- Find path to bookshelf
+	lf("traveller", "Finding path to bookshelf from " .. minetest.pos_to_string(pos) .. " to " .. minetest.pos_to_string(bookshelf_pos))
+	lf("traveller:find_and_use_bookshelf", "Using A* pathfinding with parameters: 8, 1, 1")
+	-- local path = minetest.find_path(pos, target_pos, 8, 1, 1, "A*")
+	local path, actual_destination = get_shortest_path(bookshelf_pos, pos)
+
+	if path ~= nil then
+        self._bookshelf_front = actual_destination
+        for i, node in ipairs(path) do
+            lf("traveller:find_and_use_bookshelf", string.format("Path step %d: %s", i, minetest.pos_to_string(node)))
+        end
+
+        lf("traveller", "Path found to bookshelf with " .. #path .. " nodes")
+		lf("traveller:find_and_use_bookshelf", "Path found successfully, setting up movement")
+		lf("traveller:find_and_use_bookshelf", "Actual destination: " .. minetest.pos_to_string(actual_destination))
+		self:set_yaw({self:get_pos(), actual_destination})
+		
+		-- Set up action to use bookshelf when arriving
+		lf("traveller:find_and_use_bookshelf", "Setting destination and action for bookshelf")
+		self.destination = actual_destination
+		self.action = "use_bookshelf"
+        -- ,,hack
+		core_path.to_follow_path(self, path, actual_destination, to_action, "use_bookshelf")
+		return true
+	else
+		lf("traveller", "No path found to bookshelf")
+		return false
+	end
+end
+
 -- Function to travel to a destination
 travel_to_destination = function(self, destination)
 	if not destination then
@@ -1110,7 +1754,7 @@ task_base = function(self, action, destination)
 	if path ~= nil then
 		lf("traveller:task_base", "Path found with " .. #path .. " nodes")
 		-- Place destination marker
-		maidroid.cores.path.place_destination_marker(self, destination)
+		maidroid.cores.path.place_destination_marker(destination)
 		self:set_yaw({self:get_pos(), destination})
 		core_path.to_follow_path(self, path, destination, to_action, action)
 		return true
@@ -1225,12 +1869,28 @@ local act = function(self)
 			lf("traveller:act", "use_refrigerator: no destination")
 		end
 		self.destination = nil
+	elseif self.action == "use_bookshelf" then
+		lf("traveller:act", "use_bookshelf: " .. minetest.pos_to_string(self:get_pos()))
+		lf("traveller:act", "destination=" .. (self.destination and minetest.pos_to_string(self.destination) or "nil"))
+		if self.destination then
+			lf("traveller:act", "Calling use_bookshelf at destination")
+			local success = use_bookshelf(self, self.destination)
+			if success then
+				lf("DEBUG traveller:act", "Successfully used bookshelf")
+				-- Points are now awarded directly in use_bookshelf function
+			else
+				lf("DEBUG traveller:act", "Failed to use bookshelf")
+			end
+		else
+			lf("traveller:act", "use_bookshelf: no destination")
+		end
+		self.destination = nil
 	else
 		lf("traveller:act", "unknown action: " .. tostring(self.action))
 	end
 	
-	-- Return to wander after action completion (only if not showering, using toilet, or using refrigerator)
-	if not self._is_showering and not self._is_using_toilet and not self._is_using_refrigerator then
+	-- Return to wander after action completion (only if not showering, using toilet, using refrigerator, or using bookshelf)
+	if not self._is_showering and not self._is_using_toilet and not self._is_using_refrigerator and not self._is_using_bookshelf then
 	    to_wander(self, "traveller:act")
 	end
 end
@@ -1240,9 +1900,9 @@ task = function(self)
 	local pos = self:get_pos()
 	local inv = self:get_inventory()
 	
-	-- Randomly pick one of four actions
-	local choice = math.random(4)
-    -- choice = 4
+	-- Randomly pick one of five actions
+	local choice = math.random(5)
+    choice = 5
 	lf("traveller:task", "CHOICE=" .. choice .. " selected")
 
 	if choice == 1 then
@@ -1263,6 +1923,10 @@ task = function(self)
 		lf("traveller:task", "CHOICE=4: find_and_use_refrigerator")
 		lf("traveller:task", "Calling find_and_use_refrigerator function")
 		find_and_use_refrigerator(self)
+	elseif choice == 5 then
+		lf("traveller:task", "CHOICE=5: find_and_use_bookshelf")
+		lf("traveller:task", "Calling find_and_use_bookshelf function")
+		find_and_use_bookshelf(self)
 	end
 end
 
@@ -1365,6 +2029,11 @@ on_step = function(self, dtime, moveresult)
 		return -- Skip all other processing while using refrigerator
 	end
 	
+	-- Check if maidroid is using bookshelf - if so, prevent all movement and processing
+	if on_step_bookshelf_check(self, accumulated_dtime, moveresult) then
+		return -- Skip all other processing while using bookshelf
+	end
+	
 	-- Check distance from activation position and teleport back if too far
 	if check_distance_from_activation(self) then
 		return -- Teleported back, skip other processing
@@ -1372,8 +2041,8 @@ on_step = function(self, dtime, moveresult)
 	
     -- lf("DDEBUG on_step", "TIMER ON - dtime=" .. tostring(accumulated_dtime))
     
-	-- Ensure we have the correct tool (bronze block) when not sleeping, showering, using toilet, or using refrigerator
-	if not self._is_sleeping and not self._is_showering and not self._is_using_toilet and not self._is_using_refrigerator and self.selected_tool ~= "default:bronzeblock" then
+	-- Ensure we have the correct tool (bronze block) when not sleeping, showering, using toilet, using refrigerator, or using bookshelf
+	if not self._is_sleeping and not self._is_showering and not self._is_using_toilet and not self._is_using_refrigerator and not self._is_using_bookshelf and self.selected_tool ~= "default:bronzeblock" then
 		self:set_tool("default:bronzeblock")
 		self.selected_tool = "default:bronzeblock"
 		lf("traveller:on_step", "corrected tool to bronze block")
@@ -1459,4 +2128,6 @@ maidroid.register_core("traveller", {
 	doc = doc,
 })
 
+-- lrfurn:sofa
+-- default:bookshelf
 -- vim: ai:noet:ts=4:sw=4:fdm=indent:syntax=lua

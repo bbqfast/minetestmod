@@ -153,7 +153,7 @@ local function place_path_markers(self, path)
 end
 
 -- Function to place destination marker
-local function place_destination_marker(self, destination)
+local function place_destination_marker(destination)
 	if not destination then return end
 	
 	-- Check what's at the destination position
@@ -169,8 +169,8 @@ local function place_destination_marker(self, destination)
 	end
 	
 	local current_node = minetest.get_node(place_pos)
-	-- Only place if the position is not protected and current node is air
-	if current_node.name == "air" and not minetest.is_protected(place_pos, self.owner) then
+	-- Only place if current node is air
+	if current_node.name == "air" then
 		-- Place marker with yellow color (param2 value for yellow in unifieddyes)
 		minetest.set_node(place_pos, { name = "maidroid:destination_marker", param2 = 240 })
 		lf("path", "Placed destination marker at " .. minetest.pos_to_string(place_pos))
@@ -249,7 +249,7 @@ to_follow_path = function(self, path, destination, finalize, action)
 	place_path_markers(self, path)
 	
 	-- Place destination marker
-	place_destination_marker(self, destination)
+	place_destination_marker(destination)
     
 	self.state = maidroid.states.PATH
 	self.path = path
