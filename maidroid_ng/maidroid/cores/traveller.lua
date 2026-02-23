@@ -1388,6 +1388,55 @@ local function use_bookshelf(droid, pos)
 			if droid and droid.object then
 				lf("traveller:bookshelf_timer", "droid and object valid, clearing bookshelf flag")
 				
+				-- Put the book back into the bookshelf
+				local droid_inv = droid:get_inventory()
+				if droid_inv then
+					local main_list = droid_inv:get_list("main")
+					if main_list then
+						-- Find the book in maidroid's inventory (search backwards for most recent)
+						for i = #main_list, 1, -1 do
+							local stack = main_list[i]
+							if not stack:is_empty() and (stack:get_name() == "default:book" or stack:get_name() == "default:book_written") then
+								-- Get bookshelf inventory
+								local bookshelf_meta = minetest.get_meta(pos)
+								local bookshelf_inv = bookshelf_meta:get_inventory()
+								
+								if bookshelf_inv then
+									-- Try to put book back in books inventory first
+									local books_list = bookshelf_inv:get_list("books")
+									if books_list then
+										-- Find empty slot in books inventory
+										for slot_idx = 1, #books_list do
+											if books_list[slot_idx]:is_empty() then
+												bookshelf_inv:set_stack("books", slot_idx, stack)
+												droid_inv:set_stack("main", i, ItemStack(""))
+												lf("traveller:bookshelf_timer", "Returned book to bookshelf books inventory at slot " .. slot_idx)
+												break
+											end
+										end
+									end
+									
+									-- If books inventory is full, try main inventory
+									if not books_list or #books_list == 0 then
+										local main_bookshelf_list = bookshelf_inv:get_list("main")
+										if main_bookshelf_list then
+											for slot_idx = 1, #main_bookshelf_list do
+												if main_bookshelf_list[slot_idx]:is_empty() then
+													bookshelf_inv:set_stack("main", slot_idx, stack)
+													droid_inv:set_stack("main", i, ItemStack(""))
+													lf("traveller:bookshelf_timer", "Returned book to bookshelf main inventory at slot " .. slot_idx)
+													break
+												end
+											end
+										end
+									end
+								end
+								break
+							end
+						end
+					end
+				end
+				
 				-- Clear the bookshelf flag FIRST to allow normal movement
 				droid._is_using_bookshelf = false
 				
