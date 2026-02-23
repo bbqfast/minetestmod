@@ -1212,46 +1212,7 @@ local function use_bookshelf(droid, pos)
 			inventory_name = selected_data.inventory_name
 			lf("traveller", "Selected random book from bookshelf: " .. selected_book:get_name() .. " from slot " .. original_index .. " in " .. inventory_name)
 			
-			-- Transfer the FULL stack from bookshelf to maidroid
-			local droid_inv = droid:get_inventory()
-			lf("traveller", "Starting book transfer process")
-			lf("traveller", "Maidroid inventory available: " .. tostring(droid_inv ~= nil))
-			
-			if droid_inv then
-				-- Log book details before transfer
-				lf("traveller", "Book to transfer: " .. selected_book:get_name() .. " count: " .. selected_book:get_count())
-				lf("traveller", "Removing from inventory: " .. inventory_name .. " slot: " .. original_index)
-				
-				-- Remove book from bookshelf
-				local removed_successfully = bookshelf_inv:set_stack(inventory_name, original_index, ItemStack(""))
-				lf("traveller", "Book removal completed, success: " .. tostring(removed_successfully))
-				
-				-- Add full stack to maidroid inventory
-				local remaining_stack = droid_inv:add_item("main", selected_book)
-				lf("traveller", "Book addition completed, remaining stack: " .. tostring(remaining_stack:get_count()))
-				
-				if remaining_stack:is_empty() then
-					lf("traveller", "Full book stack transferred successfully to maidroid")
-				else
-					lf("traveller", "Partial transfer - " .. remaining_stack:get_count() .. " items could not be added (inventory full?)")
-				end
-			else
-				lf("traveller", "ERROR: Failed to get maidroid inventory - transfer aborted")
-			end
-			
-			-- Update per-maidroid food_eaten_metrics (for books read)
-			if not droid._food_eaten_metrics then
-				droid._food_eaten_metrics = {}
-			end
-			local book_name = selected_book:get_name()
-			droid._food_eaten_metrics[book_name] = (droid._food_eaten_metrics[book_name] or 0) + 1
-			lf("book_metrics", "book_read updated: " .. book_name .. " = " .. droid._food_eaten_metrics[book_name])
-			
-			-- Set the selected book as the maidroid's tool (simulating holding it)
-			droid:set_tool(book_name)
-			droid.selected_tool = book_name
-			
-			-- Print reading message with book content preview
+			-- Read the book directly from bookshelf inventory without removing it
 			local function read_book_stack(stack)
 				lf("traveller", "read_book_stack: Starting function")
 				
@@ -1327,31 +1288,22 @@ local function use_bookshelf(droid, pos)
 				return result
 			end
 
-			-- Read the book from maidroid's inventory after transfer
-			local droid_inv = droid:get_inventory()
-			local book_stack = nil
+			-- Read the book directly from the bookshelf inventory
+			local book = read_book_stack(selected_book)
 			
-			-- Find the book in maidroid's main inventory (should be the last added item)
-			if droid_inv then
-				local main_list = droid_inv:get_list("main")
-				if main_list then
-					for i = #main_list, 1, -1 do  -- Search backwards to find the most recently added book
-						local stack = main_list[i]
-						if not stack:is_empty() and (stack:get_name() == "default:book" or stack:get_name() == "default:book_written") then
-							book_stack = stack
-							lf("traveller", "Found book in maidroid inventory at slot " .. i .. ": " .. stack:get_name())
-							break
-						end
-					end
-				end
-			end
-
-			local book = read_book_stack(book_stack or ItemStack(""))
 			if book then
 				local content_preview = book.text:sub(1, 10)
 				minetest.chat_send_all("Reading " .. book.title .. "..." .. content_preview .. "....")
 				lf("traveller", "Reading book: " .. book.title .. " (len=" .. #book.text .. ")")
 				lf("traveller", "Preview: " .. content_preview)
+				
+				-- Update per-maidroid food_eaten_metrics (for books read)
+				if not droid._food_eaten_metrics then
+					droid._food_eaten_metrics = {}
+				end
+				local book_name = selected_book:get_name()
+				droid._food_eaten_metrics[book_name] = (droid._food_eaten_metrics[book_name] or 0) + 1
+				lf("book_metrics", "book_read updated: " .. book_name .. " = " .. droid._food_eaten_metrics[book_name])
 			else
 				minetest.chat_send_all("Reading unknown book...")
 				lf("traveller", "Could not read book metadata properly")
@@ -1387,55 +1339,6 @@ local function use_bookshelf(droid, pos)
 			
 			if droid and droid.object then
 				lf("traveller:bookshelf_timer", "droid and object valid, clearing bookshelf flag")
-				
-				-- Put the book back into the bookshelf
-				local droid_inv = droid:get_inventory()
-				if droid_inv then
-					local main_list = droid_inv:get_list("main")
-					if main_list then
-						-- Find the book in maidroid's inventory (search backwards for most recent)
-						for i = #main_list, 1, -1 do
-							local stack = main_list[i]
-							if not stack:is_empty() and (stack:get_name() == "default:book" or stack:get_name() == "default:book_written") then
-								-- Get bookshelf inventory
-								local bookshelf_meta = minetest.get_meta(pos)
-								local bookshelf_inv = bookshelf_meta:get_inventory()
-								
-								if bookshelf_inv then
-									-- Try to put book back in books inventory first
-									local books_list = bookshelf_inv:get_list("books")
-									if books_list then
-										-- Find empty slot in books inventory
-										for slot_idx = 1, #books_list do
-											if books_list[slot_idx]:is_empty() then
-												bookshelf_inv:set_stack("books", slot_idx, stack)
-												droid_inv:set_stack("main", i, ItemStack(""))
-												lf("traveller:bookshelf_timer", "Returned book to bookshelf books inventory at slot " .. slot_idx)
-												break
-											end
-										end
-									end
-									
-									-- If books inventory is full, try main inventory
-									if not books_list or #books_list == 0 then
-										local main_bookshelf_list = bookshelf_inv:get_list("main")
-										if main_bookshelf_list then
-											for slot_idx = 1, #main_bookshelf_list do
-												if main_bookshelf_list[slot_idx]:is_empty() then
-													bookshelf_inv:set_stack("main", slot_idx, stack)
-													droid_inv:set_stack("main", i, ItemStack(""))
-													lf("traveller:bookshelf_timer", "Returned book to bookshelf main inventory at slot " .. slot_idx)
-													break
-												end
-											end
-										end
-									end
-								end
-								break
-							end
-						end
-					end
-				end
 				
 				-- Clear the bookshelf flag FIRST to allow normal movement
 				droid._is_using_bookshelf = false
