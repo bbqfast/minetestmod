@@ -1115,6 +1115,26 @@ local function use_refrigerator(droid, pos)
 	return false
 end
 
+-- Helper function to collect books from a specific inventory
+local function collect_books_from_inventory(bookshelf_inv, inventory_name, valid_books)
+	local book_list = bookshelf_inv:get_list(inventory_name)
+	lf("traveller", "Checking '" .. inventory_name .. "' inventory, list available: " .. tostring(book_list ~= nil))
+	if book_list then
+		lf("traveller", inventory_name .. " inventory size: " .. #book_list)
+		for i, stack in ipairs(book_list) do
+			if not stack:is_empty() then
+				-- Check if it's a proper MTG book type
+				local item_name = stack:get_name()
+				lf("traveller", "Slot " .. i .. ": " .. item_name .. " count: " .. stack:get_count())
+				if item_name == "default:book" or item_name == "default:book_written" then
+					table.insert(valid_books, {stack = stack, index = i, inventory_name = inventory_name})
+					lf("traveller", "Added book from '" .. inventory_name .. "' inventory: " .. item_name)
+				end
+			end
+		end
+	end
+end
+
 -- Function to get random book from bookshelf and hold it
 -- ,,book4
 local function use_bookshelf(droid, pos)
@@ -1158,133 +1178,56 @@ local function use_bookshelf(droid, pos)
 		lf("traveller", "Starting book collection from bookshelf at " .. minetest.pos_to_string(pos))
 		
 		-- First try books inventory
-		local book_list = bookshelf_inv:get_list("books")
-		lf("traveller", "Checking 'books' inventory, list available: " .. tostring(book_list ~= nil))
-		if book_list then
-			lf("traveller", "Books inventory size: " .. #book_list)
-			for i, stack in ipairs(book_list) do
-				if not stack:is_empty() then
-					-- Check if it's a proper MTG book type
-					local item_name = stack:get_name()
-					lf("traveller", "Slot " .. i .. ": " .. item_name .. " count: " .. stack:get_count())
-					if item_name == "default:book" or item_name == "default:book_written" then
-						table.insert(valid_books, {stack = stack, index = i, inventory_name = "books"})
-						lf("traveller", "Added book from 'books' inventory: " .. item_name)
-					end
-				end
-			end
-		end
-		
-		-- If no books found in books inventory, try main inventory
-		if #valid_books == 0 then
-			lf("traveller", "No books found in 'books' inventory, trying 'main' inventory")
-			current_inventory = "main"
-			book_list = bookshelf_inv:get_list("main")
-			lf("traveller", "Checking 'main' inventory, list available: " .. tostring(book_list ~= nil))
-			if book_list then
-				lf("traveller", "Main inventory size: " .. #book_list)
-				for i, stack in ipairs(book_list) do
-					if not stack:is_empty() then
-						-- Check if it's a proper MTG book type
-						local item_name = stack:get_name()
-						lf("traveller", "Slot " .. i .. ": " .. item_name .. " count: " .. stack:get_count())
-						if item_name == "default:book" or item_name == "default:book_written" then
-							table.insert(valid_books, {stack = stack, index = i, inventory_name = "main"})
-							lf("traveller", "Added book from 'main' inventory: " .. item_name)
-						end
-					end
-				end
-			end
-		end
+		collect_books_from_inventory(bookshelf_inv, "books", valid_books)
 		
 		lf("traveller", "Book collection completed, found " .. #valid_books .. " valid books")
 		
 		-- Pick a random book if available
 		local selected_book = nil
-		local original_index = nil
-		local inventory_name = nil
 		
 		if #valid_books > 0 then
 			local random_index = math.random(#valid_books)
 			local selected_data = valid_books[random_index]
 			selected_book = selected_data.stack
-			original_index = selected_data.index
-			inventory_name = selected_data.inventory_name
-			lf("traveller", "Selected random book from bookshelf: " .. selected_book:get_name() .. " from slot " .. original_index .. " in " .. inventory_name)
 			
 			-- Read the book directly from bookshelf inventory without removing it
+            -- ,,read
 			local function read_book_stack(stack)
-				lf("traveller", "read_book_stack: Starting function")
-				
 				if stack:is_empty() then 
-					lf("traveller", "read_book_stack: Stack is empty, returning nil")
 					return nil 
 				end
 
 				local name = stack:get_name()
-				lf("traveller", "read_book_stack: Stack name: " .. name)
 				
 				-- Books in MTG are usually default:book or default:book_written
 				if name ~= "default:book" and name ~= "default:book_written" then
-					lf("traveller", "read_book_stack: Not a valid MTG book type, returning nil")
 					return nil
 				end
-				
-				lf("traveller", "read_book_stack: Valid book type detected: " .. name)
 
 				local meta  = stack:get_meta()
 				local title = meta:get_string("title") -- "" if none
 				local text  = meta:get_string("text")  -- "" if none
 				
-				-- Dump all metadata for debugging
-				lf("traveller", "read_book_stack: Dumping all metadata fields:")
-				local meta_table = meta:to_table()
-				if meta_table and meta_table.fields then
-					for key, value in pairs(meta_table.fields) do
-						lf("traveller", "read_book_stack:   [" .. key .. "] = '" .. value .. "' (len=" .. #value .. ")")
-					end
-				else
-					lf("traveller", "read_book_stack:   No metadata fields found or metadata is nil")
-				end
-				
 				-- Check if metadata is stored as serialized data (common in some book mods)
 				local default_data = meta:get_string("")
 				if default_data and default_data ~= "" and default_data:find("return") then
-					lf("traveller", "read_book_stack: Found serialized book data, attempting to parse")
-					lf("traveller", "read_book_stack: Serialized data: " .. default_data)
-					
 					-- Try to parse the serialized data
 					local success, book_func = pcall(loadstring, default_data)
 					if success and book_func then
-						lf("traveller", "read_book_stack: Successfully loaded serialized function")
 						local book_data = book_func()
 						if book_data then
-							lf("traveller", "read_book_stack: Successfully executed function and got data")
 							title = book_data.title or ""
 							text = book_data.text or ""
-							lf("traveller", "read_book_stack: Parsed title: '" .. title .. "'")
-							lf("traveller", "read_book_stack: Parsed text length: " .. #text)
-						else
-							lf("traveller", "read_book_stack: Function executed but returned nil data")
 						end
-					else
-						lf("traveller", "read_book_stack: Failed to load serialized data: " .. tostring(book_func))
 					end
 				end
-				
-				lf("traveller", "read_book_stack: Final title extracted: '" .. title .. "'")
-				lf("traveller", "read_book_stack: Final text length: " .. #text)
 
 				-- Fallback title if missing
 				if title == "" then
 					title = (name == "default:book_written") and "(Untitled Book)" or "(Blank Book)"
-					lf("traveller", "read_book_stack: Using fallback title: " .. title)
-				else
-					lf("traveller", "read_book_stack: Using original title: " .. title)
 				end
 
 				local result = { name = name, title = title, text = text }
-				lf("traveller", "read_book_stack: Returning book data: name=" .. result.name .. " title=" .. result.title .. " text_len=" .. #result.text)
 				return result
 			end
 
