@@ -265,6 +265,24 @@ local function get_standable_pos_around(pos)
     return candidates
 end
 
+-- Function to get front position or random standable position around
+-- Takes a pos, a front pos, if front pos is nil, call get_standable_pos_around, return one of the list
+-- ,,front
+local function get_front_or_around(pos, front_pos)
+    lf("DEBUG traveller:get_front_or_around", "get_front_or_around: pos=" .. minetest.pos_to_string(pos) .. " front_pos=" .. (front_pos and minetest.pos_to_string(front_pos) or "nil"))
+    if front_pos then
+        return front_pos
+    else
+        local candidates = get_standable_pos_around(pos)
+        if #candidates > 0 then
+            local random_index = math.random(#candidates)
+            return candidates[random_index]
+        else
+            return nil
+        end
+    end
+end
+
 -- Function to get the shortest path by checking multiple standable positions around target
 -- ,,shortest_path
 local function get_shortest_path(target_pos, player_pos)
@@ -751,82 +769,82 @@ end
 
 -- ,,fri4
 -- Function to get the position in front of a refrigerator based on its orientation
-local function get_refrigerator_front(refrigerator_pos)
-	-- Get refrigerator node and its orientation
-	local refrigerator_node = minetest.get_node(refrigerator_pos)
-	local refrigerator_param2 = refrigerator_node.param2 or 0
+-- local function get_refrigerator_front(refrigerator_pos)
+-- 	-- Get refrigerator node and its orientation
+-- 	local refrigerator_node = minetest.get_node(refrigerator_pos)
+-- 	local refrigerator_param2 = refrigerator_node.param2 or 0
 	
-	-- Calculate offset based on refrigerator's facing direction
-	-- param2 values: 0=north, 1=east, 2=south, 3=west (90-degree rotations)
-	local offset = {x=0, y=0, z=0}
-	if refrigerator_param2 == 0 then
-		-- Facing north, front is at negative Z (behind refrigerator)
-		offset.z = -1
-	elseif refrigerator_param2 == 1 then
-		-- Facing east, front is at negative X (behind refrigerator)
-		offset.x = -1
-	elseif refrigerator_param2 == 2 then
-		-- Facing south, front is at positive Z (behind refrigerator)
-		offset.z = 1
-	elseif refrigerator_param2 == 3 then
-		-- Facing west, front is at positive X (behind refrigerator)
-		offset.x = 1
-	end
+-- 	-- Calculate offset based on refrigerator's facing direction
+-- 	-- param2 values: 0=north, 1=east, 2=south, 3=west (90-degree rotations)
+-- 	local offset = {x=0, y=0, z=0}
+-- 	if refrigerator_param2 == 0 then
+-- 		-- Facing north, front is at negative Z (behind refrigerator)
+-- 		offset.z = -1
+-- 	elseif refrigerator_param2 == 1 then
+-- 		-- Facing east, front is at negative X (behind refrigerator)
+-- 		offset.x = -1
+-- 	elseif refrigerator_param2 == 2 then
+-- 		-- Facing south, front is at positive Z (behind refrigerator)
+-- 		offset.z = 1
+-- 	elseif refrigerator_param2 == 3 then
+-- 		-- Facing west, front is at positive X (behind refrigerator)
+-- 		offset.x = 1
+-- 	end
 	
-	-- Calculate and return the position in front of refrigerator
-	return vector.add(refrigerator_pos, offset)
-end
+-- 	-- Calculate and return the position in front of refrigerator
+-- 	return vector.add(refrigerator_pos, offset)
+-- end
 
 -- ,,book3
--- Function to get the position in front of a bookshelf based on its orientation
-local function get_bookshelf_front(bookshelf_pos)
-	-- Get bookshelf node and its orientation
-	local bookshelf_node = minetest.get_node(bookshelf_pos)
-	local bookshelf_param2 = bookshelf_node.param2 or 0
+-- -- Function to get the position in front of a bookshelf based on its orientation
+-- local function get_bookshelf_front(bookshelf_pos)
+-- 	-- Get bookshelf node and its orientation
+-- 	local bookshelf_node = minetest.get_node(bookshelf_pos)
+-- 	local bookshelf_param2 = bookshelf_node.param2 or 0
 	
-	-- Debug logging to check what we're actually detecting
-	lf("traveller:get_bookshelf_front", "Bookshelf node name: " .. (bookshelf_node.name or "unknown"))
-	lf("traveller:get_bookshelf_front", "Bookshelf param2 value: " .. bookshelf_param2)
-	lf("traveller:get_bookshelf_front", "Bookshelf position: " .. minetest.pos_to_string(bookshelf_pos))
+-- 	-- Debug logging to check what we're actually detecting
+-- 	lf("traveller:get_bookshelf_front", "Bookshelf node name: " .. (bookshelf_node.name or "unknown"))
+-- 	lf("traveller:get_bookshelf_front", "Bookshelf param2 value: " .. bookshelf_param2)
+-- 	lf("traveller:get_bookshelf_front", "Bookshelf position: " .. minetest.pos_to_string(bookshelf_pos))
 	
-	-- Calculate offset based on bookshelf's facing direction (-90 degree rotation)
-	-- param2 values: 0=north, 1=east, 2=south, 3=west (90-degree rotations)
-	-- Rotated -90 degrees: north→west, east→north, south→east, west→south
-	local offset = {x=0, y=0, z=0}
-	local locked_orientation = nil
+-- 	-- Calculate offset based on bookshelf's facing direction (-90 degree rotation)
+-- 	-- param2 values: 0=north, 1=east, 2=south, 3=west (90-degree rotations)
+-- 	-- Rotated -90 degrees: north→west, east→north, south→east, west→south
+-- 	local offset = {x=0, y=0, z=0}
+-- 	local locked_orientation = nil
 	
-	if bookshelf_param2 == 0 then
-		-- Facing north, rotated -90°, front is at negative X (west)
-		offset.x = -1
-		locked_orientation = "north→west"
-	elseif bookshelf_param2 == 1 then
-		-- Facing east, rotated -90°, front is at negative Z (north)
-		offset.z = -1
-		locked_orientation = "east→north"
-	elseif bookshelf_param2 == 2 then
-		-- Facing south, rotated -90°, front is at positive X (east)
-		offset.x = 1
-		locked_orientation = "south→east"
-	elseif bookshelf_param2 == 3 then
-		-- Facing west, rotated -90°, front is at positive Z (south)
-		offset.z = 1
-		locked_orientation = "west→south"
-	else
-		-- Handle unexpected param2 values
-		lf("traveller:get_bookshelf_front", "Unexpected param2 value: " .. bookshelf_param2)
-		locked_orientation = "unknown"
-	end
+-- 	if bookshelf_param2 == 0 then
+-- 		-- Facing north, rotated -90°, front is at negative X (west)
+-- 		offset.x = -1
+-- 		locked_orientation = "north→west"
+-- 	elseif bookshelf_param2 == 1 then
+-- 		-- Facing east, rotated -90°, front is at negative Z (north)
+-- 		offset.z = -1
+-- 		locked_orientation = "east→north"
+-- 	elseif bookshelf_param2 == 2 then
+-- 		-- Facing south, rotated -90°, front is at positive X (east)
+-- 		offset.x = 1
+-- 		locked_orientation = "south→east"
+-- 	elseif bookshelf_param2 == 3 then
+-- 		-- Facing west, rotated -90°, front is at positive Z (south)
+-- 		offset.z = 1
+-- 		locked_orientation = "west→south"
+-- 	else
+-- 		-- Handle unexpected param2 values
+-- 		lf("traveller:get_bookshelf_front", "Unexpected param2 value: " .. bookshelf_param2)
+-- 		locked_orientation = "unknown"
+-- 	end
 	
-	-- Log locked orientation for debugging
-	lf("traveller:get_bookshelf_front", "Bookshelf orientation locked: " .. (locked_orientation or "unknown") .. 
-	   " (param2=" .. bookshelf_param2 .. ")")
+-- 	-- Log locked orientation for debugging
+-- 	lf("traveller:get_bookshelf_front", "Bookshelf orientation locked: " .. (locked_orientation or "unknown") .. 
+-- 	   " (param2=" .. bookshelf_param2 .. ")")
 	
-	-- Calculate and return the position in front of bookshelf
-	local target_pos = vector.add(bookshelf_pos, offset)
-	lf("traveller:get_bookshelf_front", "Bookshelf front position: " .. minetest.pos_to_string(target_pos))
+-- 	-- Calculate and return the position in front of bookshelf
+-- 	local target_pos = vector.add(bookshelf_pos, offset)
+-- 	lf("traveller:get_bookshelf_front", "Bookshelf front position: " .. minetest.pos_to_string(target_pos))
 	
-	return target_pos
-end
+-- 	return target_pos
+-- end
 
 -- Function to check and highlight positions in all four cardinal directions
 -- ,,check1,,chk
@@ -933,6 +951,7 @@ local function teleport_to_refrigerator_position(droid)
 	-- Calculate teleport position in front of refrigerator based on its orientation
 	-- local teleport_pos = get_refrigerator_front(refrigerator_pos)
 	local teleport_pos = droid._refrigerator_front
+	local teleport_pos = get_front_or_around(refrigerator_pos, droid._refrigerator_front)
 	lf("traveller", "Teleport position: " .. minetest.pos_to_string(teleport_pos))
 	
 	-- Perform teleport
@@ -963,6 +982,7 @@ local function teleport_to_bookshelf_position(droid)
 	-- Calculate teleport position in front of bookshelf based on its orientation
 	-- local teleport_pos = get_refrigerator_front(bookshelf_pos)
 	local teleport_pos = droid._bookshelf_front
+    local teleport_pos = get_front_or_around(bookshelf_pos, droid._bookshelf_fronttor_front)
 	lf("traveller", "Teleport position: " .. minetest.pos_to_string(teleport_pos))
 	
 	-- Perform teleport
@@ -977,7 +997,7 @@ local function teleport_to_bookshelf_position(droid)
 	return true
 end
 
--- ref3
+-- ,,fri3
 -- Function to get random item from refrigerator and hold it
 local function use_refrigerator(droid, pos)
     pos = droid._refrigerator_pos 
@@ -1240,13 +1260,12 @@ local function use_bookshelf(droid, pos)
 				lf("traveller", "Reading book: " .. book.title .. " (len=" .. #book.text .. ")")
 				lf("traveller", "Preview: " .. content_preview)
 				
-				-- Update per-maidroid food_eaten_metrics (for books read)
-				if not droid._food_eaten_metrics then
-					droid._food_eaten_metrics = {}
+				-- Update per-maidroid action_taken_metrics (for books read)
+				if not droid._action_taken_metrics then
+					droid._action_taken_metrics = {}
 				end
-				local book_name = selected_book:get_name()
-				droid._food_eaten_metrics[book_name] = (droid._food_eaten_metrics[book_name] or 0) + 1
-				lf("book_metrics", "book_read updated: " .. book_name .. " = " .. droid._food_eaten_metrics[book_name])
+				droid._action_taken_metrics["books_read"] = (droid._action_taken_metrics["books_read"] or 0) + 1
+				lf("action_metrics", "books_read called: " .. droid._action_taken_metrics["books_read"])
 			else
 				minetest.chat_send_all("Reading unknown book...")
 				lf("traveller", "Could not read book metadata properly")
@@ -1449,7 +1468,7 @@ local function find_and_use_toilet(self)
 end
 
 -- Function to find path to refrigerator and use it
--- ,,ref1
+-- ,,fri1
 local function find_and_use_refrigerator(self)
 	lf("traveller:find_and_use_refrigerator", "Starting refrigerator search")
 	local pos = self:get_pos()
@@ -1468,38 +1487,25 @@ local function find_and_use_refrigerator(self)
 	lf("traveller", "Found refrigerator at " .. minetest.pos_to_string(refrigerator_pos))
 	lf("traveller:find_and_use_refrigerator", "Checking if refrigerator location is safe")
 	
-
-    	-- Calculate target position in front of refrigerator based on its orientation
-	local target_pos = get_refrigerator_front(refrigerator_pos)
-	self._refrigerator_front = target_pos
-	lf("traveller", "Target position in front of refrigerator: " .. minetest.pos_to_string(target_pos))
-
+    -- Calculate distance to refrigerator
+    local distance = vector.distance(pos, refrigerator_pos)
+    lf("traveller:find_and_use_refrigerator", "Distance to refrigerator: " .. string.format("%.2f", distance))
     
-	-- Check if destination is safe
-	if not is_destination_safe(self, refrigerator_pos) then
-		lf("traveller", "Refrigerator location is not safe")
-		return false
-	end
-	
-	-- Calculate distance to refrigerator
-	local distance = vector.distance(pos, refrigerator_pos)
-	lf("traveller:find_and_use_refrigerator", "Distance to refrigerator: " .. string.format("%.2f", distance))
-	
-	-- If already close to refrigerator, use it
-	if distance < 3 then
-		lf("traveller", "Already near refrigerator, using it")
-		lf("traveller:find_and_use_refrigerator", "Calling use_refrigerator directly")
-		return use_refrigerator(self, refrigerator_pos)
-	end
-	
-	-- Find path to refrigerator
-	lf("traveller", "Finding path to refrigerator from " .. minetest.pos_to_string(pos) .. " to " .. minetest.pos_to_string(refrigerator_pos))
-	lf("traveller:find_and_use_refrigerator", "Using A* pathfinding with parameters: 8, 1, 1")
-	local path = minetest.find_path(pos, target_pos, 8, 1, 1, "A*")
+    -- If already close to refrigerator, use it
+    if distance < 3 then
+        lf("traveller", "Already near refrigerator, using it")
+        lf("traveller:find_and_use_refrigerator", "Calling use_refrigerator directly")
+        return use_refrigerator(self, refrigerator_pos)
+    end    
+
+    	-- Find shortest path to refrigerator using standable positions
+	lf("traveller:find_and_use_refrigerator", "Finding shortest path to refrigerator from " .. minetest.pos_to_string(pos) .. " to " .. minetest.pos_to_string(refrigerator_pos))
+	local path, target_pos = get_shortest_path(refrigerator_pos, pos)
 	
 	if path ~= nil then
-		lf("traveller", "Path found to refrigerator with " .. #path .. " nodes")
+		lf("traveller", "Shortest path found to refrigerator with " .. #path .. " nodes to position " .. minetest.pos_to_string(target_pos))
 		lf("traveller:find_and_use_refrigerator", "Path found successfully, setting up movement")
+		self._refrigerator_front = target_pos
 		self:set_yaw({self:get_pos(), target_pos})
 		
 		-- Set up action to use refrigerator when arriving

@@ -138,14 +138,14 @@ local function place_path_markers(self, path)
 		if current_node.name == "air" and not minetest.is_protected(place_pos, self.owner) then
 			minetest.set_node(place_pos, { name = "maidroid:path_marker" })
 			table.insert(self.temp_node_positions, place_pos)
-			lf("path", "Placed temporary path marker at " .. minetest.pos_to_string(place_pos) .. " (path node: " .. path_node.name .. ")")
+			-- lf("path", "Placed temporary path marker at " .. minetest.pos_to_string(place_pos) .. " (path node: " .. path_node.name .. ")")
 			
 			-- Set up guaranteed removal timer for each node
 			minetest.after(2, function()
 				local node = minetest.get_node(place_pos)
 				if node.name == "maidroid:path_marker" then
 					minetest.set_node(place_pos, { name = "air" })
-					lf("path", "Timer-removed temporary path marker at " .. minetest.pos_to_string(place_pos))
+					-- lf("path", "Timer-removed temporary path marker at " .. minetest.pos_to_string(place_pos))
 				end
 			end)
 		end
@@ -173,14 +173,14 @@ local function place_destination_marker(destination)
 	if current_node.name == "air" then
 		-- Place marker with yellow color (param2 value for yellow in unifieddyes)
 		minetest.set_node(place_pos, { name = "maidroid:destination_marker", param2 = 240 })
-		lf("path", "Placed destination marker at " .. minetest.pos_to_string(place_pos))
+		-- lf("path", "Placed destination marker at " .. minetest.pos_to_string(place_pos))
 		
 		-- Set up guaranteed removal timer for destination marker (10 seconds)
 		minetest.after(2, function()
 			local node = minetest.get_node(place_pos)
 			if node.name == "maidroid:destination_marker" then
 				minetest.set_node(place_pos, { name = "air" })
-				lf("path", "Timer-removed destination marker at " .. minetest.pos_to_string(place_pos))
+				-- lf("path", "Timer-removed destination marker at " .. minetest.pos_to_string(place_pos))
 			end
 		end)
 	end

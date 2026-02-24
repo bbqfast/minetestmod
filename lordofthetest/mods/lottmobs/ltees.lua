@@ -991,6 +991,7 @@ minetest.register_on_leaveplayer(function(player)
     end
 end)
 
+-- ,,punch
 minetest.register_on_punchplayer(function(player, hitter, time_from_last_punch, tool_capabilities, dir, damage)
 	if not player or not player:is_player() then
         return
@@ -1008,19 +1009,21 @@ minetest.register_on_punchplayer(function(player, hitter, time_from_last_punch, 
 	if not player_pos then
 		return
 	end
-	-- Reposition the angel slightly *behind* the player based on look direction
-	local look_dir = player:get_look_dir() or {x = 0, y = 0, z = 1}
-	local follow_distance = 2
-	local vertical_factor = 2 -- stronger vertical compensation than horizontal
-	local target_pos = {
-		x = player_pos.x - look_dir.x * follow_distance,
-		y = player_pos.y - look_dir.y * follow_distance * vertical_factor,
-		z = player_pos.z - look_dir.z * follow_distance,
-	}
+	local npc_pos = npc:get_pos()
+	if not npc_pos then
+		return
+	end
+	-- Only teleport if distance is more than 2 blocks
+	local distance = vector.distance(player_pos, npc_pos)
+	if distance <= 2 then
+		return
+	end
+	-- Teleport the angel to the player's exact position
+	local target_pos = player_pos
 	npc:set_pos(target_pos)
 	lf("on_punchplayer", "Player " .. name .. " was hit by " .. (hitter and (hitter:is_player() and hitter:get_player_name() or (hitter:get_luaentity() and hitter:get_luaentity().name or "unknown entity")) or "unknown"))
     
-	lf("npc:on_punch:set_pos", "teleported behind player to: " .. minetest.pos_to_string(target_pos))
+	lf("npc:on_punch:set_pos", "teleported to player position: " .. minetest.pos_to_string(target_pos))
 	npc:set_velocity(vector.multiply(dir or {x = 0, y = 0, z = 1}, 2.5))
 	lua:set_animation("stand")
 end)
