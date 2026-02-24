@@ -156,9 +156,15 @@ Updates:
 - remove dup items from craftable and cookable
 - added reset to cooker desirable and cooklist
 - handle fridge empty, stop counting
+- traveller reward change
+- generic get front or around
+- fix ltee teleport
+
 - refac: move non ui func out of api
 - refac: move register core
 - refac: move state
+- refac: split cooker ui
+
 
 todo:
 - add drinking

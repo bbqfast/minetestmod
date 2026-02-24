@@ -402,7 +402,7 @@ local function teleport_to_shower_position(droid)
 	-- -- Clear any current states and return to wander
 	-- droid.action = nil
 	-- droid.destination = nil
-	-- droid._is_showering = nil
+	-- droid._is_busy = nil
 	-- droid._is_sleeping = nil
 	
 	-- -- Set correct tool
@@ -465,13 +465,13 @@ local function turn_on_shower_head(droid, pos)
 			-- Set showering state and halt the maidroid
 			-- if droid then
             -- Check if already showering to prevent multiple shower calls
-            if droid._is_showering == true then
+            if droid._is_busy == true then
                 lf("traveller:turn_on_shower_head", "maidroid already showering, ignoring shower action")
                 return true
             end
             
             -- Set a flag to prevent on_step from reactivating movement
-            droid._is_showering = true
+            droid._is_busy = true
             
             -- Halt the maidroid while showering
             droid:halt()
@@ -496,7 +496,7 @@ local function turn_on_shower_head(droid, pos)
                     lf("traveller:shower_timer", "droid and object valid, clearing shower flag")
                     
                     -- Clear the shower flag FIRST to allow normal movement
-                    droid._is_showering = false
+                    droid._is_busy = false
                     droid._shower_pos = nil
                     
                     -- IMPORTANT: Clear the action state to prevent immediate re-showering
@@ -524,9 +524,9 @@ local function turn_on_shower_head(droid, pos)
 				-- minetest.after(12, function()
 				-- 	lf("DEBUG traveller:shower_timer", "backup shower turn-off timer triggered!")
 					
-				-- 	if droid and droid.object and droid._is_showering == true then
+				-- 	if droid and droid.object and droid._is_busy == true then
 				-- 		lf("DEBUG traveller:shower_timer", "backup: forcing shower turn-off")
-				-- 		droid._is_showering = false
+				-- 		droid._is_busy = false
 				-- 		droid.action = nil  -- Clear action state
 				-- 		homedecor.stop_particle_spawner(pos, "homedecor_shower")
 				-- 		lf("traveller", "Backup: Turned off shower head at " .. minetest.pos_to_string(pos))
@@ -549,15 +549,15 @@ local function turn_on_shower_head(droid, pos)
 	return false
 end
 
--- Function to check if maidroid is showering and handle shower state
-local function on_step_shower_check(droid, dtime, moveresult)
-	-- Check if maidroid is showering - if so, prevent all movement and processing
-	if droid._is_showering == true then
+-- Function to check if maidroid is busy and handle busy state
+local function on_step_busy_check(droid, dtime, moveresult)
+	-- Check if maidroid is busy - if so, prevent all movement and processing
+	if droid._is_busy == true then
 		-- Ensure velocity stays zero while showering
-		droid.object:set_velocity({x = 0, y = 0, z = 0})
-		-- Keep stand animation active while showering
-		local stand_anim = (maidroid and maidroid.animation and maidroid.animation.STAND) or "stand"
-		droid:set_animation(stand_anim, 0)
+		-- droid.object:set_velocity({x = 0, y = 0, z = 0})
+		-- -- Keep stand animation active while showering
+		-- local stand_anim = (maidroid and maidroid.animation and maidroid.animation.STAND) or "stand"
+		-- droid:set_animation(stand_anim, 0)
 		-- Skip all other processing while showering
 		return true -- Return true to indicate shower state is active
 	end
@@ -633,6 +633,7 @@ local function teleport_to_toilet_position(droid)
 	return true
 end
 
+-- ,,toi2
 -- Function to flush toilet at specific position
 local function flush_toilet(droid, pos)
     pos = droid._toilet_pos
@@ -647,13 +648,13 @@ local function flush_toilet(droid, pos)
 		teleport_to_toilet_position(droid)
 		
 		-- Check if already using toilet to prevent multiple toilet calls
-		if droid._is_using_toilet == true then
-			lf("traveller:flush_toilet", "maidroid already using toilet, ignoring toilet action")
-			return true
-		end
+		-- if droid._is_using_toilet == true then
+		-- 	lf("traveller:flush_toilet", "maidroid already using toilet, ignoring toilet action")
+		-- 	return true
+		-- end
 		
 		-- Set a flag to prevent on_step from reactivating movement
-		droid._is_using_toilet = true
+		droid._is_busy = true
 		
 		-- Halt the maidroid while using toilet
 		droid:halt()
@@ -695,7 +696,7 @@ local function flush_toilet(droid, pos)
 				lf("traveller:toilet_timer", "droid and object valid, clearing toilet flag")
 				
 				-- Clear the toilet flag FIRST to allow normal movement
-				droid._is_using_toilet = false
+				droid._is_busy = false
 				
 				-- IMPORTANT: Clear the action state to prevent immediate re-toilet
 				droid.action = nil
@@ -1016,13 +1017,13 @@ local function use_refrigerator(droid, pos)
 		teleport_to_refrigerator_position(droid)
 		
 		-- Check if already using refrigerator to prevent multiple refrigerator calls
-		if droid._is_using_refrigerator == true then
+		if droid._is_busy == true then
 			lf("traveller:use_refrigerator", "maidroid already using refrigerator, ignoring refrigerator action")
 			return true
 		end
 		
 		-- Set a flag to prevent on_step from reactivating movement
-		droid._is_using_refrigerator = true
+		droid._is_busy = true
 		
 		-- Halt the maidroid while using refrigerator
 		droid:halt()
@@ -1104,7 +1105,7 @@ local function use_refrigerator(droid, pos)
 				lf("traveller:refrigerator_timer", "droid and object valid, clearing refrigerator flag")
 				
 				-- Clear the refrigerator flag FIRST to allow normal movement
-				droid._is_using_refrigerator = false
+				droid._is_busy = false
 				
 				-- IMPORTANT: Clear the action state to prevent immediate re-refrigerator
 				droid.action = nil
@@ -1174,13 +1175,13 @@ local function use_bookshelf(droid, pos)
 		teleport_to_bookshelf_position(droid)
 		
 		-- Check if already using bookshelf to prevent multiple bookshelf calls
-		if droid._is_using_bookshelf == true then
+		if droid._is_busy == true then
 			lf("traveller:use_bookshelf", "maidroid already using bookshelf, ignoring bookshelf action")
 			return true
 		end
 		
 		-- Set a flag to prevent on_step from reactivating movement
-		droid._is_using_bookshelf = true
+		droid._is_busy = true
 		
 		-- Halt the maidroid while using bookshelf
 		droid:halt()
@@ -1303,7 +1304,7 @@ local function use_bookshelf(droid, pos)
 				lf("traveller:bookshelf_timer", "droid and object valid, clearing bookshelf flag")
 				
 				-- Clear the bookshelf flag FIRST to allow normal movement
-				droid._is_using_bookshelf = false
+				droid._is_busy = false
 				
 				-- IMPORTANT: Clear the action state to prevent immediate re-bookshelf
 				droid.action = nil
@@ -1675,17 +1676,17 @@ end
 -- ,,wand
 -- Wander state handler for traveller
 to_wander = function(self, from_caller)
-	lf("traveller:to_wander", "returning to wander from " .. tostring(from_caller))
+	lf("traveller:to_wander", "returning to wander self=" .. tostring(self) .. " from " .. tostring(from_caller))
 	-- Clear any current job-specific intent and delegate to the wander core,
 	-- similar to generic_cooker.lua's to_wander behavior.
 	self.destination = nil
 	self.action = nil
 	self._bed_target = nil
-	self._is_showering = nil  -- Clear showering state
+	self._is_busy = nil  -- Clear busy state
 	self._shower_pos = nil    -- Clear saved shower position
-	self._is_using_toilet = nil  -- Clear toilet state
+	-- self._is_using_toilet = nil  -- Clear toilet state
 	self._toilet_pos = nil      -- Clear saved toilet position
-	self._is_using_refrigerator = nil  -- Clear refrigerator state
+	-- self._is_using_refrigerator = nil  -- Clear refrigerator state
 	self._refrigerator_pos = nil      -- Clear saved refrigerator position
 	-- Set the correct tool for traveller
 	self:set_tool("default:bronzeblock")
@@ -1791,7 +1792,7 @@ local act = function(self)
 	end
 	
 	-- Return to wander after action completion (only if not showering, using toilet, using refrigerator, or using bookshelf)
-	if not self._is_showering and not self._is_using_toilet and not self._is_using_refrigerator and not self._is_using_bookshelf then
+	if not self._is_busy then
 	    to_wander(self, "traveller:act")
 	end
 end
@@ -1803,7 +1804,7 @@ task = function(self)
 	
 	-- Randomly pick one of five actions
 	local choice = math.random(5)
-    choice = 5
+    
 	lf("traveller:task", "CHOICE=" .. choice .. " selected")
 
 	if choice == 1 then
@@ -1915,25 +1916,25 @@ on_step = function(self, dtime, moveresult)
 		return -- Skip all other processing while sleeping
 	end
 	
-	-- Check if maidroid is showering - if so, prevent all movement and processing
-	if on_step_shower_check(self, accumulated_dtime, moveresult) then
-		return -- Skip all other processing while showering
+	-- Check if maidroid is busy - if so, prevent all movement and processing
+	if on_step_busy_check(self, accumulated_dtime, moveresult) then
+		return -- Skip all other processing while busy
 	end
 	
 	-- Check if maidroid is using toilet - if so, prevent all movement and processing
-	if on_step_toilet_check(self, accumulated_dtime, moveresult) then
-		return -- Skip all other processing while using toilet
-	end
+	-- if on_step_toilet_check(self, accumulated_dtime, moveresult) then
+	-- 	return -- Skip all other processing while using toilet
+	-- end
 	
 	-- Check if maidroid is using refrigerator - if so, prevent all movement and processing
-	if on_step_refrigerator_check(self, accumulated_dtime, moveresult) then
-		return -- Skip all other processing while using refrigerator
-	end
+	-- if on_step_refrigerator_check(self, accumulated_dtime, moveresult) then
+	-- 	return -- Skip all other processing while using refrigerator
+	-- end
 	
 	-- Check if maidroid is using bookshelf - if so, prevent all movement and processing
-	if on_step_bookshelf_check(self, accumulated_dtime, moveresult) then
-		return -- Skip all other processing while using bookshelf
-	end
+	-- if on_step_bookshelf_check(self, accumulated_dtime, moveresult) then
+	-- 	return -- Skip all other processing while using bookshelf
+	-- end
 	
 	-- Check distance from activation position and teleport back if too far
 	if check_distance_from_activation(self) then
@@ -1943,7 +1944,10 @@ on_step = function(self, dtime, moveresult)
     -- lf("DDEBUG on_step", "TIMER ON - dtime=" .. tostring(accumulated_dtime))
     
 	-- Ensure we have the correct tool (bronze block) when not sleeping, showering, using toilet, using refrigerator, or using bookshelf
-	if not self._is_sleeping and not self._is_showering and not self._is_using_toilet and not self._is_using_refrigerator and not self._is_using_bookshelf and self.selected_tool ~= "default:bronzeblock" then
+	-- if not self._is_sleeping and not self._is_busy and not self._is_using_toilet and not self._is_using_refrigerator and not self._is_using_bookshelf and self.selected_tool ~= "default:bronzeblock" then
+	-- if not self._is_sleeping and not self._is_busy and not self._is_using_refrigerator and not self._is_using_bookshelf and self.selected_tool ~= "default:bronzeblock" then
+        -- if not self._is_sleeping and not self._is_busy and not self._is_using_bookshelf and self.selected_tool ~= "default:bronzeblock" then
+        if not self._is_sleeping and not self._is_busy and  self.selected_tool ~= "default:bronzeblock" then
 		self:set_tool("default:bronzeblock")
 		self.selected_tool = "default:bronzeblock"
 		lf("traveller:on_step", "corrected tool to bronze block")

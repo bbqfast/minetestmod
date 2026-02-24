@@ -1076,9 +1076,15 @@ local change_direction = function(self, invert)
 		return
 	end
 
-	local distance = vector.distance(self:get_pos(), self.home)
+	local pos = self:get_pos()
+	if not pos then
+		minetest.log("error", "maidroid change_direction: self:get_pos() returned nil")
+		return
+	end
+
+	local distance = vector.distance(pos, self.home)
 	if not invert and distance > 12 then
-		direction = vector.subtract(self.home, self:get_pos())
+		direction = vector.subtract(self.home, pos)
 		-- TODO notice we need to launch path_finding
 		--if distance > 20 or direction.y > nnn then ret = true ?? endc
 		-- offset direction to home by percentage current direction
