@@ -724,49 +724,49 @@ local function flush_toilet(droid, pos)
 end
 
 -- Function to check if maidroid is using toilet and handle toilet state
-local function on_step_toilet_check(droid, dtime, moveresult)
-	-- Check if maidroid is using toilet - if so, prevent all movement and processing
-	if droid._is_using_toilet == true then
-		-- Ensure velocity stays zero while using toilet
-		droid.object:set_velocity({x = 0, y = 0, z = 0})
-		-- Keep sit animation active while using toilet
-		local sit_anim = (maidroid and maidroid.animation and maidroid.animation.SIT) or "sit"
-		droid:set_animation(sit_anim, 0)
-		-- Skip all other processing while using toilet
-		return true -- Return true to indicate toilet state is active
-	end
-	return false -- Return false to indicate not using toilet
-end
+-- local function on_step_toilet_check(droid, dtime, moveresult)
+-- 	-- Check if maidroid is using toilet - if so, prevent all movement and processing
+-- 	if droid._is_using_toilet == true then
+-- 		-- Ensure velocity stays zero while using toilet
+-- 		droid.object:set_velocity({x = 0, y = 0, z = 0})
+-- 		-- Keep sit animation active while using toilet
+-- 		local sit_anim = (maidroid and maidroid.animation and maidroid.animation.SIT) or "sit"
+-- 		droid:set_animation(sit_anim, 0)
+-- 		-- Skip all other processing while using toilet
+-- 		return true -- Return true to indicate toilet state is active
+-- 	end
+-- 	return false -- Return false to indicate not using toilet
+-- end
 
 -- Function to check if maidroid is using refrigerator and handle refrigerator state
-local function on_step_refrigerator_check(droid, dtime, moveresult)
-	-- Check if maidroid is using refrigerator - if so, prevent all movement and processing
-	if droid._is_using_refrigerator == true then
-		-- Ensure velocity stays zero while using refrigerator
-		droid.object:set_velocity({x = 0, y = 0, z = 0})
-		-- Keep mining animation active while using refrigerator (holding item)
-		local mine_anim = (maidroid and maidroid.animation and maidroid.animation.MINE) or "mine"
-		droid:set_animation(mine_anim, 0)
-		-- Skip all other processing while using refrigerator
-		return true -- Return true to indicate refrigerator state is active
-	end
-	return false -- Return false to indicate not using refrigerator
-end
+-- local function on_step_refrigerator_check(droid, dtime, moveresult)
+-- 	-- Check if maidroid is using refrigerator - if so, prevent all movement and processing
+-- 	if droid._is_using_refrigerator == true then
+-- 		-- Ensure velocity stays zero while using refrigerator
+-- 		droid.object:set_velocity({x = 0, y = 0, z = 0})
+-- 		-- Keep mining animation active while using refrigerator (holding item)
+-- 		local mine_anim = (maidroid and maidroid.animation and maidroid.animation.MINE) or "mine"
+-- 		droid:set_animation(mine_anim, 0)
+-- 		-- Skip all other processing while using refrigerator
+-- 		return true -- Return true to indicate refrigerator state is active
+-- 	end
+-- 	return false -- Return false to indicate not using refrigerator
+-- end
 
 -- Function to check if maidroid is using bookshelf and handle bookshelf state
-local function on_step_bookshelf_check(droid, dtime, moveresult)
-	-- Check if maidroid is using bookshelf - if so, prevent all movement and processing
-	if droid._is_using_bookshelf == true then
-		-- Ensure velocity stays zero while using bookshelf
-		droid.object:set_velocity({x = 0, y = 0, z = 0})
-		-- Keep mining animation active while using bookshelf (holding item)
-		local mine_anim = (maidroid and maidroid.animation and maidroid.animation.MINE) or "mine"
-		droid:set_animation(mine_anim, 0)
-		-- Skip all other processing while using bookshelf
-		return true -- Return true to indicate bookshelf state is active
-	end
-	return false -- Return false to indicate not using bookshelf
-end
+-- local function on_step_bookshelf_check(droid, dtime, moveresult)
+-- 	-- Check if maidroid is using bookshelf - if so, prevent all movement and processing
+-- 	if droid._is_using_bookshelf == true then
+-- 		-- Ensure velocity stays zero while using bookshelf
+-- 		droid.object:set_velocity({x = 0, y = 0, z = 0})
+-- 		-- Keep mining animation active while using bookshelf (holding item)
+-- 		local mine_anim = (maidroid and maidroid.animation and maidroid.animation.MINE) or "mine"
+-- 		droid:set_animation(mine_anim, 0)
+-- 		-- Skip all other processing while using bookshelf
+-- 		return true -- Return true to indicate bookshelf state is active
+-- 	end
+-- 	return false -- Return false to indicate not using bookshelf
+-- end
 
 -- ,,fri4
 -- Function to get the position in front of a refrigerator based on its orientation

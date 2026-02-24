@@ -153,6 +153,7 @@ local function place_path_markers(self, path)
 end
 
 -- Function to place destination marker
+-- ,,mark
 local function place_destination_marker(destination)
 	if not destination then return end
 	
@@ -176,7 +177,7 @@ local function place_destination_marker(destination)
 		-- lf("path", "Placed destination marker at " .. minetest.pos_to_string(place_pos))
 		
 		-- Set up guaranteed removal timer for destination marker (10 seconds)
-		minetest.after(2, function()
+		minetest.after(1, function()
 			local node = minetest.get_node(place_pos)
 			if node.name == "maidroid:destination_marker" then
 				minetest.set_node(place_pos, { name = "air" })

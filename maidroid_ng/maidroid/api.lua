@@ -17,6 +17,12 @@ maidroid.CRAFTABLE_ITEMS_PER_PAGE = 12
 -- Load cooker UI functions
 dofile(maidroid.modpath .. "/cores/cooker_ui.lua")
 
+-- Load traveller UI functions
+dofile(maidroid.modpath .. "/cores/traveller_ui.lua")
+
+-- Initialize traveller inventories table
+maidroid.traveller_inventories = {}
+
 -- Default craftable outputs for generic_cooker
 maidroid.init_craftable_outputs = {
     "farming:flour", "farming:flour_multigrain", "farming:bread_slice", "farming:toast_sandwich", "farming:garlic_clove", "farming:garlic", "farming:popcorn", "farming:cornstarch",
@@ -1784,58 +1790,6 @@ function maidroid.get_formspec(self, player, tab)
 	end
 end
 
--- Handle traveller tab logic
-function maidroid.handle_traveller_tab(self, form)
-	local pos = self:get_pos()
-	
-	-- Create metrics display
-	form = form .. "label[3,0;" .. S("Traveller Metrics") .. "]"
-		.. "box[3,0.5;8,6;black]"
-		.. "box[3.1,0.6;7.8,5.8;#343848]"
-	
-	-- Display accumulated points
-	local points = self._accumulated_points or 0
-	form = form .. "label[3.5,1;" .. S("Accumulated Points") .. ": " .. tostring(points) .. "]"
-	
-	-- Display action metrics
-	local y_pos = 2
-	form = form .. "label[3.5," .. y_pos .. ";" .. S("Actions Taken") .. ":]"
-	y_pos = y_pos + 0.5
-	
-	if self._action_taken_metrics and next(self._action_taken_metrics) ~= nil then
-		for action_name, count in pairs(self._action_taken_metrics) do
-			form = form .. "label[4," .. y_pos .. ";- " .. action_name .. ": " .. tostring(count) .. "]"
-			y_pos = y_pos + 0.5
-		end
-	else
-		form = form .. "label[4," .. y_pos .. ";- " .. S("No actions taken yet") .. "]"
-		y_pos = y_pos + 0.5
-	end
-	
-	-- Display food metrics
-	y_pos = y_pos + 0.5
-	form = form .. "label[3.5," .. y_pos .. ";" .. S("Food Eaten") .. ":]"
-	y_pos = y_pos + 0.5
-	
-	if self._food_eaten_metrics and next(self._food_eaten_metrics) ~= nil then
-		for food_name, count in pairs(self._food_eaten_metrics) do
-			-- Remove mod prefixes for cleaner display
-			local display_name = food_name:gsub("^[^:]+:", "")
-			form = form .. "label[4," .. y_pos .. ";- " .. display_name .. ": " .. tostring(count) .. "]"
-			y_pos = y_pos + 0.5
-		end
-	else
-		form = form .. "label[4," .. y_pos .. ";- " .. S("No food items eaten yet") .. "]"
-		y_pos = y_pos + 0.5
-	end
-	
-	-- Display position information
-	y_pos = y_pos + 0.5
-	form = form .. "label[3.5," .. y_pos .. ";" .. S("Current Position") .. ":]"
-		.. "label[4," .. (y_pos + 0.5) .. ";- " .. minetest.pos_to_string(pos) .. "]"
-	
-	return form
-end
 
 --- on_activate is a callback function that is called when the object is created or recreated.
 local function on_activate(self, staticdata)
@@ -2654,6 +2608,23 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 		droid._cooker_settings = settings
 		
 		minetest.chat_send_player(player_name, "Cooker settings updated")
+		return
+	end
+	
+	-- Handle traveller-specific buttons
+	if fields.toggle_traveller then
+		-- Toggle traveller state (pause/resume)
+		if droid.state == "pause" then
+			droid:set_state("normal")
+			minetest.chat_send_player(player_name, "Traveller resumed")
+		else
+			droid:set_state("pause")
+			minetest.chat_send_player(player_name, "Traveller paused")
+		end
+		-- Refresh the formspec
+		local current_tab = droid.current_tab or 1
+		minetest.show_formspec(player_name, "maidroid:gui",
+			maidroid.get_formspec(droid, player, current_tab))
 		return
 	end
 

@@ -166,6 +166,18 @@ Updates:
 - refac: split cooker ui
 
 
+for traveller tab
+create a detach inventory, refer to C:\Minetest\v5.6\mods\maidroid_ng\maidroid\cores\cooker_ui.lua
+do not mingle the create detached inventory logic with the main logic
+
+2 list
+rewardable
+3 slots (coal, steel, gold)
+reward_choice
+1 slot
+
+
+
 todo:
 - add drinking
 - new tab
