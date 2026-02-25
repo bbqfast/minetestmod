@@ -73,16 +73,46 @@ local function create_traveller_events(self, inventory_name)
 			if from_list == "rewardable" and to_list == "reward_choice" then
 				lf("DEBUG: create_traveller_events:traveller_inventory", "*** ITEM MOVED FROM REWARDABLE TO REWARD_CHOICE ***")
 				
+				-- Get the maidroid this inventory belongs to
+				local droid = self
+				lf("DEBUG: create_traveller_events:traveller_inventory", "*** DROID OBJECT ***: " .. tostring(droid))
+				
+				-- Update the selected reward based on the moved item
+				local traveller_inv = maidroid.traveller_inventories[self.traveller_inventory_id]
+				if traveller_inv then
+					local moved_stack = traveller_inv:get_stack(to_list, to_index)
+					lf("DEBUG: create_traveller_events:traveller_inventory", "*** MOVED STACK ***: " .. tostring(moved_stack))
+					if moved_stack and not moved_stack:is_empty() then
+						local item_name = moved_stack:get_name()
+						-- Use the set_selected_reward function instead of direct assignment
+						local success = maidroid.set_traveller_selected_reward(droid, item_name)
+						if success then
+							lf("DEBUG: create_traveller_events:traveller_inventory", "*** SELECTED REWARD UPDATED TO ***: " .. item_name)
+							lf("traveller_ui", "Reward choice updated to: " .. item_name)
+							
+							-- Send confirmation to player
+							if player and player:is_player() then
+								minetest.chat_send_player(player:get_player_name(), "Reward selection updated to: " .. item_name)
+							end
+						else
+							lf("DEBUG: create_traveller_events:traveller_inventory", "*** FAILED TO SET REWARD TO ***: " .. item_name)
+							if player and player:is_player() then
+								minetest.chat_send_player(player:get_player_name(), "Failed to set reward selection: " .. item_name)
+							end
+						end
+					else
+						lf("DEBUG: create_traveller_events:traveller_inventory", "*** MOVED STACK IS EMPTY OR NIL ***")
+					end
+				else
+					lf("DEBUG: create_traveller_events:traveller_inventory", "*** TRAVELLER INVENTORY NOT FOUND ***")
+				end
+				
 				-- Remove the item from reward_items tracking completely
 				if reward_items[from_index] then
 					local removed_item = reward_items[from_index].name
 					reward_items[from_index] = nil
 					lf("DEBUG: create_traveller_events:traveller_inventory", "*** REMOVED ITEM " .. removed_item .. " FROM REWARD_ITEMS AT SLOT " .. from_index .. " ***")
 				end
-				
-				-- Get the maidroid this inventory belongs to
-				local droid = self
-				lf("DEBUG: create_traveller_events:traveller_inventory", "*** DROID OBJECT ***: " .. tostring(droid))
 				
 				-- Refresh the UI AFTER inventory operations are complete
 				if player and player:is_player() then
@@ -94,6 +124,26 @@ local function create_traveller_events(self, inventory_name)
 			-- Handle moving from reward_choice to rewardable
 			elseif from_list == "reward_choice" and to_list == "rewardable" then
 				lf("DEBUG: create_traveller_events:traveller_inventory", "*** ITEM MOVED FROM REWARD_CHOICE TO REWARDABLE ***")
+				
+				-- Get the maidroid this inventory belongs to
+				local droid = self
+				
+				-- Clear the selected reward when moving back
+				local success = maidroid.set_traveller_selected_reward(droid, nil)
+				if success then
+					lf("DEBUG: create_traveller_events:traveller_inventory", "*** CLEARED SELECTED REWARD ***")
+					lf("traveller_ui", "Reward selection cleared")
+					
+					-- Send confirmation to player
+					if player and player:is_player() then
+						minetest.chat_send_player(player:get_player_name(), "Reward selection cleared - reverted to default")
+					end
+				else
+					lf("DEBUG: create_traveller_events:traveller_inventory", "*** FAILED TO CLEAR REWARD ***")
+					if player and player:is_player() then
+						minetest.chat_send_player(player:get_player_name(), "Failed to clear reward selection")
+					end
+				end
 				
 				-- Update availability tracking for the target slot
 				if reward_items[to_index] then
@@ -213,9 +263,13 @@ local function generate_traveller_form(self, form, traveller_inv, traveller_inv_
 		.. "listring[current_player;main]"
 		
 	-- Reward choice section
+	local current_reward = maidroid.get_traveller_selected_reward(self)
+	local reward_display = string.format("Current: %s", current_reward:gsub("default:", ""):gsub("_", " "))
+	
 	form = form
 		.. "label[0.5,2;" .. S("Reward Choice") .. "]"
 		.. "list[detached:" .. traveller_inv_id .. ";reward_choice;0.5,2.5;1,1;]"
+		.. "label[2,2.8;" .. minetest.colorize("#FFFF00", reward_display) .. "]"
 		.. "listring[detached:".. traveller_inv_id .. ";reward_choice]"
 		.. "listring[current_player;main]"
 		
@@ -261,6 +315,14 @@ function maidroid.get_available_reward_slots()
 		end
 	end
 	return available_slots
+end
+
+-- Utility function to get current reward selection
+function maidroid.get_current_reward_selection(droid)
+	if not droid then
+		return "default:gold_lump" -- Default fallback
+	end
+	return maidroid.get_traveller_selected_reward(droid)
 end
 
 -- Utility function to get reward item info by slot

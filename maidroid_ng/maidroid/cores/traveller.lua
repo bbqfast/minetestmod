@@ -204,6 +204,30 @@ local function check_and_award_rewards(self)
 	end
 end
 
+-- Function to set selected reward item
+local function set_selected_reward(self, reward_item)
+	if not reward_item then
+		lf("traveller", "set_selected_reward: reward_item is nil")
+		return false
+	end
+	
+	-- Validate that the reward item exists in REWARD_CONFIG
+	if not REWARD_CONFIG.rewards[reward_item] then
+		lf("traveller", "set_selected_reward: reward_item '" .. reward_item .. "' not found in REWARD_CONFIG")
+		return false
+	end
+	
+	-- Set the selected reward
+	self._selected_reward = reward_item
+	lf("traveller", "set_selected_reward: successfully set to " .. reward_item)
+	return true
+end
+
+-- Function to get selected reward item
+local function get_selected_reward(self)
+	return self._selected_reward or "default:gold_lump" -- Default fallback
+end
+
 -- Function to check distance from activation and teleport back if too far
 local function check_distance_from_activation(self)
 	local pos = self:get_pos()
@@ -2032,6 +2056,10 @@ maidroid.register_core("traveller", {
 	can_sell         = true,
 	doc = doc,
 })
+
+-- Expose traveller functions to maidroid namespace
+maidroid.set_traveller_selected_reward = set_selected_reward
+maidroid.get_traveller_selected_reward = get_selected_reward
 
 -- lrfurn:sofa
 -- default:bookshelf
