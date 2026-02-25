@@ -190,6 +190,33 @@ local function handle_rewardable_logic(self)
 			end
 		end
 		lf("DEBUG traveller_tab", "Initialized rewardable slots with default items")
+		
+		-- Register UI callback for traveller state updates
+        -- ,,x1
+		local ui_callback = function(callback_data)
+			lf("DEBUG traveller_ui", "Received UI callback: " .. callback_data.state_type)
+			-- Handle different state types
+			if callback_data.state_type == "action_started" then
+				lf("traveller_ui", "Action started: " .. tostring(callback_data.state_data.action_type))
+			elseif callback_data.state_type == "points_updated" then
+				lf("traveller_ui", "Points updated: +" .. callback_data.state_data.points_added .. " (Total: " .. callback_data.state_data.total_points .. ")")
+			elseif callback_data.state_type == "state_changed" then
+				lf("traveller_ui", "State changed to: " .. callback_data.state_data.new_state)
+			end
+			
+			-- Refresh UI after any state change
+			if callback_data.player and callback_data.droid then
+				local current_tab = callback_data.droid.current_tab or 3 -- Traveller tab
+				minetest.show_formspec(callback_data.player:get_player_name(), "maidroid:gui", maidroid.get_formspec(callback_data.droid, callback_data.player, current_tab))
+			end
+		end
+		
+		if maidroid.register_traveller_ui_callback then
+			maidroid.register_traveller_ui_callback(ui_callback)
+			lf("traveller_tab", "Registered UI callback for traveller state updates")
+		else
+			lf("traveller_tab", "Warning: register_traveller_ui_callback not available")
+		end
 	else
 		-- Ensure inventory exists and items are populated
 		local traveller_inv = maidroid.traveller_inventories[self.traveller_inventory_id]

@@ -131,6 +131,9 @@ separate the one that has summary from the ones that didn't
 
 
 ---------------------------
+only initialize reward item once from reward_init_items, 
+reward_items should use for tracking reward UI position availability of the detech inventory
+---------------------------
 ---------------------------
 ---------------------------
 
@@ -159,6 +162,8 @@ Updates:
 - traveller reward change
 - generic get front or around
 - fix ltee teleport
+- traveller UI, select reward
+- edible items tracking
 
 - refac: move non ui func out of api
 - refac: move register core

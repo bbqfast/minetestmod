@@ -66,6 +66,63 @@ local REWARD_CHECK_INTERVAL = 60
 local metrics_log_timer = 0
 local metrics_log_interval = 35 -- seconds
 
+-- UI callback system
+local ui_callback = nil
+
+-- Register UI callback function
+local function register_ui_callback(callback_func)
+	if type(callback_func) ~= "function" then
+		lf("traveller", "Failed to register UI callback: callback_func is not a function")
+		return false
+	end
+	
+	ui_callback = callback_func
+	lf("traveller", "Registered UI callback")
+	return true
+end
+
+-- Unregister UI callback function
+local function unregister_ui_callback()
+	if ui_callback then
+		ui_callback = nil
+		lf("traveller", "Unregistered UI callback")
+		return true
+	else
+		lf("traveller", "No UI callback to unregister")
+		return false
+	end
+end
+
+-- Notify UI callback of state update
+-- ,,notify
+local function notify_ui_callbacks(self, state_type, state_data)
+    lf("DEBUG traveller:notify_ui_callbacks", "enter: " .. state_type .. ", " .. tostring(state_data))
+	if not ui_callback then
+		return
+	end
+	
+	local maidroid_id = tostring(self:get_pos()) or "unknown"
+	
+	-- Try to get the player object from owner
+	local player = nil
+	if self.owner then
+		player = minetest.get_player_by_name(self.owner)
+	end
+	
+	local success, error_msg = pcall(ui_callback, {
+		maidroid_id = maidroid_id,
+		state_type = state_type,
+		state_data = state_data,
+		timestamp = os.time(),
+		player = player,
+		droid = self
+	})
+	
+	if not success then
+		lf("traveller", "UI callback error: " .. tostring(error_msg))
+	end
+end
+
 -- Point system functions
 local function initialize_points(self)
 	if not self._reward_accumulated_points then
@@ -80,9 +137,13 @@ local function initialize_points(self)
 	if not self._food_eaten_metrics then
 		self._food_eaten_metrics = {}
 	end
-	lf("traveller", "Initialized per-maidroid metrics")
+	if not self._food_kinds then
+		self._food_kinds = {}
+	end
+	lf("traveller", "Initialized per-maidroid metrics and food kinds")
 end
 
+-- ,,add
 local function add_points(self, action, points)
 	-- Apply reward multiplier
 	local multiplier = REWARD_MULTIPLIER or 1
@@ -94,6 +155,13 @@ local function add_points(self, action, points)
 		self._reward_accumulated_points = self._reward_accumulated_points + adjusted_points
 		lf("DEBUG traveller", string.format("Action '%s' completed: +%d points (base: %d, multiplier: %s) (Total: %d)", 
 			action, adjusted_points, points, tostring(multiplier), self._reward_accumulated_points))
+		
+		-- Notify UI callbacks of points update
+		notify_ui_callbacks(self, "points_updated", {
+			action = action,
+			points_added = adjusted_points,
+			total_points = self._reward_accumulated_points
+		})
 	else
 		lf("DEBUG traveller", "Warning: Point system not initialized for action '" .. action .. "'")
 	end
@@ -111,6 +179,116 @@ local function show_points(self)
 	minetest.chat_send_all(string.format("Traveller at %s has %d accumulated points", 
 		minetest.pos_to_string(pos), points))
 	lf("traveller", string.format("Points display requested: %d points", points))
+end
+
+-- Function to check if an item is edible based on item groups
+local function is_eatable(itemname)
+    local def = minetest.registered_items[itemname]
+    if not def then
+        return false
+    end
+    
+    -- Check for edible item groups
+    local groups = def.groups or {}
+    
+    -- Debug logging to see what groups are found
+    local group_list = {}
+    for group_name, value in pairs(groups) do
+        table.insert(group_list, group_name .. "=" .. value)
+    end
+    lf("DEBUG food_kinds_metrics", "Item " .. itemname .. " has groups: " .. table.concat(group_list, ", "))
+    
+    -- Check if any edible groups are present
+    -- Based on actual groups found in the items
+    return groups.farming ~= nil or 
+           groups.lottfarming ~= nil or 
+           groups.snacks ~= nil or
+           groups.eatable ~= nil or
+           groups.food_bread ~= nil or
+           groups.food_rice_bread ~= nil or
+           groups.meat ~= nil or
+           string.match(itemname, "meat") ~= nil -- Fallback for meat items
+end
+
+-- Function to track unique edible items found in refrigerator
+local function track_unique_food_items(droid, refrigerator_inv)
+	local unique_items = {}
+	local item_list = refrigerator_inv:get_list("main")
+	
+	-- Scan all slots and collect unique edible item names
+	for i, stack in ipairs(item_list) do
+		if not stack:is_empty() then
+			local item_name = stack:get_name()
+			-- Only track edible items
+			if is_eatable(item_name) then
+				unique_items[item_name] = true
+				lf("DEBUG food_kinds_metrics", "Found edible item: " .. item_name)
+			else
+				lf("DEBUG food_kinds_metrics", "Skipping non-edible item: " .. item_name)
+			end
+		end
+	end
+	
+	-- Update maidroid's unique edible item tracking
+	if not droid._food_kinds then
+		droid._food_kinds = {}
+	end
+	
+	-- Count unique edible items found
+	local unique_count = 0
+	for item_name, _ in pairs(unique_items) do
+		unique_count = unique_count + 1
+		droid._food_kinds[item_name] = true
+		lf("DEBUG food_kinds_metrics", "Unique edible item found in fridge: " .. item_name)
+	end
+	
+	lf("DEBUG food_kinds_metrics", string.format("Found %d unique edible items in refrigerator", unique_count))
+	return unique_count
+end
+
+-- Function to get unique edible items statistics
+local function get_food_kinds_stats(self)
+	if not self._food_kinds or next(self._food_kinds) == nil then
+		return {}
+	end
+	
+	local stats = {}
+	for item_name, _ in pairs(self._food_kinds) do
+		table.insert(stats, {name = item_name})
+	end
+	
+	-- Sort alphabetically for consistent display
+	table.sort(stats, function(a, b) 
+		return a.name < b.name 
+	end)
+	
+	return stats
+end
+
+-- Function to display unique edible items summary in chat
+local function show_food_summary(self)
+	local pos = self:get_pos()
+	local item_stats = get_food_kinds_stats(self)
+	
+	if #item_stats == 0 then
+		minetest.chat_send_all(string.format("Traveller at %s has not found any unique edible items", 
+			minetest.pos_to_string(pos)))
+		lf("traveller", "Edible item summary requested: no unique edible items found")
+		return
+	end
+	
+	-- Create summary message with unique count
+	local unique_count = #item_stats
+	local item_names = {}
+	for _, stat in ipairs(item_stats) do
+		table.insert(item_names, stat.name:gsub(".*:", "")) -- Remove mod prefixes
+	end
+	
+	local items_list = table.concat(item_names, ", ")
+	minetest.chat_send_all(string.format("Traveller at %s found %d unique edible items: %s", 
+		minetest.pos_to_string(pos), unique_count, items_list))
+	
+	lf("traveller", string.format("Edible item summary: %d unique items - %s", unique_count, items_list))
 end
 
 -- Function to log traveller metrics for a specific maidroid
@@ -147,6 +325,26 @@ local function log_traveller_metrics(self)
 			table.concat(food_parts, ", ")))
 	else
 		lf("food_metrics", string.format("Traveller - No food items eaten yet"))
+	end
+	
+	-- Log unique edible items metrics
+	if self._food_kinds and next(self._food_kinds) ~= nil then
+		local unique_items = {}
+		for item_name, _ in pairs(self._food_kinds) do
+			-- Remove mod prefixes for cleaner display
+			local clean_name = item_name:gsub(".*:", "")
+			table.insert(unique_items, clean_name)
+		end
+		
+		-- Sort alphabetically for consistent display
+		table.sort(unique_items)
+		
+		local unique_count = #unique_items
+		local items_list = table.concat(unique_items, ", ")
+		lf("food_kinds_metrics", string.format("Traveller - Unique Edible Items (%d): %s", 
+			unique_count, items_list))
+	else
+		lf("food_kinds_metrics", string.format("Traveller - No unique edible items found yet"))
 	end
 	
 	lf("traveller_metrics", "**************** End Traveller Metrics ****************")
@@ -1059,6 +1257,10 @@ local function use_refrigerator(droid, pos)
 		local refrigerator_meta = minetest.get_meta(pos)
 		local refrigerator_inv = refrigerator_meta:get_inventory()
 		
+		-- Track unique edible items found in refrigerator
+		local unique_count = track_unique_food_items(droid, refrigerator_inv)
+		lf("traveller", "Refrigerator contains " .. unique_count .. " unique edible items")
+		
 		-- Try to get a random item from refrigerator
 		local item_list = refrigerator_inv:get_list("main")
 		
@@ -1715,6 +1917,13 @@ to_wander = function(self, from_caller)
 	-- Set the correct tool for traveller
 	self:set_tool("default:bronzeblock")
 	lf("traveller:to_wander", "setting state to WANDER")
+	
+	-- Notify UI callbacks of returning to wander
+	notify_ui_callbacks(self, "state_changed", {
+		new_state = "wander",
+		from_caller = from_caller or "traveller:to_wander"
+	})
+	
 	wander.to_wander(self, from_caller or "traveller:to_wander")
 end
 
@@ -1723,10 +1932,13 @@ end
 local act = function(self)
 	lf("traveller:act", "act function called! action=" .. tostring(self.action))
 	
-	-- if not self.action then
-	-- 	lf("DEBUG traveller:act", "no action, returning")
-	-- 	return
-	-- end
+	-- Notify UI callbacks of action start
+	if self.action then
+		notify_ui_callbacks(self, "action_started", {
+			action_type = self.action,
+			destination = self.destination
+		})
+	end
 	
 	lf("traveller:act", "handling action: " .. tostring(self.action))
 	
@@ -1894,6 +2106,22 @@ end
 on_pause = function(self)
 	wander_core.on_pause(self)
 	lf("traveller", "Traveller core paused")
+	
+	-- Notify UI callbacks of core pause
+	notify_ui_callbacks(self, "core_paused", {
+		position = self:get_pos()
+	})
+end
+
+on_resume = function(self)
+	self.path = nil
+	wander_core.on_resume(self)
+	lf("traveller", "Traveller core resumed")
+	
+	-- Notify UI callbacks of core resume
+	notify_ui_callbacks(self, "core_resumed", {
+		position = self:get_pos()
+	})
 end
 
 -- ,,step
@@ -2060,6 +2288,8 @@ maidroid.register_core("traveller", {
 -- Expose traveller functions to maidroid namespace
 maidroid.set_traveller_selected_reward = set_selected_reward
 maidroid.get_traveller_selected_reward = get_selected_reward
+maidroid.register_traveller_ui_callback = register_ui_callback
+maidroid.unregister_traveller_ui_callback = unregister_ui_callback
 
 -- lrfurn:sofa
 -- default:bookshelf
