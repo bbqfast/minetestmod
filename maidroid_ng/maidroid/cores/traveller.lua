@@ -50,8 +50,10 @@ local ACTION_POINTS = {
 local REWARD_CONFIG = {
 	rewards = {
 		["default:coal_lump"] = 10,
-		["default:iron_lump"] = 30,
-		["default:silver_lump"] = 60,
+		["default:clay_lump"] = 10,
+		["default:iron_lump"] = 35,
+		["lottores:tin_lump"] = 30,
+		["lottores:silver_lump"] = 60,
 		["default:gold_lump"] = 100
 	}
 }

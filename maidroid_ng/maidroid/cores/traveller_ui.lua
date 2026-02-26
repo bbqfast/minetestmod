@@ -9,18 +9,31 @@ local S = minetest.get_translator("maidroid")
 local reward_init_items = {
     "default:coal_lump",
     "default:iron_lump", 
-    "default:gold_lump"
+    "default:gold_lump",
+    "default:clay_lump",
+    "lottores:tin_lump",
+    "lottores:silver_lump",
+    -- "default:mese_crystal_fragment"
 }
 
 -- Initialize reward items once from reward_init_items
 local reward_items = {}
-for i, item in ipairs(reward_init_items) do
-	reward_items[i] = {
-		name = item,
-		available = true,  -- Track if this position is available
-		slot = i  -- UI slot position (1-based)
-	}
+local slot_index = 1
+-- Use pairs instead of ipairs to handle commented items (nil values)
+for i, item in pairs(reward_init_items) do
+	if item and item ~= "" then -- Skip nil and empty strings (commented items)
+		reward_items[slot_index] = {
+			name = item,
+			available = true,  -- Track if this position is available
+			slot = slot_index  -- UI slot position (1-based)
+		}
+		lf("traveller_ui", "Added reward item " .. slot_index .. ": " .. item)
+		slot_index = slot_index + 1
+	else
+		lf("traveller_ui", "Skipped item at index " .. i .. ": " .. tostring(item))
+	end
 end
+lf("traveller_ui", "Total reward items initialized: " .. (slot_index - 1))
 
 -- Create traveller events for reward inventory
 local function create_traveller_events(self, inventory_name)
@@ -165,7 +178,7 @@ local function create_traveller_events(self, inventory_name)
 		end,
 	})
 
-	inventory:set_size("rewardable", 3) -- 3 slots: coal, steel, gold
+	inventory:set_size("rewardable", 6) -- 6 slots: coal, steel, gold, copper, tin, silver
 	inventory:set_size("reward_choice", 1) -- 1 slot for reward selection
 
 	return inventory
@@ -197,11 +210,45 @@ local function handle_rewardable_logic(self)
 		end
 		
 		-- Initialize reward items only once from reward_init_items
-		for i, reward_item in ipairs(reward_items) do
-			if i <= 3 then -- Only fill first 3 slots
+		for i = 1, 6 do
+			local reward_item = reward_items[i]
+			if reward_item then
 				local stack = ItemStack(reward_item.name .. " 1") -- Add 1 item
 				traveller_inventory:set_stack("rewardable", i, stack)
 				lf("traveller_tab", "Set rewardable slot " .. i .. " to " .. reward_item.name .. " 1")
+			else
+				lf("traveller_tab", "No reward item for slot " .. i)
+			end
+		end
+		
+		-- Debug: Log total reward items found
+		local total_items = 0
+		for i = 1, 6 do
+			if reward_items[i] then
+				total_items = total_items + 1
+			end
+		end
+		lf("traveller_tab", "Total reward items found: " .. total_items)
+		
+		-- Debug: Check actual inventory size
+		local inv_size = traveller_inventory:get_size("rewardable")
+		lf("traveller_tab", "Inventory rewardable size: " .. inv_size)
+		
+		-- Force clear all slots and refill
+		for i = 1, inv_size do
+			traveller_inventory:set_stack("rewardable", i, ItemStack(""))
+		end
+		lf("traveller_tab", "Cleared all rewardable slots")
+		
+		-- Refill with correct items
+		for i = 1, 6 do
+			local reward_item = reward_items[i]
+			if reward_item then
+				local stack = ItemStack(reward_item.name .. " 1") -- Add 1 item
+				traveller_inventory:set_stack("rewardable", i, stack)
+				lf("traveller_tab", "Refilled rewardable slot " .. i .. " with " .. reward_item.name .. " 1")
+			else
+				lf("traveller_tab", "No reward item available for slot " .. i)
 			end
 		end
 		lf("DEBUG traveller_tab", "Initialized rewardable slots with default items")
@@ -249,29 +296,18 @@ local function handle_rewardable_logic(self)
 			lf("traveller_tab", "Warning: register_traveller_ui_callback not available")
 		end
 	else
-		-- Ensure inventory exists and items are populated
+		-- Check if inventory needs to be recreated due to size change
 		local traveller_inv = maidroid.traveller_inventories[self.traveller_inventory_id]
 		if traveller_inv then
-			-- Check if slots are empty and repopulate if needed
-			local needs_population = false
-			for i = 1, 3 do
-				local stack = traveller_inv:get_stack("rewardable", i)
-				if stack:is_empty() then
-					needs_population = true
-					break
-				end
-			end
-			
-			if needs_population then
-			-- Repopulate empty slots using reward_items tracking
-			for i, reward_item in ipairs(reward_items) do
-				if i <= 3 then -- Only fill first 3 slots
-					local stack = ItemStack(reward_item.name .. " 1") -- Add 1 item
-					traveller_inv:set_stack("rewardable", i, stack)
-					lf("traveller_tab", "Repopulated rewardable slot " .. i .. " to " .. reward_item.name .. " 1")
-				end
-			end
-				lf("traveller_tab", "Repopulated empty rewardable slots")
+			local current_size = traveller_inv:get_size("rewardable")
+			if current_size ~= 6 then
+				lf("traveller_tab", "Recreating inventory - size mismatch: current=" .. current_size .. ", expected=6")
+				-- Remove old inventory
+				maidroid.traveller_inventories[self.traveller_inventory_id] = nil
+				-- Create new one
+				local traveller_inventory = create_traveller_events(self, self.traveller_inventory_id)
+				maidroid.traveller_inventories[self.traveller_inventory_id] = traveller_inventory
+				lf("traveller_tab", "Recreated traveller inventory with correct size")
 			end
 		end
 	end
@@ -281,7 +317,7 @@ local function handle_rewardable_logic(self)
 	if traveller_inv then
 		lf("traveller_tab", "Found traveller inventory")
 		-- Debug: check what's actually in the inventory
-		for i = 1, 3 do
+		for i = 1, 6 do
 			local stack = traveller_inv:get_stack("rewardable", i)
 			lf("traveller_tab", "Rewardable slot " .. i .. ": " .. stack:get_name() .. " " .. stack:get_count())
 		end
@@ -316,7 +352,7 @@ local function generate_traveller_form(self, form, traveller_inv, traveller_inv_
 	-- Rewardable section
 	form = form
 		.. "label[0.5,0;" .. S("Rewardable Items") .. "]"
-		.. "list[detached:" .. traveller_inv_id .. ";rewardable;0.5,0.5;3,1;]"
+		.. "list[detached:" .. traveller_inv_id .. ";rewardable;0.5,0.5;6,1;]"
 		
 	-- Reward choice section
 	local current_reward = maidroid.get_traveller_selected_reward(self)

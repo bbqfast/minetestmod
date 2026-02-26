@@ -165,6 +165,7 @@ Updates:
 - traveller UI, select reward
 - edible items tracking
 - real time UI date
+- fix form pops up when not active
 
 - refac: move non ui func out of api
 - refac: move register core
