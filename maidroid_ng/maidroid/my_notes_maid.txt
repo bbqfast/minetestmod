@@ -164,6 +164,7 @@ Updates:
 - fix ltee teleport
 - traveller UI, select reward
 - edible items tracking
+- real time UI date
 
 - refac: move non ui func out of api
 - refac: move register core

@@ -181,6 +181,21 @@ local function handle_rewardable_logic(self)
 		maidroid.traveller_inventories[self.traveller_inventory_id] = traveller_inventory
 		lf("traveller_tab", "Created traveller inventory with ID: " .. self.traveller_inventory_id)
 		
+		-- Remove selected reward from reward_items tracking during initialization
+		local selected_reward = maidroid.get_traveller_selected_reward(self)
+		if selected_reward then
+			lf("traveller_tab", "Removing selected reward '" .. selected_reward .. "' from reward_items tracking during initialization")
+			
+			-- Find and remove the selected reward from reward_items tracking
+			for i, reward_item in ipairs(reward_items) do
+				if reward_item and reward_item.name == selected_reward then
+					reward_items[i] = nil
+					lf("traveller_tab", "Removed selected reward '" .. selected_reward .. "' from reward_items slot " .. i .. " during initialization")
+					break
+				end
+			end
+		end
+		
 		-- Initialize reward items only once from reward_init_items
 		for i, reward_item in ipairs(reward_items) do
 			if i <= 3 then -- Only fill first 3 slots
@@ -190,6 +205,13 @@ local function handle_rewardable_logic(self)
 			end
 		end
 		lf("DEBUG traveller_tab", "Initialized rewardable slots with default items")
+		
+		-- Initialize reward choice slot with selected reward
+		if selected_reward then
+			local reward_stack = ItemStack(selected_reward .. " 1")
+			traveller_inventory:set_stack("reward_choice", 1, reward_stack)
+			lf("traveller_tab", "Set reward_choice slot to " .. selected_reward .. " 1")
+		end
 		
 		-- Register UI callback for traveller state updates
         -- ,,x1
@@ -206,8 +228,17 @@ local function handle_rewardable_logic(self)
 			
 			-- Refresh UI after any state change
 			if callback_data.player and callback_data.droid then
-				local current_tab = callback_data.droid.current_tab or 3 -- Traveller tab
-				minetest.show_formspec(callback_data.player:get_player_name(), "maidroid:gui", maidroid.get_formspec(callback_data.droid, callback_data.player, current_tab))
+				-- Check if UI is currently active before refreshing
+				local player_name = callback_data.player:get_player_name()
+				
+				-- Only refresh if the maidroid GUI is currently active (check maidroid_buf)
+				if maidroid.maidroid_buf and maidroid.maidroid_buf[player_name] then
+					local current_tab = callback_data.droid.current_tab or 3 -- Traveller tab
+					minetest.show_formspec(player_name, "maidroid:gui", maidroid.get_formspec(callback_data.droid, callback_data.player, current_tab))
+					lf("DEBUG traveller_ui", "Refreshed active UI for player: " .. player_name)
+				else
+					lf("DEBUG traveller_ui", "UI not active for player: " .. player_name .. ", skipping refresh")
+				end
 			end
 		end
 		
@@ -286,8 +317,6 @@ local function generate_traveller_form(self, form, traveller_inv, traveller_inv_
 	form = form
 		.. "label[0.5,0;" .. S("Rewardable Items") .. "]"
 		.. "list[detached:" .. traveller_inv_id .. ";rewardable;0.5,0.5;3,1;]"
-		.. "listring[detached:".. traveller_inv_id .. ";rewardable]"
-		.. "listring[current_player;main]"
 		
 	-- Reward choice section
 	local current_reward = maidroid.get_traveller_selected_reward(self)
@@ -298,6 +327,11 @@ local function generate_traveller_form(self, form, traveller_inv, traveller_inv_
 		.. "list[detached:" .. traveller_inv_id .. ";reward_choice;0.5,2.5;1,1;]"
 		.. "label[2,2.8;" .. minetest.colorize("#FFFF00", reward_display) .. "]"
 		.. "listring[detached:".. traveller_inv_id .. ";reward_choice]"
+
+		.. "listring[detached:".. traveller_inv_id .. ";rewardable]"
+		.. "listring[detached:".. traveller_inv_id .. ";reward_choice]"
+		.. "listring[detached:".. traveller_inv_id .. ";rewardable]"
+        
 		.. "listring[current_player;main]"
 		
 	-- Add traveller controls below the lists

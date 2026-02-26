@@ -133,6 +133,9 @@ local random_pos_near = maidroid.helpers.random_pos_near
 
 local maidroid_buf = {} -- formspec buffer
 
+-- Expose maidroid_buf to maidroid namespace
+maidroid.maidroid_buf = maidroid_buf
+
 -- registered maidroids list in case of import mode
 maidroid.registered_maidroids = {}
 
