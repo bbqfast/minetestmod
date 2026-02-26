@@ -166,6 +166,8 @@ Updates:
 - edible items tracking
 - real time UI date
 - fix form pops up when not active
+- working expanded inv slots 
+
 
 - refac: move non ui func out of api
 - refac: move register core

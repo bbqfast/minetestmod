@@ -18,6 +18,21 @@ local reward_init_items = {
 
 -- Initialize reward items once from reward_init_items
 local reward_items = {}
+
+-- Function to get random animation frames
+local function get_random_animation_frames()
+	local animations = {
+		maidroid.animation.STAND,
+		maidroid.animation.SIT,
+		maidroid.animation.LAY,
+		maidroid.animation.WALK,
+		maidroid.animation.MINE,
+		maidroid.animation.WALK_MINE
+	}
+	
+	local selected_anim = animations[math.random(#animations)]
+	return selected_anim.x .. "," .. selected_anim.y
+end
 local slot_index = 1
 -- Use pairs instead of ipairs to handle commented items (nil values)
 for i, item in pairs(reward_init_items) do
@@ -380,7 +395,7 @@ local function generate_traveller_form(self, form, traveller_inv, traveller_inv_
 		.. minetest.colorize("#ACEEAC", (self.state and tostring(self.state) or S("Unknown"))) .. "]"
 		.. "model[4,6;3,3;3d;character.b3d;"
 		.. minetest.formspec_escape(self.textures[1])
-		.. ";0,180;false;true;200,219;7.5]"
+		.. ";" .. math.random(-15,15) .. "," .. (180 + math.random(-45,45)) .. ";false;true;" .. get_random_animation_frames() .. ";7.5]"
 	
 	return form
 end
