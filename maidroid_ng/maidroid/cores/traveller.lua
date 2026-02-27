@@ -68,6 +68,15 @@ local REWARD_CHECK_INTERVAL = 60
 local metrics_log_timer = 0
 local metrics_log_interval = 35 -- seconds
 
+-- Action metrics mapping: converts _action_taken_metrics key names to action names for add_points()
+local AMENITIES = {
+	shower_used = "shower",
+	toilet_used = "toilet", 
+	refrigerator_used = "fridge",
+	books_read = "bookshelf",
+	bookshelf_used = "bookshelf"
+}
+
 -- UI callback system
 local ui_callback = nil
 
@@ -291,6 +300,30 @@ local function show_food_summary(self)
 		minetest.pos_to_string(pos), unique_count, items_list))
 	
 	lf("traveller", string.format("Edible item summary: %d unique items - %s", unique_count, items_list))
+end
+
+-- Function to get amenities with usage count > 1
+local function get_amenities(self)
+	local amenities = {}
+	
+	-- Check if _action_taken_metrics exists and has data
+	if not self._action_taken_metrics or next(self._action_taken_metrics) == nil then
+		lf("traveller", "get_amenities: No action metrics available")
+		return amenities
+	end
+	
+	-- Iterate through all action metrics and collect those with count > 1
+	for metric_name, count in pairs(self._action_taken_metrics) do
+		if count > 1 then
+			-- Map metric name to display name using AMENITIES table
+			local display_name = AMENITIES[metric_name] or metric_name
+			table.insert(amenities, display_name)
+			lf("traveller", string.format("get_amenities: Found amenity '%s' -> '%s' with count %d", metric_name, display_name, count))
+		end
+	end
+	
+	lf("traveller", string.format("get_amenities: Returning %d amenities with count > 1", #amenities))
+	return amenities
 end
 
 -- Function to log traveller metrics for a specific maidroid
@@ -2292,6 +2325,7 @@ maidroid.set_traveller_selected_reward = set_selected_reward
 maidroid.get_traveller_selected_reward = get_selected_reward
 maidroid.register_traveller_ui_callback = register_ui_callback
 maidroid.unregister_traveller_ui_callback = unregister_ui_callback
+maidroid.get_traveller_amenities = get_amenities
 
 -- lrfurn:sofa
 -- default:bookshelf

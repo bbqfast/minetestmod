@@ -22,7 +22,7 @@ local reward_items = {}
 -- Function to get random animation frames
 local function get_random_animation_frames()
 	local animations = {
-		maidroid.animation.STAND,
+		-- maidroid.animation.STAND,
 		maidroid.animation.SIT,
 		maidroid.animation.LAY,
 		maidroid.animation.WALK,
@@ -378,21 +378,41 @@ local function generate_traveller_form(self, form, traveller_inv, traveller_inv_
 		.. "list[detached:" .. traveller_inv_id .. ";reward_choice;0.5,2.5;1,1;]"
 		.. "label[2,2.8;" .. minetest.colorize("#FFFF00", reward_display) .. "]"
 		.. "listring[detached:".. traveller_inv_id .. ";reward_choice]"
-
 		.. "listring[detached:".. traveller_inv_id .. ";rewardable]"
 		.. "listring[detached:".. traveller_inv_id .. ";reward_choice]"
 		.. "listring[detached:".. traveller_inv_id .. ";rewardable]"
-        
 		.. "listring[current_player;main]"
 		
 	-- Add traveller controls below the lists
 	form = form
-		.. "button[0.5,4;2.5,1;toggle_traveller;" .. S("Toggle Traveller") .. "]"
-		.. "button[3.5,4;2.5,1;view_metrics;" .. S("View Metrics") .. "]"
-		.. "label[0.5,5;" .. S("Current Task:") .. " "
+		.. "label[0.5,3.3;" .. S("Current Task:") .. " "
 		.. minetest.colorize("#ACEEAC", (self.action and self.action or S("Idle"))) .. "]"
-		.. "label[3.5,5;" .. S("State:") .. " "
+		.. "label[0.5,3.7;" .. S("State:") .. " "
 		.. minetest.colorize("#ACEEAC", (self.state and tostring(self.state) or S("Unknown"))) .. "]"
+	
+	-- Add amenities display
+	local amenities = maidroid.get_traveller_amenities(self)
+	local amenities_list = {"shower", "toilet", "fridge", "bookshelf", "bookshelf"}
+	local y_pos = 4.1
+	
+	form = form .. "label[0.5," .. y_pos .. ";" .. S("Amenities:") .. "]"
+	y_pos = y_pos + 0.5
+	
+	for _, amenity in ipairs(amenities_list) do
+		local has_amenity = "No"
+		for _, available_amenity in ipairs(amenities) do
+			if available_amenity == amenity then
+				has_amenity = "Yes"
+				break
+			end
+		end
+		
+		local color = has_amenity == "Yes" and "#00FF00" or "#FF0000"
+		form = form .. "label[0.5," .. y_pos .. ";" .. amenity .. ": " .. minetest.colorize(color, has_amenity) .. "]"
+		y_pos = y_pos + 0.4
+	end
+	
+	form = form
 		.. "model[4,6;3,3;3d;character.b3d;"
 		.. minetest.formspec_escape(self.textures[1])
 		.. ";" .. math.random(-15,15) .. "," .. (180 + math.random(-45,45)) .. ";false;true;" .. get_random_animation_frames() .. ";7.5]"

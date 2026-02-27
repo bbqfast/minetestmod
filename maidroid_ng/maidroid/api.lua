@@ -2614,22 +2614,6 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 		return
 	end
 	
-	-- Handle traveller-specific buttons
-	if fields.toggle_traveller then
-		-- Toggle traveller state (pause/resume)
-		if droid.state == "pause" then
-			droid:set_state("normal")
-			minetest.chat_send_player(player_name, "Traveller resumed")
-		else
-			droid:set_state("pause")
-			minetest.chat_send_player(player_name, "Traveller paused")
-		end
-		-- Refresh the formspec
-		local current_tab = droid.current_tab or 1
-		minetest.show_formspec(player_name, "maidroid:gui",
-			maidroid.get_formspec(droid, player, current_tab))
-		return
-	end
 
 	maidroid_buf[player_name] = nil
 	return true
