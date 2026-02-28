@@ -279,3 +279,41 @@ function maidroid.register_core(name, def)
 	end
 	maidroid.cores[name] = def
 end
+
+
+-- crossed_boundary checks if maidroid crossed width or length boundaries from activation position
+-- Takes width and length parameters and returns true if maidroid crossed either boundary
+-- Checks boundaries relative to self._activation_pos (center point)
+function maidroid.crossed_boundary(self, width, length)
+	local pos = self:get_pos()
+	
+	if not pos then
+		lf("api", "crossed_boundary: maidroid position is nil")
+		return false
+	end
+	
+	if not self._activation_pos then
+		lf("api", "crossed_boundary: activation position is nil")
+		return false
+	end
+	
+	-- Calculate offset from activation position
+	local offset = vector.subtract(pos, self._activation_pos)
+	
+	-- Calculate half dimensions (boundaries extend from -half to +half in each direction)
+	local half_width = width / 2
+	local half_length = length / 2
+	
+	-- Check if offset is outside the rectangular boundary
+	local crossed_width = offset.x < -half_width or offset.x > half_width
+	local crossed_length = offset.z < -half_length or offset.z > half_length
+	
+	-- Return true if either boundary was crossed
+	if crossed_width or crossed_length then
+		lf("api", string.format("Boundary crossed: pos=%s, activation_pos=%s, width=%d, length=%d, crossed_width=%s, crossed_length=%s", 
+			minetest.pos_to_string(pos), minetest.pos_to_string(self._activation_pos), width, length, tostring(crossed_width), tostring(crossed_length)))
+		return true
+	end
+	
+	return false
+end

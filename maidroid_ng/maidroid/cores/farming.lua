@@ -1564,9 +1564,16 @@ on_step = function(self, dtime, moveresult)
 	if self._activation_pos then
 		local current_pos = self:get_pos()
 		local distance = vector.distance(current_pos, self._activation_pos)
-		local max_distance = get_max_distance_from_activation()
+		local max_distance = maidroid.get_max_distance_from_activation()
+        
 		if distance > max_distance then
 			lf("farming", "Too far from activation (" .. string.format("%.1f", distance) .. " > " .. max_distance .. "), teleporting back")
+			self.object:set_pos(self._activation_pos)
+		end
+		
+		-- Check if maidroid crossed boundary (10x10 area centered at activation position)
+		if maidroid.crossed_boundary(self, 5, 5) then
+			lf("DEBUG farming", "Crossed 10x10 boundary, teleporting back to activation position")
 			self.object:set_pos(self._activation_pos)
 		end
 	end

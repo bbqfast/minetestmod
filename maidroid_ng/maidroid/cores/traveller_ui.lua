@@ -374,9 +374,9 @@ local function generate_traveller_form(self, form, traveller_inv, traveller_inv_
 	local reward_display = string.format("Current: %s", current_reward:gsub("default:", ""):gsub("_", " "))
 	
 	form = form
-		.. "label[0.5,2;" .. S("Reward Choice") .. "]"
-		.. "list[detached:" .. traveller_inv_id .. ";reward_choice;0.5,2.5;1,1;]"
-		.. "label[2,2.8;" .. minetest.colorize("#FFFF00", reward_display) .. "]"
+		.. "label[0.5,1.7;" .. S("Reward Choice") .. "]"
+		.. "list[detached:" .. traveller_inv_id .. ";reward_choice;0.5,2.2;1,1;]"
+		.. "label[2,2.5;" .. minetest.colorize("#FFFF00", reward_display) .. "]"
 		.. "listring[detached:".. traveller_inv_id .. ";reward_choice]"
 		.. "listring[detached:".. traveller_inv_id .. ";rewardable]"
 		.. "listring[detached:".. traveller_inv_id .. ";reward_choice]"
@@ -385,15 +385,15 @@ local function generate_traveller_form(self, form, traveller_inv, traveller_inv_
 		
 	-- Add traveller controls below the lists
 	form = form
-		.. "label[0.5,3.3;" .. S("Current Task:") .. " "
+		.. "label[0.5,3.0;" .. S("Current Task:") .. " "
 		.. minetest.colorize("#ACEEAC", (self.action and self.action or S("Idle"))) .. "]"
-		.. "label[0.5,3.7;" .. S("State:") .. " "
+		.. "label[0.5,3.4;" .. S("State:") .. " "
 		.. minetest.colorize("#ACEEAC", (self.state and tostring(self.state) or S("Unknown"))) .. "]"
 	
 	-- Add amenities display
 	local amenities = maidroid.get_traveller_amenities(self)
 	local amenities_list = {"shower", "toilet", "fridge", "bookshelf", "bookshelf"}
-	local y_pos = 4.1
+	local y_pos = 3.8
 	
 	form = form .. "label[0.5," .. y_pos .. ";" .. S("Amenities:") .. "]"
 	y_pos = y_pos + 0.5

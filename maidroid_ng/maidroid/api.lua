@@ -848,6 +848,7 @@ local get_pos = function(self)
 	return self.object:get_pos()
 end
 
+
 -- is_on_ground return true if maidroid touches floor
 local is_on_ground = function(self, moveresult)
 	if moveresult then
@@ -2231,6 +2232,7 @@ local register_maidroid = function(product_name, def)
 		set_tool           = set_tool,
 		heal               = heal,
 		get_pos            = get_pos,
+		crossed_boundary   = crossed_boundary,
 		is_on_ground       = is_on_ground,
 		is_blocked         = is_blocked,
 		toggle_entity_jump = toggle_entity_jump,
