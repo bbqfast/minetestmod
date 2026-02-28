@@ -2328,34 +2328,6 @@ maidroid.register_tool_rotation = function(itemname, r_shift)
 	tool_rotation[itemname] = r_shift
 end
 
--- Handle farming dimension settings
-function maidroid.handle_farming_dimension_settings(droid, player, player_name, fields)
-	local length = tonumber(fields.farming_length)
-	local width = tonumber(fields.farming_width)
-	
-
-	lf("DEBUG api:register", "====================== function maidroid.set_farming_dimensions")
-	-- Use the new set_farming_dimensions function
-	local success = maidroid.set_farming_dimensions(droid, length, width)
-	
-	if success then
-		minetest.chat_send_player(player_name, "Farming dimension set to " .. (length or droid.farming_length or 10) .. "x" .. (width or droid.farming_width or 10))
-	else
-		-- Show error messages for invalid values
-		if length and (length <= 0 or length > 50) then
-			minetest.chat_send_player(player_name, "Invalid length. Please enter a number between 1 and 50.")
-		end
-		if width and (width <= 0 or width > 50) then
-			minetest.chat_send_player(player_name, "Invalid width. Please enter a number between 1 and 50.")
-		end
-	end
-	
-	lf("DEBUG api:register", "====================== function maidroid.set_farming_dimensions")
-	-- Refresh the formspec to show updated values
-	local current_tab = droid.current_tab or 4 -- Farming tab
-	minetest.show_formspec(player_name, "maidroid:gui",
-		maidroid.get_formspec(droid, player, current_tab))
-end
 
 minetest.register_on_player_receive_fields(function(player, formname, fields)
 	if formname ~= "maidroid:gui" then
@@ -2663,8 +2635,7 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 	end
 	
 	-- Farming dimension handling
-	if fields.set_farming_dim or (fields.farming_length and fields.key_enter_field == "farming_length") or (fields.farming_width and fields.key_enter_field == "farming_width") then
-		maidroid.handle_farming_dimension_settings(droid, player, player_name, fields)
+	if maidroid.handle_farming_dimension_settings(droid, player, player_name, fields) then
 		return
 	end
 
