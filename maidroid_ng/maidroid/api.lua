@@ -1180,7 +1180,7 @@ local is_blocked_orig = function(self, criterion, check_inside)
 end
 
 -- ,,isb,,blocked
-local is_blocked = function(self, criterion, check_inside)
+local is_blocked_low_fence = function(self, criterion, check_inside)
 	-- Helper to add a distinct position to the history (max 3)
 	local function add_prev_pos(pos)
 		if not self._prev_pos then
@@ -1325,6 +1325,14 @@ local is_blocked = function(self, criterion, check_inside)
 			return on_blocked(node.name, "diag2_below")
 		end
 		return on_not_blocked("diagonal")
+	end
+end
+
+local is_blocked = function(self, criterion, check_inside)
+	if self._use_low_fence then
+		return is_blocked_low_fence(self, criterion, check_inside)
+	else
+		return is_blocked_orig(self, criterion, check_inside)
 	end
 end
 
@@ -1701,6 +1709,7 @@ function maidroid.get_formspec(self, player, tab)
 	.. ( (owns and self.core.doc) and "," .. S("Doc") or "" )
 	.. ( (self.core.name == "generic_cooker" and owns) and "," .. S("Cooker") or "" )
 	.. ( (self.core.name == "traveller" and owns) and "," .. S("Traveller") or "" )
+	.. ( (self.core.name == "farming" and owns) and "," .. S("Farming") or "" )
 	.. ";" .. tab .. ";false;true]"
 	self.current_tab = tab
 
@@ -1790,6 +1799,14 @@ function maidroid.get_formspec(self, player, tab)
 		tab_max = tab_max + 1
 		if tab == tab_max then
 			return maidroid.handle_traveller_tab(self, form)
+		end
+	end
+	
+	-- Farming tab for farming core
+	if owns and self.core.name == "farming" then
+		tab_max = tab_max + 1
+		if tab == tab_max then
+			return maidroid.handle_farming_tab(self, form)
 		end
 	end
 end
@@ -2616,6 +2633,35 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 		return
 	end
 	
+	-- Farming dimension handling
+	if fields.set_farming_dim or (fields.farming_length and fields.key_enter_field == "farming_length") or (fields.farming_width and fields.key_enter_field == "farming_width") then
+		local length = tonumber(fields.farming_length)
+		local width = tonumber(fields.farming_width)
+		
+
+        lf("DEBUG api:register", "====================== function maidroid.set_farming_dimensions")
+		-- Use the new set_farming_dimensions function
+		local success = maidroid.set_farming_dimensions(droid, length, width)
+		
+		if success then
+			minetest.chat_send_player(player_name, "Farming dimension set to " .. (length or droid.farming_length or 10) .. "x" .. (width or droid.farming_width or 10))
+		else
+			-- Show error messages for invalid values
+			if length and (length <= 0 or length > 50) then
+				minetest.chat_send_player(player_name, "Invalid length. Please enter a number between 1 and 50.")
+			end
+			if width and (width <= 0 or width > 50) then
+				minetest.chat_send_player(player_name, "Invalid width. Please enter a number between 1 and 50.")
+			end
+		end
+		
+        lf("DEBUG api:register", "====================== function maidroid.set_farming_dimensions")
+		-- Refresh the formspec to show updated values
+		local current_tab = droid.current_tab or 4 -- Farming tab
+		minetest.show_formspec(player_name, "maidroid:gui",
+			maidroid.get_formspec(droid, player, current_tab))
+		return
+	end
 
 	maidroid_buf[player_name] = nil
 	return true

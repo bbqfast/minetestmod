@@ -168,6 +168,8 @@ Updates:
 - fix form pops up when not active
 - working expanded inv slots 
 - traveller animation and angle
+- amenities UI
+- square boundary for farmer
 
 - refac: move non ui func out of api
 - refac: move register core

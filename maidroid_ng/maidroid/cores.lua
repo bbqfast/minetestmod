@@ -18,6 +18,7 @@ dofile(maidroid.modpath .. "/cores/basic.lua") -- Use wander and follow
 -- Jobs
 if maidroid.settings.farming then
 	dofile(maidroid.modpath .. "/cores/farming.lua") -- Use: Wander
+	dofile(maidroid.modpath .. "/cores/farming_ui.lua") -- Farming UI functions
 end
 if maidroid.settings.torcher then
 	dofile(maidroid.modpath .. "/cores/torcher.lua") -- Use: Follow

@@ -681,6 +681,9 @@ on_start = function(self)
 	self.path = nil
 	wander_core.on_start(self)
 	
+	-- Initialize low fence detection for farming core
+	self._use_low_fence = true
+	
 	-- Store activation position if not already set (retain last spawned position)
 	if not self._activation_pos then
 		self._activation_pos = self:get_pos()
@@ -1571,9 +1574,11 @@ on_step = function(self, dtime, moveresult)
 			self.object:set_pos(self._activation_pos)
 		end
 		
-		-- Check if maidroid crossed boundary (10x10 area centered at activation position)
-		if maidroid.crossed_boundary(self, 5, 5) then
-			lf("DEBUG farming", "Crossed 10x10 boundary, teleporting back to activation position")
+		-- Check if maidroid crossed boundary using custom farm dimensions
+		local farm_length = self.farming_length or 5
+		local farm_width = self.farming_width or 5
+		if maidroid.crossed_boundary(self, farm_width, farm_length) then
+			lf("farming", "Crossed " .. farm_width .. "x" .. farm_length .. " boundary, teleporting back to activation position")
 			self.object:set_pos(self._activation_pos)
 		end
 	end
@@ -1725,8 +1730,40 @@ maidroid.cores.farming.max_distance_from_activation = max_distance_from_activati
 maidroid.cores.farming.set_max_distance_from_activation = set_max_distance_from_activation
 maidroid.cores.farming.get_max_distance_from_activation = get_max_distance_from_activation
 
+-- Function to set farming dimensions
+function maidroid.set_farming_dimensions(droid, length, width)
+	if not droid then
+		lf("farming", "set_farming_dimensions: droid is nil")
+		return false
+	end
+
+    lf("DEBUG farming:set_farming_dimensions", "set_farming_dimensions: droid is not nil")
+	
+	-- Validate and set length
+	if length and length > 0 and length <= 50 then
+		droid.farming_length = length
+		lf("farming", "Farming length set to: " .. length)
+	else
+		lf("farming", "Invalid length: " .. tostring(length) .. ". Please enter a number between 1 and 50.")
+		return false
+	end
+	
+	-- Validate and set width
+	if width and width > 0 and width <= 50 then
+		droid.farming_width = width
+		lf("farming", "Farming width set to: " .. width)
+	else
+		lf("farming", "Invalid width: " .. tostring(width) .. ". Please enter a number between 1 and 50.")
+		return false
+	end
+	
+	lf("farming", "Farming dimension set to " .. length .. "x" .. width)
+	return true
+end
+
 -- Also expose directly to maidroid table as fallback
 maidroid.set_max_distance_from_activation_farming = set_max_distance_from_activation
 maidroid.get_max_distance_from_activation_farming = get_max_distance_from_activation
+-- maidroid.set_farming_dimensions = maidroid.cores.farming.set_farming_dimensions
 
 -- vim: ai:noet:ts=4:sw=4:fdm=indent:syntax=lua
