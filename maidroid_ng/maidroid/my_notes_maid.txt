@@ -170,6 +170,7 @@ Updates:
 - traveller animation and angle
 - amenities UI
 - square boundary for farmer
+- set farming dimension UI
 
 - refac: move non ui func out of api
 - refac: move register core
