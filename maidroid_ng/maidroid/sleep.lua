@@ -149,7 +149,7 @@ end
 
 -- ,,bed,,sleep
 -- Function to find and sleep in a nearby bed
-local function try_sleep_in_bed(droid, pos, core_module)
+local function try_sleep_in_bed(droid, pos, core_module, find_distance)
     lf("DEBUG sleep_module:try_sleep_in_bed", "looking for bed near pos=" .. minetest.pos_to_string(pos))
     
     -- Check if beds mod is available
@@ -158,7 +158,7 @@ local function try_sleep_in_bed(droid, pos, core_module)
         return false
     end
     
-    local find_dist = 12
+    local find_dist = find_distance or 12
     local bed_pos = minetest.find_node_near(pos, find_dist, {"group:bed"})
     if not bed_pos then
         lf("DEBUG sleep_module:try_sleep_in_bed", "no bed found near pos=" .. minetest.pos_to_string(pos))

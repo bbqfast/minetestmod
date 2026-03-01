@@ -32,7 +32,7 @@ local search = maidroid.helpers.search_surrounding
 local TRAVEL_RANGE = 50 -- Maximum distance to travel
 local REST_INTERVAL = 5 -- Seconds to rest between travels
 local MAX_CARRY_WEIGHT = 100 -- Maximum items the traveller can carry
-local MAX_DISTANCE_FROM_ACTIVATION = 5 -- Maximum distance from activation point
+local MAX_DISTANCE_FROM_ACTIVATION = 20 -- Maximum distance from activation point
 
 -- Destination tracking
 local destinations = {}
@@ -2082,7 +2082,7 @@ task = function(self)
 		lf("traveller:task", "CHOICE=1: try_sleep_in_bed - about to call")
 		lf("traveller:task", "pos=" .. minetest.pos_to_string(pos))
 		lf("traveller:task", "core_module params: to_action=" .. tostring(to_action) .. ", name=traveller")
-		local result = maidroid.sleep.try_sleep_in_bed(self, pos, {to_action = to_action, name = "traveller"})
+		local result = maidroid.sleep.try_sleep_in_bed(self, pos, {to_action = to_action, name = "traveller"}, TRAVEL_RANGE)
 		lf("traveller:task", "try_sleep_in_bed returned: " .. tostring(result))
 	elseif choice == 2 then
 		lf("traveller:task", "CHOICE=2: find_and_turn_on_shower")

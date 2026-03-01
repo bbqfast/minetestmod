@@ -1071,6 +1071,8 @@ local set_target_node = function(self, destination)
 	direction.y = 0
 
 	local speed = maidroid.settings.speed * ( 1 + math.random(0,10)/20 )
+    -- ,,hackl
+	-- local speed = 3
 	local velocity = vector.multiply(direction, speed)
 
 	self.object:set_velocity(velocity)
@@ -2328,6 +2330,73 @@ maidroid.register_tool_rotation = function(itemname, r_shift)
 	tool_rotation[itemname] = r_shift
 end
 
+-- Handle cooker receive fields
+maidroid.handle_cooker_receive_field = function(droid, player, player_name, fields)
+	if fields.cooklist_next then
+		local current_page = droid.cooklist_page or 1
+		local items_per_page = 6
+		local cooklist_data = {}
+		if maidroid.cores and maidroid.cores.generic_cooker then
+			local cooker_items = dofile(maidroid.modpath .. "/cores/cooker_items.lua")
+			cooklist_data = cooker_items.all_farming_outputs or {}
+		end
+		local total_pages = math.ceil(#cooklist_data / items_per_page)
+		
+		if current_page < total_pages then
+			droid.cooklist_page = current_page + 1
+		end
+		-- Refresh the formspec
+		local current_tab = droid.current_tab or 1
+		minetest.show_formspec(player_name, "maidroid:gui",
+			maidroid.get_formspec(droid, player, current_tab))
+		return true
+	end
+	
+	if fields.cooklist_prev then
+		-- Go to previous page
+		local current_page = droid.cooklist_page or 1
+		if current_page > 1 then
+			droid.cooklist_page = current_page - 1
+		end
+		-- Refresh the formspec
+		local current_tab = droid.current_tab or 1
+		minetest.show_formspec(player_name, "maidroid:gui",
+			maidroid.get_formspec(droid, player, current_tab))
+		return true
+	end
+	
+	if fields.cookable_prev then
+		-- Go to previous page
+		local current_page = droid.cookable_page or 1
+		if current_page > 1 then
+			droid.cookable_page = current_page - 1
+		end
+		-- Refresh the formspec
+		local current_tab = droid.current_tab or 1
+		minetest.show_formspec(player_name, "maidroid:gui",
+			maidroid.get_formspec(droid, player, current_tab))
+		return true
+	end
+	
+	if fields.cookable_next then
+		-- Go to next page
+		local current_page = droid.cookable_page or 1
+		local items_per_page = 12
+		local total_pages = math.ceil(#maidroid.all_furnace_inputs / items_per_page)
+		
+		if current_page < total_pages then
+			droid.cookable_page = current_page + 1
+		end
+		-- Refresh the formspec
+		local current_tab = droid.current_tab or 1
+		minetest.show_formspec(player_name, "maidroid:gui",
+			maidroid.get_formspec(droid, player, current_tab))
+		return true
+	end
+	
+	return false
+end
+
 
 minetest.register_on_player_receive_fields(function(player, formname, fields)
 	if formname ~= "maidroid:gui" then
@@ -2494,72 +2563,11 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 			maidroid.get_formspec(droid, player, current_tab))
 		return
 	end
-	
-	-- Cookable pagination handling
-	if fields.cookable_prev then
-		-- Go to previous page
-		local current_page = droid.cookable_page or 1
-		if current_page > 1 then
-			droid.cookable_page = current_page - 1
-		end
-		-- Refresh the formspec
-		local current_tab = droid.current_tab or 1
-		minetest.show_formspec(player_name, "maidroid:gui",
-			maidroid.get_formspec(droid, player, current_tab))
-		return
-	end
-	
-	if fields.cookable_next then
-		-- Go to next page
-		local current_page = droid.cookable_page or 1
-		local items_per_page = 12
-		local total_pages = math.ceil(#maidroid.all_furnace_inputs / items_per_page)
 		
-		if current_page < total_pages then
-			droid.cookable_page = current_page + 1
-		end
-		-- Refresh the formspec
-		local current_tab = droid.current_tab or 1
-		minetest.show_formspec(player_name, "maidroid:gui",
-			maidroid.get_formspec(droid, player, current_tab))
+	if maidroid.handle_cooker_receive_field(droid, player, player_name, fields) then
 		return
 	end
-	
-	-- Cooklist pagination handling
-	if fields.cooklist_prev then
-		-- Go to previous page
-		local current_page = droid.cooklist_page or 1
-		if current_page > 1 then
-			droid.cooklist_page = current_page - 1
-		end
-		-- Refresh the formspec
-		local current_tab = droid.current_tab or 1
-		minetest.show_formspec(player_name, "maidroid:gui",
-			maidroid.get_formspec(droid, player, current_tab))
-		return
-	end
-	
-	if fields.cooklist_next then
-		-- Go to next page
-		local current_page = droid.cooklist_page or 1
-		local items_per_page = 6
-		local cooklist_data = {}
-		if maidroid.cores and maidroid.cores.generic_cooker then
-			local cooker_items = dofile(maidroid.modpath .. "/cores/cooker_items.lua")
-			cooklist_data = cooker_items.all_farming_outputs or {}
-		end
-		local total_pages = math.ceil(#cooklist_data / items_per_page)
 		
-		if current_page < total_pages then
-			droid.cooklist_page = current_page + 1
-		end
-		-- Refresh the formspec
-		local current_tab = droid.current_tab or 1
-		minetest.show_formspec(player_name, "maidroid:gui",
-			maidroid.get_formspec(droid, player, current_tab))
-		return
-	end
-	
 	if fields.set_distance or (fields.max_distance and fields.key_enter_field == "max_distance") then
 		-- Set the max distance from activation
 		local new_distance = tonumber(fields.max_distance)
@@ -2635,7 +2643,7 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 	end
 	
 	-- Farming dimension handling
-	if maidroid.handle_farming_dimension_settings(droid, player, player_name, fields) then
+	if maidroid.handle_farming_receive_fields(droid, player, player_name, fields) then
 		return
 	end
 

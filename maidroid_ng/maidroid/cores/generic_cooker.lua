@@ -1457,7 +1457,7 @@ task = function(droid)
 	    	try_get_item_from_nearby_chest(droid, pos, get_combined_take_items(droid))
 	else
 		lf("DEBUG generic_cooker:task", "CHOICE=4: try_sleep_in_bed")
-	    	maidroid.sleep.try_sleep_in_bed(droid, pos, {GenericCookerTarget = GenericCookerTarget, to_action = to_action, name = "generic_cooker"})
+	    	maidroid.sleep.try_sleep_in_bed(droid, pos, {GenericCookerTarget = GenericCookerTarget, to_action = to_action, name = "generic_cooker"}, 12)
 	end
 end
 

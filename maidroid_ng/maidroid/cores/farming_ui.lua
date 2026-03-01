@@ -349,8 +349,8 @@ function maidroid.set_farming_selected_seed(droid, seed_name)
 	return false
 end
 
--- Handle farming dimension settings
-function maidroid.handle_farming_dimension_settings(droid, player, player_name, fields)
+-- Handle farming receive fields
+function maidroid.handle_farming_receive_fields(droid, player, player_name, fields)
 	if not (fields.set_farming_dim or (fields.farming_length and fields.key_enter_field == "farming_length") or (fields.farming_width and fields.key_enter_field == "farming_width")) then
 		return false
 	end
