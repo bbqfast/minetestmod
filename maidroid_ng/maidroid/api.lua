@@ -2394,6 +2394,136 @@ maidroid.handle_cooker_receive_field = function(droid, player, player_name, fiel
 		return true
 	end
 	
+	-- Reset desirable and reinitialize craftable
+	if fields.reset_desirable then
+		maidroid.reset_desirable_and_craftable(droid)
+		
+		-- Refresh the formspec
+		local current_tab = droid.current_tab or 1
+		minetest.show_formspec(player_name, "maidroid:gui",
+			maidroid.get_formspec(droid, player, current_tab))
+		return true
+	end
+	
+	-- Reset cooklist and reinitialize cookable
+	if fields.reset_cooklist then
+		maidroid.reset_cooklist_and_cookable(droid)
+		
+		-- Refresh the formspec
+		local current_tab = droid.current_tab or 1
+		minetest.show_formspec(player_name, "maidroid:gui",
+			maidroid.get_formspec(droid, minetest.get_player_by_name(player_name), current_tab))
+		return true
+	end
+	
+	-- Go to next desirable page
+	if fields.desirable_next then
+		-- Go to next page
+		local current_page = droid.desirable_page or 1
+		local desirable_outputs = {}
+		
+		-- Build complete list from all pages using helper function
+		if type(droid.desirable_page_items) == "table" then
+			desirable_outputs = maidroid.build_complete_desirable_list(droid)
+		elseif type(droid.desired_craft_outputs) == "table" then
+			-- Fallback to regular desired outputs if page tracking not set
+			desirable_outputs = droid.desired_craft_outputs
+		end
+		
+		if type(desirable_outputs) ~= "table" or #desirable_outputs == 0 then
+			desirable_outputs = {}
+		end
+		
+		local items_per_page = 6
+		-- Always show at least 6 pages when there are desirable items
+		local total_pages = math.max(6, math.ceil(#desirable_outputs / items_per_page))
+		
+		if current_page < total_pages then
+			droid.desirable_page = current_page + 1
+		end
+		-- Refresh the formspec
+		local current_tab = droid.current_tab or 1
+		minetest.show_formspec(player_name, "maidroid:gui",
+			maidroid.get_formspec(droid, player, current_tab))
+		return true
+	end
+	
+	-- Go to previous desirable page
+	if fields.desirable_prev then
+		-- Go to previous page
+		local current_page = droid.desirable_page or 1
+		if current_page > 1 then
+			droid.desirable_page = current_page - 1
+		end
+		-- Refresh the formspec
+		local current_tab = droid.current_tab or 1
+		minetest.show_formspec(player_name, "maidroid:gui",
+			maidroid.get_formspec(droid, player, current_tab))
+		return true
+	end
+	
+	-- Go to previous craftable page
+	if fields.craftable_prev then
+		-- Go to previous page
+		local current_page = droid.craftable_page or 1
+		if current_page > 1 then
+			droid.craftable_page = current_page - 1
+		end
+		-- Refresh the formspec
+		local current_tab = droid.current_tab or 1
+		minetest.show_formspec(player_name, "maidroid:gui",
+			maidroid.get_formspec(droid, player, current_tab))
+		return true
+	end
+	
+	-- Go to next craftable page
+	if fields.craftable_next then
+		-- Go to next page
+		local current_page = droid.craftable_page or 1
+		local craftable_outputs = {}
+		if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.get_craftable_outputs then
+			craftable_outputs = maidroid.cores.generic_cooker.get_craftable_outputs() or {}
+		end
+		if type(craftable_outputs) ~= "table" or #craftable_outputs == 0 then
+			craftable_outputs = maidroid.init_craftable_outputs
+		end
+		
+		local items_per_page = 12
+		local total_pages = math.ceil(#craftable_outputs / items_per_page)
+		
+		if current_page < total_pages then
+			droid.craftable_page = current_page + 1
+		end
+		-- Refresh the formspec
+		local current_tab = droid.current_tab or 1
+		minetest.show_formspec(player_name, "maidroid:gui",
+			maidroid.get_formspec(droid, player, current_tab))
+		return true
+	end
+	
+	-- Toggle cooker functionality
+	if fields.toggle_cooker then
+		-- Toggle cooker functionality
+		if droid.pause then
+			droid.pause = false
+			if droid.core and droid.core.on_resume then
+				droid.core.on_resume(droid)
+			end
+			minetest.chat_send_player(player_name, "Cooker resumed")
+		else
+			droid.pause = true
+			if droid.core and droid.core.on_pause then
+				droid.core.on_pause(droid)
+			end
+			minetest.chat_send_player(player_name, "Cooker paused")
+		end
+		-- Refresh the formspec
+		local current_tab = droid.current_tab or 1
+		minetest.show_formspec(player_name, "maidroid:gui",
+			maidroid.get_formspec(droid, player, current_tab))
+		return true
+	end
+	
 	return false
 end
 
@@ -2436,134 +2566,6 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 		return
 	end
 	
-	-- Cooker tab field handling
-	if fields.toggle_cooker then
-		-- Toggle cooker functionality
-		if droid.pause then
-			droid.pause = false
-			if droid.core and droid.core.on_resume then
-				droid.core.on_resume(droid)
-			end
-			minetest.chat_send_player(player_name, "Cooker resumed")
-		else
-			droid.pause = true
-			if droid.core and droid.core.on_pause then
-				droid.core.on_pause(droid)
-			end
-			minetest.chat_send_player(player_name, "Cooker paused")
-		end
-		-- Refresh the formspec
-		local current_tab = droid.current_tab or 1
-		minetest.show_formspec(player_name, "maidroid:gui",
-			maidroid.get_formspec(droid, player, current_tab))
-		return
-	end
-	
-	-- Craftable pagination handling
-	if fields.craftable_prev then
-		-- Go to previous page
-		local current_page = droid.craftable_page or 1
-		if current_page > 1 then
-			droid.craftable_page = current_page - 1
-		end
-		-- Refresh the formspec
-		local current_tab = droid.current_tab or 1
-		minetest.show_formspec(player_name, "maidroid:gui",
-			maidroid.get_formspec(droid, player, current_tab))
-		return
-	end
-	
-	if fields.craftable_next then
-		-- Go to next page
-		local current_page = droid.craftable_page or 1
-		local craftable_outputs = {}
-		if maidroid.cores.generic_cooker and maidroid.cores.generic_cooker.get_craftable_outputs then
-			craftable_outputs = maidroid.cores.generic_cooker.get_craftable_outputs() or {}
-		end
-		if type(craftable_outputs) ~= "table" or #craftable_outputs == 0 then
-			craftable_outputs = maidroid.init_craftable_outputs
-		end
-		
-		local items_per_page = 12
-		local total_pages = math.ceil(#craftable_outputs / items_per_page)
-		
-		if current_page < total_pages then
-			droid.craftable_page = current_page + 1
-		end
-		-- Refresh the formspec
-		local current_tab = droid.current_tab or 1
-		minetest.show_formspec(player_name, "maidroid:gui",
-			maidroid.get_formspec(droid, player, current_tab))
-		return
-	end
-	
-	-- Desirable pagination handling
-	if fields.desirable_prev then
-		-- Go to previous page
-		local current_page = droid.desirable_page or 1
-		if current_page > 1 then
-			droid.desirable_page = current_page - 1
-		end
-		-- Refresh the formspec
-		local current_tab = droid.current_tab or 1
-		minetest.show_formspec(player_name, "maidroid:gui",
-			maidroid.get_formspec(droid, player, current_tab))
-		return
-	end
-	
-	if fields.desirable_next then
-		-- Go to next page
-		local current_page = droid.desirable_page or 1
-		local desirable_outputs = {}
-		
-		-- Build complete list from all pages using helper function
-		if type(droid.desirable_page_items) == "table" then
-			desirable_outputs = maidroid.build_complete_desirable_list(droid)
-		elseif type(droid.desired_craft_outputs) == "table" then
-			-- Fallback to regular desired outputs if page tracking not set
-			desirable_outputs = droid.desired_craft_outputs
-		end
-		
-		if type(desirable_outputs) ~= "table" or #desirable_outputs == 0 then
-			desirable_outputs = {}
-		end
-		
-		local items_per_page = 6
-		-- Always show at least 6 pages when there are desirable items
-		local total_pages = math.max(6, math.ceil(#desirable_outputs / items_per_page))
-		
-		if current_page < total_pages then
-			droid.desirable_page = current_page + 1
-		end
-		-- Refresh the formspec
-		local current_tab = droid.current_tab or 1
-		minetest.show_formspec(player_name, "maidroid:gui",
-			maidroid.get_formspec(droid, player, current_tab))
-		return
-	end
-	
-	-- Reset cooklist and reinitialize cookable
-	if fields.reset_cooklist then
-		maidroid.reset_cooklist_and_cookable(droid)
-		
-		-- Refresh the formspec
-		local current_tab = droid.current_tab or 1
-		minetest.show_formspec(player_name, "maidroid:gui",
-			maidroid.get_formspec(droid, minetest.get_player_by_name(player_name), current_tab))
-		return
-	end
-	
-	-- Reset desirable and reinitialize craftable
-	if fields.reset_desirable then
-		maidroid.reset_desirable_and_craftable(droid)
-		
-		-- Refresh the formspec
-		local current_tab = droid.current_tab or 1
-		minetest.show_formspec(player_name, "maidroid:gui",
-			maidroid.get_formspec(droid, player, current_tab))
-		return
-	end
-		
 	if maidroid.handle_cooker_receive_field(droid, player, player_name, fields) then
 		return
 	end
