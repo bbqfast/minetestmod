@@ -99,6 +99,10 @@ maidroid.get_staticdata = function(self, captured)
 		if self._activation_pos then
 			data.activation_pos = self._activation_pos
 		end
+		-- Save farming dimension mode
+		if self.farming_dim_mode then
+			data.farming_dim_mode = self.farming_dim_mode
+		end
 	end
 
 
@@ -317,3 +321,93 @@ function maidroid.crossed_boundary(self, width, length)
 	
 	return false
 end
+
+-- check_activation_position_and_boundary checks if maidroid is too far from activation position
+-- or has crossed the farm boundary, and teleports back if needed
+function maidroid.check_activation_position_and_boundary(self)
+	if self._activation_pos then
+		local current_pos = self:get_pos()
+		local distance = vector.distance(current_pos, self._activation_pos)
+		local max_distance = maidroid.get_max_distance_from_activation()
+        
+		if distance > max_distance then
+			lf("farming", "Too far from activation (" .. string.format("%.1f", distance) .. " > " .. max_distance .. "), teleporting back")
+			self.object:set_pos(self._activation_pos)
+		end
+		
+		-- Check boundary based on dimension mode
+		local dim_mode = maidroid.get_farming_dim_mode(self)
+		
+		if dim_mode == "rectangle" then
+			-- Check if maidroid crossed boundary using custom farm dimensions
+			local farm_length = self.farming_length or 5
+			local farm_width = self.farming_width or 5
+			if maidroid.crossed_boundary(self, farm_width, farm_length) then
+				lf("farming", "Crossed " .. farm_width .. "x" .. farm_length .. " rectangle boundary, teleporting back to activation position")
+				self.object:set_pos(self._activation_pos)
+			end
+		else -- default to "radius"
+			-- Check if maidroid crossed radius boundary
+			local farm_radius = self.farming_radius or 5
+			if distance > farm_radius then
+				lf("farming", "Crossed radius " .. farm_radius .. " boundary, teleporting back to activation position")
+				self.object:set_pos(self._activation_pos)
+			end
+		end
+	end
+end
+
+-- Function to set farming dimensions
+function maidroid.set_farming_dimensions(droid, length, width)
+	if not droid then
+		lf("farming", "set_farming_dimensions: droid is nil")
+		return false
+	end
+
+    lf("DEBUG farming:set_farming_dimensions", "set_farming_dimensions: droid is not nil")
+	
+	-- Validate and set length
+	if length and length > 0 and length <= 50 then
+		droid.farming_length = length
+		lf("farming", "Farming length set to: " .. length)
+	else
+		lf("farming", "Invalid length: " .. tostring(length) .. ". Please enter a number between 1 and 50.")
+		return false
+	end
+	
+	-- Validate and set width
+	if width and width > 0 and width <= 50 then
+		droid.farming_width = width
+		lf("farming", "Farming width set to: " .. width)
+	else
+		lf("farming", "Invalid width: " .. tostring(width) .. ". Please enter a number between 1 and 50.")
+		return false
+	end
+	
+	lf("farming", "Farming dimension set to " .. length .. "x" .. width)
+	return true
+end
+
+-- Function to set farming dimension mode (radius or rectangle) for specific droid
+function maidroid.set_farming_dim_mode(droid, mode)
+	-- Check for invalid mode first
+	if not mode or (mode ~= "radius" and mode ~= "rectangle") then
+		local error_msg = "Invalid farming dimension mode: " .. tostring(mode) .. ". Use 'radius' or 'rectangle'"
+		lf("DEBUG set_farming_dim_mode", error_msg)
+		error(error_msg)
+		return -- Exit after error
+	end
+	
+	-- Valid mode - proceed with setting
+	droid.farming_dim_mode = mode
+	lf("DEBUG set_farming_dim_mode", "Farming dimension mode set to: " .. mode .. " for droid at " .. minetest.pos_to_string(droid:get_pos()))
+	return true
+end
+
+-- Function to get farming dimension mode for specific droid
+function maidroid.get_farming_dim_mode(droid)
+    lf("DEBUG get_farming_dim_mode", "Farming dimension mode: " .. (droid.farming_dim_mode or "radius"))
+	return droid.farming_dim_mode or "radius"
+end
+
+

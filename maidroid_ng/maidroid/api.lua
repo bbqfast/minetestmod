@@ -1765,6 +1765,15 @@ function maidroid.get_formspec(self, player, tab)
 		return form
 	end
 
+
+    local dimode = maidroid.get_farming_dim_mode(self)
+    local dimode_index = (dimode == "rectangle") and "2" or "1"
+    lf("DEBUGGGG  api", "====================== dimode:" .. dimode)
+    lf("DEBUGGGG  api", "====================== dimode_index:" .. dimode_index)
+    -- error("")
+
+
+    -- ,,ctrl
 	if tab == 3 and owns then -- control tab
 		form = form .. enligthen_tool(self)
 			.. "list[detached:"..self.inventory_name..";main;3,0;8,3;]"
@@ -1776,7 +1785,7 @@ function maidroid.get_formspec(self, player, tab)
 			.. "label[7.1,4.2;" .. S("Width") .. "]"
 			.. "button[8,4.0;1.5,0.8;set_farming_dim;" .. S("Set") .. "]"
 			.. "label[4,4.8;" .. S("Dimension Mode") .. "]"
-			.. "dropdown[4,5.2;3,0.8;dim_mode;by radius,by rectangle;" .. ((self.farming_dim_mode == "rectangle") and "2" or "1") .. "]"
+			.. "dropdown[4,5.2;3,0.8;dim_mode;radius,rectangle;" .. dimode_index .. "]"
 		return form
 	end
 
@@ -1919,6 +1928,11 @@ local function on_activate(self, staticdata)
 		if data.activation_pos then
 			self._activation_pos = data.activation_pos
 			lf("api", "Loaded saved activation position: " .. minetest.pos_to_string(self._activation_pos))
+		end
+		-- Load farming dimension mode
+		if data.farming_dim_mode then
+			self.farming_dim_mode = data.farming_dim_mode
+			lf("api", "Loaded saved farming dimension mode: " .. self.farming_dim_mode)
 		end
 	end
 
@@ -2716,6 +2730,7 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 		return
 	end
 	
+    -- ,,x1
 	-- Control tab handling
 	lf("DEBUG api:receive_fields", "About to call handle_control_receive_fields")
 	if maidroid.handle_control_receive_fields(droid, player, player_name, fields) then
@@ -2727,8 +2742,6 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
     -- if maidroid.handle_farming_receive_fields(droid, player, player_name, fields) then
     --     return
     -- end
-
-    -- ,,x1
 
 	maidroid_buf[player_name] = nil
 	return true
@@ -2766,37 +2779,6 @@ if false then
 		minetest.register_alias("maidroid:maidroid_mk" .. i .. "_egg", "maidroid:maidroid_egg")
 		minetest.register_alias("maidroid_tool:captured_maidroid_mk" .. i .. "_egg", ":maidroid_tool:captured_maidroid_egg")
 	end
-end
-
--- Function to set farming dimensions
-function maidroid.set_farming_dimensions(droid, length, width)
-	if not droid then
-		lf("farming", "set_farming_dimensions: droid is nil")
-		return false
-	end
-
-    lf("DEBUG farming:set_farming_dimensions", "set_farming_dimensions: droid is not nil")
-	
-	-- Validate and set length
-	if length and length > 0 and length <= 50 then
-		droid.farming_length = length
-		lf("farming", "Farming length set to: " .. length)
-	else
-		lf("farming", "Invalid length: " .. tostring(length) .. ". Please enter a number between 1 and 50.")
-		return false
-	end
-	
-	-- Validate and set width
-	if width and width > 0 and width <= 50 then
-		droid.farming_width = width
-		lf("farming", "Farming width set to: " .. width)
-	else
-		lf("farming", "Invalid width: " .. tostring(width) .. ". Please enter a number between 1 and 50.")
-		return false
-	end
-	
-	lf("farming", "Farming dimension set to " .. length .. "x" .. width)
-	return true
 end
 
 -- Handle farming receive fields
@@ -2855,6 +2837,7 @@ function maidroid.handle_farming_receive_fields(droid, player, player_name, fiel
 	return true
 end
 
+-- ,,ctrl
 -- Handle control receive fields
 function maidroid.handle_control_receive_fields(droid, player, player_name, fields)
     lf("DEBUG api:handle_control_receive_fields", "====================== function maidroid.handle_control_receive_fields")
@@ -2896,17 +2879,26 @@ function maidroid.handle_control_receive_fields(droid, player, player_name, fiel
 	if fields.dim_mode then
         lf("DEBUG api:handle_control_receive_fields", "Dimension mode dropdown changed to: " .. fields.dim_mode)
 		-- Convert dropdown index (1-based) to mode value
-		local mode_value = nil
-		if fields.dim_mode == "1" then
-			mode_value = "radius"
-		elseif fields.dim_mode == "2" then
-			mode_value = "rectangle"
-		end
+		local mode_value = fields.dim_mode
+        
+		-- if fields.dim_mode == "1" then
+		-- 	mode_value = "radius"
+		-- elseif fields.dim_mode == "2" then
+		-- 	mode_value = "rectangle"
+		-- end
 		
+        
 		if mode_value then
 			droid.farming_dim_mode = mode_value
-			lf("DEBUG api:handle_control_receive_fields", "Farming dimension mode set to: " .. mode_value)
-			minetest.chat_send_player(player_name, "Dimension mode set to: " .. mode_value)
+            -- Safely call set_farming_dim_mode with error handling
+			local success, err = pcall(maidroid.set_farming_dim_mode, droid, mode_value)
+			if not success then
+				lf("ERROR api:handle_control_receive_fields", "Failed to set farming dimension mode: " .. tostring(err))
+				minetest.chat_send_player(player_name, "Error setting dimension mode: " .. tostring(err))
+			else
+				lf("DEBUG api:handle_control_receive_fields", "Farming dimension mode set to: " .. mode_value)
+				minetest.chat_send_player(player_name, "Dimension mode set to: " .. mode_value)
+			end
 			
 			-- Refresh the formspec to show updated dropdown state
 			local current_tab = droid.current_tab or 3 -- Control tab
@@ -2921,7 +2913,6 @@ end
 
 -- Create maidroid.api table to expose functions
 maidroid.api = {
-	set_farming_dimensions = maidroid.set_farming_dimensions,
 	handle_farming_receive_fields = maidroid.handle_farming_receive_fields,
 	handle_control_receive_fields = maidroid.handle_control_receive_fields,
 }

@@ -684,6 +684,9 @@ on_start = function(self)
 	-- Initialize low fence detection for farming core
 	self._use_low_fence = true
 	
+	-- Initialize farming dimension mode (default to radius)
+	self.farming_dim_mode = self.farming_dim_mode or "radius"
+	
 	-- Store activation position if not already set (retain last spawned position)
 	if not self._activation_pos then
 		self._activation_pos = self:get_pos()
@@ -1564,24 +1567,8 @@ end
 -- ,,step
 on_step = function(self, dtime, moveresult)
 	-- Check if maidroid is more than max_distance_from_activation blocks away from activation position
-	if self._activation_pos then
-		local current_pos = self:get_pos()
-		local distance = vector.distance(current_pos, self._activation_pos)
-		local max_distance = maidroid.get_max_distance_from_activation()
-        
-		if distance > max_distance then
-			lf("farming", "Too far from activation (" .. string.format("%.1f", distance) .. " > " .. max_distance .. "), teleporting back")
-			self.object:set_pos(self._activation_pos)
-		end
-		
-		-- Check if maidroid crossed boundary using custom farm dimensions
-		local farm_length = self.farming_length or 5
-		local farm_width = self.farming_width or 5
-		if maidroid.crossed_boundary(self, farm_width, farm_length) then
-			lf("farming", "Crossed " .. farm_width .. "x" .. farm_length .. " boundary, teleporting back to activation position")
-			self.object:set_pos(self._activation_pos)
-		end
-	end
+	-- Check activation position and boundary constraints
+	maidroid.check_activation_position_and_boundary(self)
 
 	if self.pause then
 		return
