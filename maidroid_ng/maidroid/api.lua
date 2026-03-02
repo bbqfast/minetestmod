@@ -1684,29 +1684,31 @@ end
 function maidroid.get_formspec(self, player, tab)
 	local owns = self:player_can_control(player)
 	lf("maidroid.get_formspec", "maidroid.get_formspec called by " .. player:get_player_name() .. " for tab: " .. tostring(tab))
-	-- Skip left panel for cooker tab (tab 5)
-	local is_cooker_tab = (tab == 5)
-	lf("maidroid.get_formspec", "is_cooker_tab: " .. tostring(is_cooker_tab))
 	
-	-- Use different form size for cooker tab to utilize full width
-	local form = is_cooker_tab and "size[14,7.4]" or "size[11,7.4]"
+	-- Calculate final tab number for cooker tab (will be determined later)
+	local is_cooker_tab = false
+	local cooker_tab_num = nil
 	
-	if not is_cooker_tab then
-		form = form .. "box[0.2,3.9;2.3,2.7;black]"
-			.. "box[0.3,4;2.1,2.5;#343848]"
-			-- .. "model[0.2,4;3,3;3d;maidroid.b3d;"
-			.. "model[0.2,4;3,3;3d;character.b3d;"
-			.. minetest.formspec_escape(self.textures[1])
-			.. ";0,180;false;true;200,219;7.5]" -- ]model
-			.. "label[0,6.6;" .. S("Health") .. "]"
-			.. "label[0,0;" .. S("this maidroid is ") .. "]"
-			.. "label[0.5,0.75;" .. self.core.description .. "]"
-	end
+    -- local form = is_cooker_tab and "size[14,7.4]" or "size[11,7.4]"
+	-- Use standard form size initially, will adjust if cooker tab
+	local form = "size[11,7.4]"
+	
+	-- Add model and left panel elements (will be hidden for cooker tab)
+	form = form .. "box[0.2,3.9;2.3,2.7;black]"
+		.. "box[0.3,4;2.1,2.5;#343848]"
+		-- .. "model[0.2,4;3,3;3d;maidroid.b3d;"
+		.. "model[0.2,4;3,3;3d;character.b3d;"
+		.. minetest.formspec_escape(self.textures[1])
+		.. ";0,180;false;true;200,219;7.5]" -- ]model
+		.. "label[0,6.6;" .. S("Health") .. "]"
+		.. "label[0,0;" .. S("this maidroid is ") .. "]"
+		.. "label[0.5,0.75;" .. self.core.description .. "]"
 	
     	-- Adjust tabheader position for cooker tab
 	local tabheader_pos = is_cooker_tab and "tabheader[0,0;tabheader;" or "tabheader[0,0;tabheader;"
 	form = form .. tabheader_pos .. S("Inventory")
 	.. ( owns and "," .. S("Flush") or "")
+	.. ( owns and "," .. S("Control") or "")
 	.. ( self.core.can_sell and "," .. S("Shop") or "" )
 	.. ( (owns and self.core.doc) and "," .. S("Doc") or "" )
 	.. ( (self.core.name == "generic_cooker" and owns) and "," .. S("Cooker") or "" )
@@ -1763,7 +1765,22 @@ function maidroid.get_formspec(self, player, tab)
 		return form
 	end
 
-	local tab_max = owns and 3 or 2
+	if tab == 3 and owns then -- control tab
+		form = form .. enligthen_tool(self)
+			.. "list[detached:"..self.inventory_name..";main;3,0;8,3;]"
+			.. "label[3,3.5;" .. S("Maidroid Controls") .. "]"
+			.. "label[4,3.8;" .. S("Farming Dimension") .. "]"
+			.. "field[4,4.3;1,0.8;farming_length;;" .. (self.farming_length or "5") .. "]"
+			.. "label[5.1,4.2;" .. S("Length") .. "]"
+			.. "field[6,4.3;1,0.8;farming_width;;" .. (self.farming_width or "5") .. "]"
+			.. "label[7.1,4.2;" .. S("Width") .. "]"
+			.. "button[8,4.0;1.5,0.8;set_farming_dim;" .. S("Set") .. "]"
+			.. "label[4,4.8;" .. S("Dimension Mode") .. "]"
+			.. "dropdown[4,5.2;3,0.8;dim_mode;by radius,by rectangle;" .. ((self.farming_dim_mode == "rectangle") and "2" or "1") .. "]"
+		return form
+	end
+
+	local tab_max = owns and 4 or 2
 	if tab == tab_max and self.core.can_sell then
 		if owns then
 			form = form .. enligthen_tool(self)
@@ -1791,8 +1808,21 @@ function maidroid.get_formspec(self, player, tab)
 	-- ,,tab
 	if owns and self.core.name == "generic_cooker" then
 		tab_max = tab_max + 1
+		cooker_tab_num = tab_max
 		if tab == tab_max then
-			return maidroid.handle_generic_cooker_tab(self, form)
+			is_cooker_tab = true
+			-- Build cooker form from scratch with correct size and tabheader only
+			local cooker_form = "size[14,7.4]"
+				.. "tabheader[0,0;tabheader;" .. S("Inventory")
+				.. ( owns and "," .. S("Flush") or "")
+				.. ( owns and "," .. S("Control") or "")
+				.. ( self.core.can_sell and "," .. S("Shop") or "" )
+				.. ( (owns and self.core.doc) and "," .. S("Doc") or "" )
+				.. ( (self.core.name == "generic_cooker" and owns) and "," .. S("Cooker") or "" )
+				.. ( (self.core.name == "traveller" and owns) and "," .. S("Traveller") or "" )
+				.. ( (self.core.name == "farming" and owns) and "," .. S("Farming") or "" )
+				.. ";" .. tab .. ";false;true]"
+			return maidroid.handle_generic_cooker_tab(self, cooker_form)
 		end
 	end
 	
@@ -2589,6 +2619,47 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 		return
 	end
 	
+	-- -- Control tab handlers
+	-- if fields.toggle_follow then
+	-- 	-- Toggle follow mode
+	-- 	if droid.core and droid.core.toggle_follow then
+	-- 		droid.core:toggle_follow(droid)
+	-- 	end
+	-- 	minetest.show_formspec(player_name, "maidroid:gui",
+	-- 		maidroid.get_formspec(droid, player, 3))
+	-- 	return
+	-- end
+	
+	-- if fields.toggle_stand then
+	-- 	-- Toggle stand mode
+	-- 	if droid.core and droid.core.toggle_stand then
+	-- 		droid.core:toggle_stand(droid)
+	-- 	end
+	-- 	minetest.show_formspec(player_name, "maidroid:gui",
+	-- 		maidroid.get_formspec(droid, player, 3))
+	-- 	return
+	-- end
+	
+	-- if fields.toggle_wander then
+	-- 	-- Toggle wander mode
+	-- 	if droid.core and droid.core.toggle_wander then
+	-- 		droid.core:toggle_wander(droid)
+	-- 	end
+	-- 	minetest.show_formspec(player_name, "maidroid:gui",
+	-- 		maidroid.get_formspec(droid, player, 3))
+	-- 	return
+	-- end
+	
+	-- if fields.go_home then
+	-- 	-- Send maidroid home
+	-- 	if droid.core and droid.core.go_home then
+	-- 		droid.core:go_home(droid)
+	-- 	end
+	-- 	minetest.show_formspec(player_name, "maidroid:gui",
+	-- 		maidroid.get_formspec(droid, player, 3))
+	-- 	return
+	-- end
+	
 	if maidroid.handle_cooker_receive_field(droid, player, player_name, fields) then
 		return
 	end
@@ -2645,10 +2716,19 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 		return
 	end
 	
-	-- Farming dimension handling
-	if maidroid.handle_farming_receive_fields(droid, player, player_name, fields) then
+	-- Control tab handling
+	lf("DEBUG api:receive_fields", "About to call handle_control_receive_fields")
+	if maidroid.handle_control_receive_fields(droid, player, player_name, fields) then
+		lf("DEBUG api:receive_fields", "handle_control_receive_fields returned true")
 		return
 	end
+	lf("DEBUG api:receive_fields", "handle_control_receive_fields returned false")
+
+    -- if maidroid.handle_farming_receive_fields(droid, player, player_name, fields) then
+    --     return
+    -- end
+
+    -- ,,x1
 
 	maidroid_buf[player_name] = nil
 	return true
@@ -2687,5 +2767,163 @@ if false then
 		minetest.register_alias("maidroid_tool:captured_maidroid_mk" .. i .. "_egg", ":maidroid_tool:captured_maidroid_egg")
 	end
 end
+
+-- Function to set farming dimensions
+function maidroid.set_farming_dimensions(droid, length, width)
+	if not droid then
+		lf("farming", "set_farming_dimensions: droid is nil")
+		return false
+	end
+
+    lf("DEBUG farming:set_farming_dimensions", "set_farming_dimensions: droid is not nil")
+	
+	-- Validate and set length
+	if length and length > 0 and length <= 50 then
+		droid.farming_length = length
+		lf("farming", "Farming length set to: " .. length)
+	else
+		lf("farming", "Invalid length: " .. tostring(length) .. ". Please enter a number between 1 and 50.")
+		return false
+	end
+	
+	-- Validate and set width
+	if width and width > 0 and width <= 50 then
+		droid.farming_width = width
+		lf("farming", "Farming width set to: " .. width)
+	else
+		lf("farming", "Invalid width: " .. tostring(width) .. ". Please enter a number between 1 and 50.")
+		return false
+	end
+	
+	lf("farming", "Farming dimension set to " .. length .. "x" .. width)
+	return true
+end
+
+-- Handle farming receive fields
+function maidroid.handle_farming_receive_fields(droid, player, player_name, fields)
+	if not (fields.set_farming_dim or fields.dim_mode or (fields.farming_length and fields.key_enter_field == "farming_length") or (fields.farming_width and fields.key_enter_field == "farming_width")) then
+		return false
+	end
+	
+	-- Handle dimension mode dropdown changes
+	if fields.dim_mode then
+		-- Convert dropdown index (1-based) to mode value
+		local mode_value = nil
+		if fields.dim_mode == "1" then
+			mode_value = "radius"
+		elseif fields.dim_mode == "2" then
+			mode_value = "rectangle"
+		end
+		
+		if mode_value then
+			droid.farming_dim_mode = mode_value
+			lf("farming", "Farming dimension mode set to: " .. mode_value)
+			minetest.chat_send_player(player_name, "Dimension mode set to: " .. mode_value)
+			
+			-- Refresh the formspec to show updated dropdown state
+			local current_tab = droid.current_tab or 3 -- Control tab
+			minetest.show_formspec(player_name, "maidroid:gui",
+				maidroid.get_formspec(droid, player, current_tab))
+		end
+		return true
+	end
+	
+	local length = tonumber(fields.farming_length)
+	local width = tonumber(fields.farming_width)
+	
+	lf("DEBUG api:register", "====================== function maidroid.set_farming_dimensions")
+	-- Use the new set_farming_dimensions function
+	local success = maidroid.set_farming_dimensions(droid, length, width)
+	if success then
+		minetest.chat_send_player(player_name, "Farming dimension set to " .. (length or droid.farming_length or 10) .. "x" .. (width or droid.farming_width or 10))
+	else
+		-- Show error messages for invalid values
+		if length and (length <= 0 or length > 50) then
+			minetest.chat_send_player(player_name, "Invalid length. Please enter a number between 1 and 50.")
+		end
+		if width and (width <= 0 or width > 50) then
+			minetest.chat_send_player(player_name, "Invalid width. Please enter a number between 1 and 50.")
+		end
+	end
+	
+	lf("DEBUG api:register", "====================== function maidroid.set_farming_dimensions")
+	-- Refresh the formspec to show updated values
+	local current_tab = droid.current_tab or 3 -- Control tab
+	minetest.show_formspec(player_name, "maidroid:gui",
+		maidroid.get_formspec(droid, player, current_tab))
+	
+	return true
+end
+
+-- Handle control receive fields
+function maidroid.handle_control_receive_fields(droid, player, player_name, fields)
+    lf("DEBUG api:handle_control_receive_fields", "====================== function maidroid.handle_control_receive_fields")
+    lf("DEBUG api:handle_control_receive_fields", "Received fields: " .. tostring(fields.set_farming_dim) .. ", " .. tostring(fields.dim_mode) .. ", " .. tostring(fields.farming_length) .. ", " .. tostring(fields.farming_width))
+	if not (fields.set_farming_dim or fields.dim_mode or (fields.farming_length and fields.key_enter_field == "farming_length") or (fields.farming_width and fields.key_enter_field == "farming_width")) then
+		return false
+	end
+	
+	-- Handle Set button click first (takes priority over dropdown)
+	if fields.set_farming_dim then
+		local length = tonumber(fields.farming_length)
+		local width = tonumber(fields.farming_width)
+		
+		lf("DEBUG api:register", "====================== function maidroid.set_farming_dimensions")
+		-- Use the new set_farming_dimensions function
+		local success = maidroid.set_farming_dimensions(droid, length, width)
+		if success then
+			minetest.chat_send_player(player_name, "Farming dimension set to " .. (length or droid.farming_length or 10) .. "x" .. (width or droid.farming_width or 10))
+		else
+			-- Show error messages for invalid values
+			if length and (length <= 0 or length > 50) then
+				minetest.chat_send_player(player_name, "Invalid length. Please enter a number between 1 and 50.")
+			end
+			if width and (width <= 0 or width > 50) then
+				minetest.chat_send_player(player_name, "Invalid width. Please enter a number between 1 and 50.")
+			end
+		end
+		
+		lf("DEBUG api:register", "====================== function maidroid.set_farming_dimensions")
+		-- Refresh the formspec to show updated values
+		local current_tab = droid.current_tab or 3 -- Control tab
+		minetest.show_formspec(player_name, "maidroid:gui",
+			maidroid.get_formspec(droid, player, current_tab))
+		
+		return true
+	end
+	
+	-- Handle dimension mode dropdown changes (only if not Set button)
+	if fields.dim_mode then
+        lf("DEBUG api:handle_control_receive_fields", "Dimension mode dropdown changed to: " .. fields.dim_mode)
+		-- Convert dropdown index (1-based) to mode value
+		local mode_value = nil
+		if fields.dim_mode == "1" then
+			mode_value = "radius"
+		elseif fields.dim_mode == "2" then
+			mode_value = "rectangle"
+		end
+		
+		if mode_value then
+			droid.farming_dim_mode = mode_value
+			lf("DEBUG api:handle_control_receive_fields", "Farming dimension mode set to: " .. mode_value)
+			minetest.chat_send_player(player_name, "Dimension mode set to: " .. mode_value)
+			
+			-- Refresh the formspec to show updated dropdown state
+			local current_tab = droid.current_tab or 3 -- Control tab
+			minetest.show_formspec(player_name, "maidroid:gui",
+				maidroid.get_formspec(droid, player, current_tab))
+		end
+		return true
+	end
+	
+	return true
+end
+
+-- Create maidroid.api table to expose functions
+maidroid.api = {
+	set_farming_dimensions = maidroid.set_farming_dimensions,
+	handle_farming_receive_fields = maidroid.handle_farming_receive_fields,
+	handle_control_receive_fields = maidroid.handle_control_receive_fields,
+}
 
 -- vim: ai:noet:ts=4:sw=4:fdm=indent:syntax=lua
