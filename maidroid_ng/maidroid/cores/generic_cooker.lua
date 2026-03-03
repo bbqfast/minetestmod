@@ -1574,6 +1574,7 @@ on_start = function(droid)
     -- end
     
     -- tests()
+    droid._use_low_fence = true
     lf("generic_cooker", "------------------------------------------------on_start------------------------------------------------")
     
     -- Store activation position if not already set (retain last spawned position)

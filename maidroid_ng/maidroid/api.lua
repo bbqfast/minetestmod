@@ -1685,6 +1685,11 @@ function maidroid.get_formspec(self, player, tab)
 	local owns = self:player_can_control(player)
 	lf("maidroid.get_formspec", "maidroid.get_formspec called by " .. player:get_player_name() .. " for tab: " .. tostring(tab))
 	
+	-- Debug: Log tab number to see which tab is being requested
+	if tab == 3 then
+		lf("DEBUG api:get_formspec", "Control tab (tab 3) requested - should reach control block")
+	end
+	
 	-- Calculate final tab number for cooker tab (will be determined later)
 	local is_cooker_tab = false
 	local cooker_tab_num = nil
@@ -1776,16 +1781,18 @@ function maidroid.get_formspec(self, player, tab)
     -- ,,ctrl
 	if tab == 3 and owns then -- control tab
 		form = form .. enligthen_tool(self)
-			.. "list[detached:"..self.inventory_name..";main;3,0;8,3;]"
-			.. "label[3,3.5;" .. S("Maidroid Controls") .. "]"
-			.. "label[4,3.8;" .. S("Farming Dimension") .. "]"
-			.. "field[4,4.3;1,0.8;farming_length;;" .. (self.farming_length or "5") .. "]"
-			.. "label[5.1,4.2;" .. S("Length") .. "]"
-			.. "field[6,4.3;1,0.8;farming_width;;" .. (self.farming_width or "5") .. "]"
-			.. "label[7.1,4.2;" .. S("Width") .. "]"
-			.. "button[8,4.0;1.5,0.8;set_farming_dim;" .. S("Set") .. "]"
-			.. "label[4,4.8;" .. S("Dimension Mode") .. "]"
-			.. "dropdown[4,5.2;3,0.8;dim_mode;radius,rectangle;" .. dimode_index .. "]"
+			.. "label[3,0.5;" .. S("Maidroid Controls") .. "]"
+			.. "label[3,1.5;" .. S("Farming Dimension") .. "]"
+			.. "field[3,2.0;1,0.8;farming_length;;" .. (self.farming_length or "5") .. "]"
+			.. "label[4.1,1.9;" .. S("Length") .. "]"
+			.. "field[5,2.0;1,0.8;farming_width;;" .. (self.farming_width or "5") .. "]"
+			.. "label[6.1,1.9;" .. S("Width") .. "]"
+			.. "button[7,1.7;1.5,0.8;set_farming_dim;" .. S("Set") .. "]"
+			.. "label[3,2.5;" .. S("Dimension Mode") .. "]"
+			.. "dropdown[3,2.9;3,0.8;dim_mode;radius,rectangle;" .. dimode_index .. "]"
+			.. "label[7,2.5;" .. S("Low Fence Mode") .. "]"
+			.. "checkbox[7,2.9;low_fence_mode;" .. S("Enable") .. ";" .. tostring(self._use_low_fence == true) .. "]"
+		lf("DEBUG api:get_formspec", "Low fence mode state: " .. tostring(self._use_low_fence) .. " (checkbox: " .. tostring(self._use_low_fence == true) .. ")")
 		return form
 	end
 
@@ -2600,6 +2607,9 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 		return
 	end
 
+	-- Debug: Log all received fields
+	lf("DEBUG api:receive_fields", "Received fields: " .. dump(fields))
+
 	local player_name = player:get_player_name()
 	if not maidroid_buf[player_name] then
 		return
@@ -2841,8 +2851,8 @@ end
 -- Handle control receive fields
 function maidroid.handle_control_receive_fields(droid, player, player_name, fields)
     lf("DEBUG api:handle_control_receive_fields", "====================== function maidroid.handle_control_receive_fields")
-    lf("DEBUG api:handle_control_receive_fields", "Received fields: " .. tostring(fields.set_farming_dim) .. ", " .. tostring(fields.dim_mode) .. ", " .. tostring(fields.farming_length) .. ", " .. tostring(fields.farming_width))
-	if not (fields.set_farming_dim or fields.dim_mode or (fields.farming_length and fields.key_enter_field == "farming_length") or (fields.farming_width and fields.key_enter_field == "farming_width")) then
+    	lf("DEBUG api:handle_control_receive_fields", "Received fields: " .. tostring(fields.set_farming_dim) .. ", " .. tostring(fields.dim_mode) .. ", " .. tostring(fields.farming_length) .. ", " .. tostring(fields.farming_width) .. ", " .. tostring(fields.low_fence_mode))
+	if not (fields.set_farming_dim or fields.dim_mode or (fields.farming_length and fields.key_enter_field == "farming_length") or (fields.farming_width and fields.key_enter_field == "farming_width") or fields.low_fence_mode ~= nil) then
 		return false
 	end
 	
@@ -2875,8 +2885,24 @@ function maidroid.handle_control_receive_fields(droid, player, player_name, fiel
 		return true
 	end
 	
+	-- Handle low fence mode checkbox,,x1
+	if fields.low_fence_mode ~= nil and tostring(fields.low_fence_mode) ~= tostring(droid._use_low_fence) then
+		minetest.chat_send_player(player_name, "DEBUG: Low fence mode handler reached!")
+		lf("DEBUG api:handle_control_receive_fields", "Low fence mode checkbox changed to: " .. tostring(fields.low_fence_mode))
+		droid._use_low_fence = fields.low_fence_mode == "true"
+		
+		lf("DEBUG api:handle_control_receive_fields", "Low fence mode set to: " .. tostring(droid._use_low_fence))
+		minetest.chat_send_player(player_name, "Low fence mode " .. (droid._use_low_fence and "enabled" or "disabled"))
+		
+		-- Refresh the formspec to show updated checkbox state
+		local current_tab = droid.current_tab or 3 -- Control tab
+		minetest.show_formspec(player_name, "maidroid:gui",
+			maidroid.get_formspec(droid, player, current_tab))
+		return true
+	end
+	
 	-- Handle dimension mode dropdown changes (only if not Set button)
-	if fields.dim_mode then
+	if fields.dim_mode and fields.dim_mode ~= droid.farming_dim_mode then
         lf("DEBUG api:handle_control_receive_fields", "Dimension mode dropdown changed to: " .. fields.dim_mode)
 		-- Convert dropdown index (1-based) to mode value
 		local mode_value = fields.dim_mode
