@@ -103,6 +103,10 @@ maidroid.get_staticdata = function(self, captured)
 		if self.farming_dim_mode then
 			data.farming_dim_mode = self.farming_dim_mode
 		end
+		-- Save low fence mode
+		if self._use_low_fence ~= nil then
+			data._use_low_fence = self._use_low_fence
+		end
 	end
 
 
@@ -330,13 +334,20 @@ function maidroid.check_activation_position_and_boundary(self)
 		local distance = vector.distance(current_pos, self._activation_pos)
 		local max_distance = maidroid.get_max_distance_from_activation()
         
-		if distance > max_distance then
+        -- if not self._is_bounded then
+        local dim_mode = maidroid.get_farming_dim_mode(self)
+        if dim_mode == "none" then
+            return
+        end
+
+
+		if dim_mode == "radius" and distance > max_distance then
 			lf("farming", "Too far from activation (" .. string.format("%.1f", distance) .. " > " .. max_distance .. "), teleporting back")
 			self.object:set_pos(self._activation_pos)
+            return
 		end
 		
 		-- Check boundary based on dimension mode
-		local dim_mode = maidroid.get_farming_dim_mode(self)
 		
 		if dim_mode == "rectangle" then
 			-- Check if maidroid crossed boundary using custom farm dimensions
@@ -346,13 +357,13 @@ function maidroid.check_activation_position_and_boundary(self)
 				lf("farming", "Crossed " .. farm_width .. "x" .. farm_length .. " rectangle boundary, teleporting back to activation position")
 				self.object:set_pos(self._activation_pos)
 			end
-		else -- default to "radius"
-			-- Check if maidroid crossed radius boundary
-			local farm_radius = self.farming_radius or 5
-			if distance > farm_radius then
-				lf("farming", "Crossed radius " .. farm_radius .. " boundary, teleporting back to activation position")
-				self.object:set_pos(self._activation_pos)
-			end
+		-- else -- default to "radius"
+		-- 	-- Check if maidroid crossed radius boundary
+		-- 	local farm_radius = self.farming_radius or 5
+		-- 	if distance > farm_radius then
+		-- 		lf("farming", "Crossed radius " .. farm_radius .. " boundary, teleporting back to activation position")
+		-- 		self.object:set_pos(self._activation_pos)
+		-- 	end
 		end
 	end
 end

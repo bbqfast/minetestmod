@@ -1789,7 +1789,7 @@ function maidroid.get_formspec(self, player, tab)
 			.. "label[6.1,1.9;" .. S("Width") .. "]"
 			.. "button[7,1.7;1.5,0.8;set_farming_dim;" .. S("Set") .. "]"
 			.. "label[3,2.5;" .. S("Dimension Mode") .. "]"
-			.. "dropdown[3,2.9;3,0.8;dim_mode;radius,rectangle;" .. dimode_index .. "]"
+			.. "dropdown[3,2.9;3,0.8;dim_mode;radius,rectangle;none;" .. dimode_index .. "]"
 			.. "label[7,2.5;" .. S("Low Fence Mode") .. "]"
 			.. "checkbox[7,2.9;low_fence_mode;" .. S("Enable") .. ";" .. tostring(self._use_low_fence == true) .. "]"
 		lf("DEBUG api:get_formspec", "Low fence mode state: " .. tostring(self._use_low_fence) .. " (checkbox: " .. tostring(self._use_low_fence == true) .. ")")
@@ -1940,6 +1940,11 @@ local function on_activate(self, staticdata)
 		if data.farming_dim_mode then
 			self.farming_dim_mode = data.farming_dim_mode
 			lf("api", "Loaded saved farming dimension mode: " .. self.farming_dim_mode)
+		end
+		-- Load low fence mode
+		if data._use_low_fence ~= nil then
+			self._use_low_fence = data._use_low_fence
+			lf("api", "Loaded saved low fence mode: " .. tostring(self._use_low_fence))
 		end
 	end
 
@@ -2805,6 +2810,8 @@ function maidroid.handle_farming_receive_fields(droid, player, player_name, fiel
 			mode_value = "radius"
 		elseif fields.dim_mode == "2" then
 			mode_value = "rectangle"
+		elseif fields.dim_mode == "3" then
+			mode_value = "none"
 		end
 		
 		if mode_value then

@@ -677,12 +677,15 @@ select_seed = function(self)
 	end
 end
 
+-- ,,start
 on_start = function(self)
 	self.path = nil
 	wander_core.on_start(self)
 	
 	-- Initialize low fence detection for farming core
 	self._use_low_fence = true
+    self._is_bounded = true
+    self._mow_only = true
 	
 	-- Initialize farming dimension mode (default to radius)
 	self.farming_dim_mode = self.farming_dim_mode or "radius"
@@ -1007,7 +1010,7 @@ search_and_harvest = function(self, pos, inv)
     -- lf("[maidroid:farming]", "Searching for mowable plants near " .. minetest.pos_to_string(pos))
     local dest = search(pos, is_mowable, self.owner)
     if dest then
-        -- lf("[maidroid:farming]", "Found mowable plant at " .. minetest.pos_to_string(dest))
+        lf("[maidroid:farming]", "Found mowable plant at " .. minetest.pos_to_string(dest))
     else
         lf("farming:task", "No mowable plants found")
     end
@@ -1073,7 +1076,7 @@ task = function(self)
     lf("farming:task", "task() [maidroid:farming] lnode=" .. lname .. " cnode=" .. cname)
 
     -- error("dummy error")
-    if cnode.name == "air" and is_valid_soil(lnode.name) then
+    if not self._mow_only and cnode.name == "air" and is_valid_soil(lnode.name) then
         lf("farming:task", "Convert dirt to soil at "..minetest.pos_to_string(lpos))
         lf("farming:task", "Before: "..cnode.name)
         minetest.set_node(lpos, { name = "farming:soil" })
@@ -1083,7 +1086,7 @@ task = function(self)
 
     -- First, occasionally try to dump an oversized stack into a nearby chest.
     -- This may initiate a path-following action toward a chest.
-    if maybe_dump_to_nearby_chest(self, inv, pos) then
+    if not self._mow_only and maybe_dump_to_nearby_chest(self, inv, pos) then
         return
     end
 
@@ -1092,18 +1095,24 @@ task = function(self)
 
     -- Ensure there is water within 3 nodes horizontally on the same y as lpos; if not, try to place a water source nearby
     -- only if LT on standing soil
-    check_and_place_water(self, lpos, lnode, cnode)
+    if not self._mow_only then
+        check_and_place_water(self, lpos, lnode, cnode)
+    end
 
-    if no_search_and_collect_papyrus(self, pos, inv) then
+    if not self._mow_only and no_search_and_collect_papyrus(self, pos, inv) then
         return
     end
     -- Planting logic
-    if no_search_and_plant(self, pos, inv) then
+    if not self._mow_only and no_search_and_plant(self, pos, inv) then
         return
     end
-
+-- ,,x1
     -- Harvesting
-    if no_search_and_harvest(self, pos, inv) then
+    -- if no_search_and_harvest(self, pos, inv) then
+    --     return
+    -- end
+
+    if search_and_harvest(self, pos, inv) then
         return
     end
 
@@ -1467,7 +1476,9 @@ mow = function(self, dtime)
 		harvest_metrics[mature] = (harvest_metrics[mature] or 0) + 1
 		lf("farming:mow", "harvest_metrics updated: " .. mature .. " = " .. harvest_metrics[mature])
 		
-		replant_after_harvest(self, mature, self.destination)
+        if not self._mow_only then
+		    replant_after_harvest(self, mature, self.destination)
+        end
 		to_wander(self, "farming:mow_done", 0, timers.change_dir_max, "mow")
 	end
  end

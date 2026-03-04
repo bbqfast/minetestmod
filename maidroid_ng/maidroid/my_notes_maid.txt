@@ -173,7 +173,7 @@ Updates:
 - set farming dimension UI
 - added new tab for control
 - handling dimension mode
-
+- UI configure low fence mode
 
 - refac: move non ui func out of api
 - refac: move register core

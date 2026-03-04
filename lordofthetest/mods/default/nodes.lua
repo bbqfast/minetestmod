@@ -1,5 +1,8 @@
 -- mods/default/nodes.lua
 
+-- Load common global flags
+dofile(minetest.get_modpath("default") .. "/global_flags.lua")
+
 minetest.register_node("default:stone", {
 	description = "Stone",
 	tiles = {"default_stone.png"},
@@ -144,7 +147,7 @@ minetest.register_node("default:dirt", {
 minetest.register_abm({
 	nodenames = {"default:dirt"},
 	interval = 2,
-	chance = 200,
+	chance = FAST_GRASS_CHANGES and 10 or 200,
 	action = function(pos, node)
 		local above = {x=pos.x, y=pos.y+1, z=pos.z}
 		local name = minetest.get_node(above).name

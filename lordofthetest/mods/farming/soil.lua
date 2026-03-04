@@ -1,6 +1,9 @@
 
 local S = minetest.get_translator("farming")
 
+-- Load common global flags
+dofile(minetest.get_modpath("default") .. "/global_flags.lua")
+
 -- default dry soil node
 
 local dry_soil = "farming:soil"
@@ -144,8 +147,8 @@ minetest.register_alias("farming:desert_sand_soil_wet", dry_soil .. "_wet")
 minetest.register_abm({
 	label = "Soil changes",
 	nodenames = {"group:field"},
-	interval = 15,
-	chance = 4,
+	interval = FAST_SOIL_CHANGES and 1 or 15,
+	chance = FAST_SOIL_CHANGES and 1 or 4,
 	catch_up = false,
 
 	action = function(pos, node)
