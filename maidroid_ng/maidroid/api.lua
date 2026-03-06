@@ -1946,6 +1946,11 @@ local function on_activate(self, staticdata)
 			self._use_low_fence = data._use_low_fence
 			lf("api", "Loaded saved low fence mode: " .. tostring(self._use_low_fence))
 		end
+		-- Load mow only mode
+		if data._mow_only ~= nil then
+			self._mow_only = data._mow_only
+			lf("api", "Loaded saved mow only mode: " .. tostring(self._mow_only))
+		end
 	end
 
 	self.object:set_nametag_attributes({ text = self.nametag, color = { a=255, r=96, g=224, b=96 }})
@@ -1987,33 +1992,6 @@ local function on_activate(self, staticdata)
 end
 
 
-local cmd_maidroid_ls = {
-	params = "",
-	description = S("List all maidroid_staticdata_*.txt files in this world"),
-	privs = { maidroid = true },
-	func = function(name, param)
-		local worldpath = minetest.get_worldpath() or "."
-		local files = minetest.get_dir_list(worldpath, false) or {}
-		local ids = {}
-		for _, fname in ipairs(files) do
-			-- match files like maidroid_staticdata_<id>.txt
-			local id = fname:match("^maidroid_staticdata_(.+)%.txt$")
-			if id then
-				table.insert(ids, id)
-			end
-		end
-
-		if #ids == 0 then
-			return true, "No maidroid_staticdata_*.txt files found in this world."
-		end
-
-		table.sort(ids)
-		return true, "Saved maidroids (" .. #ids .. "): \n" .. table.concat(ids, ", ")
-	end,
-}
-
-minetest.register_chatcommand("maidroid_ls", cmd_maidroid_ls)
-minetest.register_chatcommand("mr_ls", cmd_maidroid_ls)
 
 -- pickup_item pickup collect all stacks from world in radius
 local pickup_item = function(self, radius)
@@ -2754,9 +2732,9 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 	end
 	lf("DEBUG api:receive_fields", "handle_control_receive_fields returned false")
 
-    -- if maidroid.handle_farming_receive_fields(droid, player, player_name, fields) then
-    --     return
-    -- end
+    if maidroid.handle_farming_receive_fields(droid, player, player_name, fields) then
+        return
+    end
 
 	maidroid_buf[player_name] = nil
 	return true
@@ -2798,8 +2776,24 @@ end
 
 -- Handle farming receive fields
 function maidroid.handle_farming_receive_fields(droid, player, player_name, fields)
-	if not (fields.set_farming_dim or fields.dim_mode or (fields.farming_length and fields.key_enter_field == "farming_length") or (fields.farming_width and fields.key_enter_field == "farming_width")) then
+	if not (fields.set_farming_dim or fields.dim_mode or fields.mow_only or (fields.farming_length and fields.key_enter_field == "farming_length") or (fields.farming_width and fields.key_enter_field == "farming_width")) then
 		return false
+	end
+	
+	-- Handle mow only checkbox
+	if fields.mow_only ~= nil then
+		local new_value = fields.mow_only == "true"
+		if droid._mow_only ~= new_value then
+			droid._mow_only = new_value
+			lf("farming", "Mow only setting set to: " .. tostring(new_value))
+			minetest.chat_send_player(player_name, "Mow only " .. (new_value and "enabled" or "disabled"))
+			
+			-- Refresh the formspec to show updated checkbox state
+			local current_tab = droid.current_tab or 4 -- Farming tab
+			minetest.show_formspec(player_name, "maidroid:gui",
+				maidroid.get_formspec(droid, player, current_tab))
+		end
+		return true
 	end
 	
 	-- Handle dimension mode dropdown changes
@@ -2824,6 +2818,21 @@ function maidroid.handle_farming_receive_fields(droid, player, player_name, fiel
 			minetest.show_formspec(player_name, "maidroid:gui",
 				maidroid.get_formspec(droid, player, current_tab))
 		end
+		return true
+	end
+	
+	-- Handle mow_only checkbox changes
+	if fields.mow_only ~= nil and tostring(fields.mow_only) ~= tostring(droid._mow_only) then
+		lf("DEBUG api:handle_farming_receive_fields", "Mow only checkbox changed to: " .. tostring(fields.mow_only))
+		droid._mow_only = fields.mow_only == "true"
+		
+		lf("DEBUG api:handle_farming_receive_fields", "Mow only mode set to: " .. tostring(droid._mow_only))
+		minetest.chat_send_player(player_name, "Mow only mode " .. (droid._mow_only and "enabled" or "disabled"))
+		
+		-- Refresh the formspec to show updated checkbox state
+		local current_tab = droid.current_tab or 4 -- Farming tab
+		minetest.show_formspec(player_name, "maidroid:gui",
+			maidroid.get_formspec(droid, player, current_tab))
 		return true
 	end
 	

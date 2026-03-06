@@ -1506,15 +1506,17 @@ on_step = function(droid, dtime, moveresult)
 	droid:pickup_item()
 
 	-- Check if maidroid is more than max_distance_from_activation blocks away from activation position
-	if droid._activation_pos then
-		local current_pos = droid:get_pos()
-		local distance = vector.distance(current_pos, droid._activation_pos)
-		local max_distance = get_max_distance_from_activation()
-		if distance > max_distance then
-			lf("generic_cooker", "Too far from activation (" .. string.format("%.1f", distance) .. " > " .. max_distance .. "), teleporting back")
-			droid.object:set_pos(droid._activation_pos)
-		end
-	end
+	maidroid.check_activation_position_and_boundary(droid)
+	-- if droid._activation_pos then
+	-- 	local current_pos = droid:get_pos()
+	-- 	local distance = vector.distance(current_pos, droid._activation_pos)
+	-- 	local max_distance = get_max_distance_from_activation()
+	-- 	if distance > max_distance then
+	-- 		lf("generic_cooker", "Too far from activation (" .. string.format("%.1f", distance) .. " > " .. max_distance .. "), teleporting back")
+	-- 		droid.object:set_pos(droid._activation_pos)
+	-- 	end
+	-- end
+    
 
 	-- Update metrics logging timer
 	metrics_log_timer = metrics_log_timer + dtime

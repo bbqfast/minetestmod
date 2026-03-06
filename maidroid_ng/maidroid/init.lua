@@ -273,6 +273,94 @@ local cmd_maidroid_surface = {
 
 minetest.register_chatcommand("maidroid_surface", cmd_maidroid_surface)
 
+-- Chatcommand to open maidroid teleport GUI
+local cmd_maidroid_teleport_gui = {
+	description = "Open GUI to select and teleport to a maidroid",
+	privs = {server=true},
+	func = function(name)
+		lf("teleport_gui", "Chatcommand invoked by player: " .. name)
+		local player = minetest.get_player_by_name(name)
+		if not player then
+			lf("teleport_gui", "Player not found: " .. name)
+			return false, "Player not found."
+		end
+
+		-- Collect all maidroids in the world
+		local maidroids = {}
+		local all_objects = {}
+		
+		-- Get all connected players and search around them for maidroids
+		local players = minetest.get_connected_players()
+		lf("teleport_gui", "Found " .. #players .. " connected players")
+		for _, p in ipairs(players) do
+			local objs = minetest.get_objects_inside_radius(p:get_pos(), 1000) -- Large radius
+			lf("teleport_gui", "Found " .. #objs .. " objects around player " .. p:get_player_name())
+			for _, obj in ipairs(objs) do
+				table.insert(all_objects, obj)
+			end
+		end
+
+		-- Process found objects
+		local maidroid_count = 0
+		for _, obj in ipairs(all_objects) do
+			local ent = obj:get_luaentity()
+			if ent and maidroid.is_maidroid(ent.name) then
+				local pos = obj:get_pos()
+				local display_name = ent.nametag and ent.nametag ~= "" and ent.nametag or "Unnamed"
+				table.insert(maidroids, {
+					name = display_name,
+					pos = pos,
+					entity = ent
+				})
+				maidroid_count = maidroid_count + 1
+				lf("teleport_gui", "Found maidroid: " .. display_name .. " at " .. minetest.pos_to_string(pos))
+			end
+		end
+		lf("teleport_gui", "Total maidroids found: " .. maidroid_count)
+
+		-- Create formspec
+		local formspec = "size[8,9]" ..
+			"label[0.5,0.5;Select Maidroid to Teleport:]" ..
+			"textlist[0.5,1;7,6;maidroid_list;"
+
+		-- Add maidroids to list
+		if #maidroids == 0 then
+			formspec = formspec .. "No maidroids found"
+			lf("teleport_gui", "No maidroids found, showing empty list")
+		else
+			for i, maidroid in ipairs(maidroids) do
+				local pos_str = minetest.pos_to_string(vector.round(maidroid.pos))
+				-- formspec = formspec .. minetest.formspec_escape(maidroid.name) .. " @ " .. pos_str
+				formspec = formspec .. minetest.formspec_escape(maidroid.name)
+				if i < #maidroids then
+					formspec = formspec .. ","
+				end
+			end
+		end
+
+		formspec = formspec .. "]" ..
+			"button[1,7.5;3,1;teleport;Teleport]" ..
+			"button[4,7.5;3,1;cancel;Cancel]"
+
+		-- Store maidroid data for this player
+		if not maidroid.maidroid_teleport_data then
+			maidroid.maidroid_teleport_data = {}
+		end
+		maidroid.maidroid_teleport_data[name] = {
+			maidroids = maidroids,
+			selected_index = nil
+		}
+		lf("teleport_gui", "Stored maidroid data for player: " .. name .. " (" .. #maidroids .. " maidroids)")
+
+		minetest.show_formspec(name, "maidroid:teleport_gui", formspec)
+		lf("teleport_gui", "Opened teleport GUI for player: " .. name)
+		return true, "Maidroid teleport GUI opened"
+	end
+}
+
+minetest.register_chatcommand("maidroid_teleport_gui", cmd_maidroid_teleport_gui)
+minetest.register_chatcommand("mr_tpgui", cmd_maidroid_teleport_gui)
+
 local cmd_mr_surface = {
 	description = "Teleport to ground level (0) or move vertically relative to your current position",
 	privs = {server=true},
@@ -313,6 +401,95 @@ local cmd_mr_surface = {
 }
 
 minetest.register_chatcommand("mr_surface", cmd_mr_surface)
+
+
+-- Form handler for maidroid teleport GUI
+minetest.register_on_player_receive_fields(function(player, formname, fields)
+	if formname ~= "maidroid:teleport_gui" then
+		return
+	end
+
+	local player_name = player:get_player_name()
+	lf("teleport_gui", "Form received from player: " .. player_name .. ", fields: " .. dump(fields))
+	
+	-- Handle textlist selection (store the selected index)
+	if fields.maidroid_list and fields.maidroid_list ~= "" then
+		-- Parse selection (format: "CHG:index" or just "index")
+		local index = tonumber(fields.maidroid_list:match("^CHG:(%d+)$") or fields.maidroid_list:match("^(%d+)$"))
+		if index then
+			-- Store the selected index for this player
+			if not maidroid.maidroid_teleport_data then
+				maidroid.maidroid_teleport_data = {}
+			end
+			if not maidroid.maidroid_teleport_data[player_name] then
+				maidroid.maidroid_teleport_data[player_name] = {}
+			end
+			maidroid.maidroid_teleport_data[player_name].selected_index = index
+			lf("teleport_gui", "Stored selected index " .. index .. " for player: " .. player_name)
+		end
+		return -- Don't process other fields yet, wait for button click
+	end
+	
+	-- Handle cancel button
+	if fields.cancel then
+		lf("teleport_gui", "Cancel button pressed by player: " .. player_name)
+		-- Clean up stored data
+		if maidroid.maidroid_teleport_data and maidroid.maidroid_teleport_data[player_name] then
+			maidroid.maidroid_teleport_data[player_name] = nil
+			lf("teleport_gui", "Cleaned up teleport data for player: " .. player_name)
+		end
+		return
+	end
+
+	-- Handle teleport button
+	if fields.teleport then
+		lf("teleport_gui", "Teleport button pressed by player: " .. player_name)
+		local player_data = maidroid.maidroid_teleport_data and maidroid.maidroid_teleport_data[player_name]
+		local maidroids = player_data and player_data.maidroids or {}
+		local selected_index = player_data and player_data.selected_index
+		
+		if not maidroids or #maidroids == 0 then
+			lf("teleport_gui", "No maidroids available for teleport for player: " .. player_name)
+			minetest.chat_send_player(player_name, "No maidroids available for teleport")
+			return
+		end
+
+		if not selected_index then
+			lf("teleport_gui", "No maidroid selected by player: " .. player_name)
+			minetest.chat_send_player(player_name, "Please select a maidroid first")
+			return
+		end
+
+		lf("teleport_gui", "Using stored selection index: " .. tostring(selected_index))
+		if selected_index < 1 or selected_index > #maidroids then
+			lf("teleport_gui", "Invalid selection index: " .. tostring(selected_index) .. " for player: " .. player_name)
+			minetest.chat_send_player(player_name, "Invalid selection")
+			return
+		end
+
+		local selected_maidroid = maidroids[selected_index]
+		if not selected_maidroid or not selected_maidroid.pos then
+			lf("teleport_gui", "Selected maidroid position not available for player: " .. player_name)
+			minetest.chat_send_player(player_name, "Selected maidroid position not available")
+			return
+		end
+
+		-- Teleport player to maidroid position
+		local target_pos = selected_maidroid.pos
+		lf("teleport_gui", "Teleporting player " .. player_name .. " to maidroid '" .. selected_maidroid.name .. "' at position " .. minetest.pos_to_string(target_pos))
+		player:set_pos(target_pos)
+		
+		minetest.chat_send_player(player_name, 
+			"Teleported to maidroid '" .. selected_maidroid.name .. "' at " .. 
+			minetest.pos_to_string(vector.round(target_pos)))
+
+		-- Clean up stored data
+		if maidroid.maidroid_teleport_data and maidroid.maidroid_teleport_data[player_name] then
+			maidroid.maidroid_teleport_data[player_name] = nil
+			lf("teleport_gui", "Cleaned up teleport data after successful teleport for player: " .. player_name)
+		end
+	end
+end)
 
 
 

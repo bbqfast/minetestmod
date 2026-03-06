@@ -682,10 +682,16 @@ on_start = function(self)
 	self.path = nil
 	wander_core.on_start(self)
 	
-	-- Initialize low fence detection for farming core
-	self._use_low_fence = true
-    self._is_bounded = true
-    self._mow_only = true
+	-- Initialize low fence detection for farming core (only if not already set)
+	if self._use_low_fence == nil then
+		self._use_low_fence = true
+	end
+	if self._is_bounded == nil then
+		self._is_bounded = true
+	end
+	if self._mow_only == nil then
+		self._mow_only = true
+	end
 	
 	-- Initialize farming dimension mode (default to radius)
 	self.farming_dim_mode = self.farming_dim_mode or "radius"

@@ -75,7 +75,7 @@ local function create_farming_events(self, inventory_name)
 						-- Set the selected seed for farming
 						droid.selected_seed = item_name
 						lf("DEBUG: create_farming_events:farming_inventory", "*** SELECTED SEED UPDATED TO ***: " .. item_name)
-						lf("farming_ui", "Seed choice updated to: " .. item_name)
+						lf("DEBUG: farming_ui", "Seed choice updated to: " .. item_name)
 						
 						-- Send confirmation to player
 						if player and player:is_player() then
@@ -105,7 +105,7 @@ local function create_farming_events(self, inventory_name)
 				-- Clear the selected seed when moving back
 				droid.selected_seed = nil
 				lf("DEBUG: create_farming_events:farming_inventory", "*** CLEARED SELECTED SEED ***")
-				lf("farming_ui", "Seed selection cleared")
+				lf("DEBUG farming_ui", "Seed selection cleared")
 				
 				-- Send confirmation to player
 				if player and player:is_player() then
@@ -234,44 +234,41 @@ local function generate_farming_form(self, form, farming_inv, farming_inv_id)
 		
 	-- Seedable section
 	form = form
-		.. "label[0.5,0;" .. S("Available Seeds") .. "]"
-		.. "list[detached:" .. farming_inv_id .. ";seedable;0.5,0.5;8,1;]"
+		-- .. "label[0.5,0;" .. S("Available Seeds") .. "]"
+		-- .. "list[detached:" .. farming_inv_id .. ";seedable;0.5,0.5;8,1;]"
 		
 	-- Seed choice section
 	local current_seed = self.selected_seed or "Auto-select"
 	local seed_display = string.format("Current: %s", current_seed:gsub("farming:seed_", ""):gsub(":", " "))
 	
 	form = form
-		.. "label[0.5,1.7;" .. S("Seed Choice") .. "]"
-		.. "list[detached:" .. farming_inv_id .. ";seed_choice;0.5,2.2;1,1;]"
-		.. "label[2,2.5;" .. minetest.colorize("#FFFF00", seed_display) .. "]"
-		.. "listring[detached:".. farming_inv_id .. ";seed_choice]"
-		.. "listring[detached:".. farming_inv_id .. ";seedable]"
-		.. "listring[detached:".. farming_inv_id .. ";seed_choice]"
-		.. "listring[detached:".. farming_inv_id .. ";seedable]"
-		.. "listring[current_player;main]"
+		-- .. "label[0.5,1.7;" .. S("Seed Choice") .. "]"
+		-- .. "list[detached:" .. farming_inv_id .. ";seed_choice;0.5,2.2;1,1;]"
+		-- .. "label[2,2.5;" .. minetest.colorize("#FFFF00", seed_display) .. "]"
+		-- .. "listring[detached:".. farming_inv_id .. ";seed_choice]"
+		-- .. "listring[detached:".. farming_inv_id .. ";seedable]"
+		-- .. "listring[detached:".. farming_inv_id .. ";seed_choice]"
+		-- .. "listring[detached:".. farming_inv_id .. ";seedable]"
+		-- .. "listring[current_player;main]"
 		
 	-- Add farming controls below the lists
-	form = form
-		.. "label[0.5,3.0;" .. S("Current Task:") .. " "
-		.. minetest.colorize("#ACEEAC", (self.action and self.action or S("Idle"))) .. "]"
-		.. "label[0.5,3.4;" .. S("State:") .. " "
-		.. minetest.colorize("#ACEEAC", (self.state and tostring(self.state) or S("Unknown"))) .. "]"
+	-- form = form
+	-- 	.. "label[0.5,3.0;" .. S("Current Task:") .. " "
+	-- 	.. minetest.colorize("#ACEEAC", (self.action and self.action or S("Idle"))) .. "]"
+	-- 	.. "label[0.5,3.4;" .. S("State:") .. " "
+	-- 	.. minetest.colorize("#ACEEAC", (self.state and tostring(self.state) or S("Unknown"))) .. "]"
 	
 	-- Add farming dimension section
 	form = form
-		.. "label[0.5,3.8;" .. S("Farming Dimension") .. "]"
-		.. "field[0.5,4.3;1,0.8;farming_length;;" .. (self.farming_length or "5") .. "]"
-		.. "label[1.6,4.2;" .. S("Length") .. "]"
-		.. "field[2.5,4.3;1,0.8;farming_width;;" .. (self.farming_width or "5") .. "]"
-		.. "label[3.6,4.2;" .. S("Width") .. "]"
-		.. "button[4.5,4.0;1.5,0.8;set_farming_dim;" .. S("Set") .. "]"
+		-- .. "label[0.5,3.8;" .. S("Farming Dimension") .. "]"
+		-- .. "field[0.5,4.3;1,0.8;farming_length;;" .. (self.farming_length or "5") .. "]"
 	
 	-- Add farming tools display
 	local tools_list = {"hoe", "scythe", "water_bucket"}
-	local y_pos = 5.0
+	local y_pos = 1.5
+	local x_pos = 2.5 -- Position to avoid inventory overlap but not too far right
 	
-	form = form .. "label[0.5," .. y_pos .. ";" .. S("Farming Tools:") .. "]"
+	form = form .. "label[" .. x_pos .. "," .. y_pos .. ";" .. S("Farming Tools:") .. "]"
 	y_pos = y_pos + 0.5
 	
 	for _, tool_name in ipairs(tools_list) do
@@ -288,17 +285,15 @@ local function generate_farming_form(self, form, farming_inv, farming_inv_id)
 		end
 		
 		local color = has_tool == "Yes" and "#00FF00" or "#FF0000"
-		form = form .. "label[0.5," .. y_pos .. ";" .. tool_name .. ": " .. minetest.colorize(color, has_tool) .. "]"
+		form = form .. "label[" .. x_pos .. "," .. y_pos .. ";" .. tool_name .. ": " .. minetest.colorize(color, has_tool) .. "]"
 		y_pos = y_pos + 0.4
 	end
 	
-	-- Add activation position display
-	if self._activation_pos then
-		form = form
-			.. "label[0.5," .. y_pos .. ";" .. S("Home Position:") .. " "
-			.. minetest.colorize("#87CEEB", minetest.pos_to_string(self._activation_pos)) .. "]"
-		y_pos = y_pos + 0.4
-	end
+	-- Add mow only checkbox
+	form = form
+		.. "label[" .. x_pos .. "," .. y_pos .. ";" .. S("Mow Only") .. "]"
+		.. "checkbox[" .. x_pos .. "," .. (y_pos + 0.4) .. ";mow_only;" .. S("Enable mowing only") .. ";" .. tostring(self._mow_only or false) .. "]"
+	y_pos = y_pos + 0.8
 	
 	-- Add 3D model with animation
 	form = form
@@ -346,5 +341,30 @@ function maidroid.set_farming_selected_seed(droid, seed_name)
 		lf("farming_ui", "Cleared farming selected seed")
 		return true
 	end
+	return false
+end
+
+-- Handle farming receive fields
+function maidroid.handle_farming_receive_fields(droid, player, player_name, fields)
+	if not (fields.mow_only) then
+		return false
+	end
+	
+	-- Handle mow only checkbox
+	if fields.mow_only ~= nil then
+		local new_value = fields.mow_only == "true"
+		if droid._mow_only ~= new_value then
+			droid._mow_only = new_value
+			lf("DEBUG farming", "Mow only setting set to: " .. tostring(new_value))
+			minetest.chat_send_player(player_name, "Mow only " .. (new_value and "enabled" or "disabled"))
+			
+			-- Refresh the formspec to show updated checkbox state
+			local current_tab = droid.current_tab or 4 -- Farming tab
+			minetest.show_formspec(player_name, "maidroid:gui",
+				maidroid.get_formspec(droid, player, current_tab))
+		end
+		return true
+	end
+	
 	return false
 end

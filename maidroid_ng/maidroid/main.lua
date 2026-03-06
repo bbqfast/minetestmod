@@ -99,6 +99,8 @@ maidroid.get_staticdata = function(self, captured)
 		if self._activation_pos then
 			data.activation_pos = self._activation_pos
 		end
+        
+        
 		-- Save farming dimension mode
 		if self.farming_dim_mode then
 			data.farming_dim_mode = self.farming_dim_mode
@@ -106,6 +108,10 @@ maidroid.get_staticdata = function(self, captured)
 		-- Save low fence mode
 		if self._use_low_fence ~= nil then
 			data._use_low_fence = self._use_low_fence
+		end
+		-- Save mow only mode
+		if self._mow_only ~= nil then
+			data._mow_only = self._mow_only
 		end
 	end
 
@@ -417,8 +423,38 @@ end
 
 -- Function to get farming dimension mode for specific droid
 function maidroid.get_farming_dim_mode(droid)
-    lf("DEBUG get_farming_dim_mode", "Farming dimension mode: " .. (droid.farming_dim_mode or "radius"))
+    -- lf("DEBUG get_farming_dim_mode", "Farming dimension mode: " .. (droid.farming_dim_mode or "radius"))
 	return droid.farming_dim_mode or "radius"
 end
+
+
+-- Chat Commands
+local cmd_maidroid_ls = {
+	params = "",
+	description = S("List all maidroid_staticdata_*.txt files in this world"),
+	privs = { maidroid = true },
+	func = function(name, param)
+		local worldpath = minetest.get_worldpath() or "."
+		local files = minetest.get_dir_list(worldpath, false) or {}
+		local ids = {}
+		for _, fname in ipairs(files) do
+			-- match files like maidroid_staticdata_<id>.txt
+			local id = fname:match("^maidroid_staticdata_(.+)%.txt$")
+			if id then
+				table.insert(ids, id)
+			end
+		end
+
+		if #ids == 0 then
+			return true, "No maidroid_staticdata_*.txt files found in this world."
+		end
+
+		table.sort(ids)
+		return true, "Saved maidroids (" .. #ids .. "): \n" .. table.concat(ids, ", ")
+	end,
+}
+
+minetest.register_chatcommand("maidroid_ls", cmd_maidroid_ls)
+minetest.register_chatcommand("mr_ls", cmd_maidroid_ls)
 
 
